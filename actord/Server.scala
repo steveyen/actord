@@ -67,7 +67,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
               el.expTime > (nowInSeconds + time)) 
               set(el.updateExpTime(nowInSeconds + time))
         } else 
-          mod ! ModDelete(key) // TODO: Async semantics might be unexpected.
+          mod ! ModDelete(el) // TODO: Async semantics might be unexpected.
         true
       }
     ).getOrElse(false)
@@ -111,7 +111,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	def flushAll(expTime: Long) {
 	  for ((key, el) <- data)
       if (expTime == 0L) 
-        mod ! ModDelete(key)
+        mod ! ModDelete(el)
       else
         delete(key, expTime)
 	}
@@ -148,17 +148,17 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
               if (el.lru == null)
                   el.lru = new LRUList(el.key, null, null)
           }
+          
+          touch(el)
 
           data_i_!!(data + (el.key -> el))
         }
         
-        case ModDelete(key) => {
-          data.get(key).foreach(
-            existing => if (existing.lru != null) 
-                            existing.lru.remove
-          )
+        case ModDelete(el) => {
+          if (el.lru != null) 
+              el.lru.remove
           
-          data_i_!!(data - key)
+          data_i_!!(data - el.key)
         }
         
         case ModTouch(el) => touch(el)
@@ -168,9 +168,9 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   
   mod.start
   
-  case class ModSet(el: MEntry)
-  case class ModDelete(key: String)
-  case class ModTouch(el: MEntry)
+  case class ModSet    (el: MEntry)
+  case class ModDelete (el: MEntry)
+  case class ModTouch  (el: MEntry)
 }
 
 // -------------------------------------------------------
