@@ -1,8 +1,6 @@
 package ff.actord
 
 import java.net._
-import java.nio.charset._
-import java.util.concurrent._
 
 import org.slf4j._
 
