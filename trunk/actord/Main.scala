@@ -1,5 +1,7 @@
 package ff.actord
 
+import scala.collection._
+
 import java.net._
 
 import org.slf4j._
@@ -14,7 +16,9 @@ import ff.actord.Util._
 object Main
 {
   def main(args: Array[String]) {
-    startAcceptor(new MServer, Runtime.getRuntime.availableProcessors, 11211)
+    startAcceptor(new MServer(new immutable.TreeMap[String, MEntry]), 
+                  Runtime.getRuntime.availableProcessors, 
+                  11211)
 
     println("listening on port " + 11211)
   }
