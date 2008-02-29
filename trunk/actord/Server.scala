@@ -22,6 +22,8 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   }  
   
   def data = synchronized { data_i } // Allows threads to snapshot the tree's root.
+  
+  // --------------------------------------------
 
   def getUnexpired(key: String): Option[MEntry] =
     data.get(key) match {
