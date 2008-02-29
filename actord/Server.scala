@@ -1,30 +1,38 @@
 package ff.actord
 
+import scala.collection._
+
 import ff.actord.Util._
 
 /**
  * Tracks key/value entries.
  *
  * We want MServer to clear of any dependencies on wire protocol.
+ *
+ * Callers can pass in storage.SMap instead of TreeMap for data persistence.
  */
-class MServer {
-  // TODO: Use storage.SMap for data persistence and query capability.
+class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   // TODO: Need to add LRU capability, see apache.commons.LRUMap.
+  // TODO: Maybe just use volatile, or AtomicReference here.
   //
-  val data = new scala.collection.mutable.HashMap[String, MEntry] with
-                 scala.collection.mutable.SynchronizedMap[String, MEntry]
+  private var data_i = dataStart
   
+  private def data_i_!!(d: immutable.SortedMap[String, MEntry]) = synchronized {
+    data_i = d
+  }  
+  
+  def data = synchronized { data_i } // Allows threads to snapshot the tree's root.
+
   def getUnexpired(key: String): Option[MEntry] =
     data.get(key) match {
       case s @ Some(el) => if (el.isExpired) None else s
       case None => None
     }
 
-  def get(key: String): Option[MEntry] =
-    getUnexpired(key)
+  def get(key: String): Option[MEntry] = getUnexpired(key)
 	
-  def set(el: MEntry) = {
-    data + (el.key -> el)
+  def set(el: MEntry) = synchronized {
+    data_i_!!(data_i + (el.key -> el))
     true
 	}
 	
@@ -45,10 +53,10 @@ class MServer {
 		  el => {
 		    if (time != 0L) {
           if (el.expTime == 0L || 
-              el.expTime > (nowInSeconds + time))
-              data + (el.key -> el.updateExpTime(nowInSeconds + time))
+              el.expTime > (nowInSeconds + time)) 
+              data_i_!!(data + (el.key -> el.updateExpTime(nowInSeconds + time)))
     		} else 
-    		  data - key
+    		  data_i_!!(data - key)
         true
       }
     ).getOrElse(false)
@@ -61,7 +69,7 @@ class MServer {
 	      //
         val v = Math.max(0, (try { new String(el.data, "US_ASCII").toLong } catch { case _ => 0L }) + mod)
         val s = v.toString
-        data + (el.key -> el.updateData(s.getBytes))
+        data_i_!!(data + (el.key -> el.updateData(s.getBytes)))
         s
       }
     }
@@ -69,10 +77,10 @@ class MServer {
 	def keys = data.keys
 	
 	def flushAll(expTime: Long) {
-	  for ((key, el) <- data)
-	    if (expTime == 0L)
-	      data - key
-	    else
+    for ((key, el) <- data)
+  	  if (expTime == 0L) 
+        data_i_!!(data - key)
+      else
 	      delete(key, expTime)
 	}
 }
