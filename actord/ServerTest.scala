@@ -24,20 +24,20 @@ class MServerTestCase(name: String) extends TestCase(name) {
   override def runTest = name match {
     case "should be empty after creation" =>
       assertEquals(None,  m.get("a"))
-      assertEquals(false, m.delete("a", 0L))
-      assertEquals(false, m.delete("a", 1L))      
-      assertEquals(false, m.replace(ea))
-      assertEquals(false, m.append(ea))
-      assertEquals(false, m.prepend(ea))
-      assertEquals("NOT_FOUND", m.delta("a", 1L))
-      assertEquals("NOT_FOUND", m.checkAndSet(ea, 0L))
+      assertEquals(false, m.delete("a", 0L, false))
+      assertEquals(false, m.delete("a", 1L, false))      
+      assertEquals(false, m.replace(ea, false))
+      assertEquals(false, m.append(ea, false))
+      assertEquals(false, m.prepend(ea, false))
+      assertEquals("NOT_FOUND", m.delta("a", 1L, false))
+      assertEquals("NOT_FOUND", m.checkAndSet(ea, 0L, false))
       
     case "should support get after set" =>
       assertEquals("first get", None, m.get("a"))
-      assertEquals("first set", true, m.set(ea))
+      assertEquals("first set", true, m.set(ea, false))
       assertTrue("get after set 1", entrySame(m.get("a"), ea))
       assertTrue("get after set 2", entrySame(m.get("a"), ea))
-      assertEquals("no add after set", false, m.add(ea))
+      assertEquals("no add after set", false, m.add(ea, false))
   }
   
   def entrySame(aOpt: Option[MEntry], b: MEntry) =
