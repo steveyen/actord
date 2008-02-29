@@ -23,9 +23,8 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   //
   private var data_i = dataStart
   
-  private def data_i_!!(d: immutable.SortedMap[String, MEntry]) = synchronized {
-    data_i = d
-  }  
+  private def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
+    synchronized { data_i = d }  
   
   def data = synchronized { data_i } // Allows threads to snapshot the tree's root.
   
@@ -40,7 +39,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   def get(key: String): Option[MEntry] = getUnexpired(key)
 	
   def set(el: MEntry) = {
-    data_i_!!(data + (el.key -> el))
+    mod ! ModSet(el) // TODO: Async semantics here might be unexpected.
     true
 	}
 	
@@ -63,8 +62,8 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
           if (el.expTime == 0L || 
               el.expTime > (nowInSeconds + time)) 
               set(el.updateExpTime(nowInSeconds + time))
-    		} else 
-    		  data_i_!!(data - key)
+        } else 
+          mod ! ModDelete(key)
         true
       }
     ).getOrElse(false)
@@ -106,12 +105,33 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	def keys = data.keys
 	
 	def flushAll(expTime: Long) {
-    for ((key, el) <- data)
-  	  if (expTime == 0L) 
-        data_i_!!(data - key)
+	  for ((key, el) <- data)
+      if (expTime == 0L) 
+        mod ! ModDelete(key)
       else
-	      delete(key, expTime)
+        delete(key, expTime)
 	}
+
+  // --------------------------------------------
+  
+  // Only this actor is allowed to update the data, 
+  // effectively serializing writes.
+  //
+  // TODO: Should the mod actor be on its own separate real thread?
+  //
+  private val mod = actor {
+    loop {
+      react {
+        case ModSet(el)     => data_i_!!(data + (el.key -> el))
+        case ModDelete(key) => data_i_!!(data - key)
+      }
+    }
+  }
+  
+  mod.start
+  
+  case class ModSet(el: MEntry)
+  case class ModDelete(key: String)
 }
 
 // -------------------------------------------------------
