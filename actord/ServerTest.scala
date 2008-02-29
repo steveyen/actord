@@ -11,6 +11,7 @@ class MServerTest extends TestConsoleMain {
       "should support get after set" ::
       "should support set calls on the same key" ::
       "should support add and replace operations" ::
+      "should support delete calls of 0 expTime" ::
       Nil
     ).map(name => new MServerTestCase(name)):_*
   )
@@ -68,6 +69,15 @@ class MServerTestCase(name: String) extends TestCase(name) {
       assertEquals("get 1", true,  entrySame(m.get("a"), ea))
       assertEquals("rep 2", true,  m.replace(ea2, false))
       assertEquals("get 2", true,  entrySame(m.get("a"), ea2))
+
+    case "should support delete calls of 0 expTime" =>
+      assertEquals("get 0", None,  m.get("a"))
+      assertEquals("del 0", false, m.delete("a", 0L, false))
+      assertEquals("get 0", None,  m.get("a"))
+      assertEquals("set 1", true,  m.set(ea, false))
+      assertEquals("get 1", true,  entrySame(m.get("a"), ea))
+      assertEquals("del 1", true,  m.delete("a", 0L, false))
+      assertEquals("get x", None,  m.get("a"))
   }
   
   def entrySame(aOpt: Option[MEntry], b: MEntry) =
