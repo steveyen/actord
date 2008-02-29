@@ -123,6 +123,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   // Also, this actor manages the LRU list.
   //
   // TODO: Should the mod actor be on its own separate real thread?
+  // TODO: Need to flush LRU when memory gets tight.
   //
   private val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
