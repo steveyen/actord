@@ -124,6 +124,11 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   //
   // TODO: Should the mod actor be on its own separate real thread?
   // TODO: Need to flush LRU when memory gets tight.
+  // TODO: For multi-core write scalability, need to have more than
+  //       one writer actor?  Possibly via more than one tree root,
+  //       such as one tree root (or MServer) per CPU processor thread.
+  //       In that world, transport protocol handlers have to dispatch
+  //       to the right MServer.
   //
   private val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
