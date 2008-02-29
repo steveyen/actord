@@ -33,7 +33,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 
   def get(key: String): Option[MEntry] = getUnexpired(key)
 	
-  def set(el: MEntry) = synchronized {
+  def set(el: MEntry) = {
     data_i_!!(data_i + (el.key -> el))
     true
 	}
@@ -67,9 +67,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	  getUnexpired(key) match {
 	    case None => "NOT_FOUND"
 	    case Some(el) => {
-	      // TODO: Is US_ASCII right here?
-	      //
-        val v = Math.max(0, (try { new String(el.data, "US_ASCII").toLong } catch { case _ => 0L }) + mod)
+        val v = Math.max(0, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + mod)
         val s = v.toString
         data_i_!!(data + (el.key -> el.updateData(s.getBytes))) // TODO: Should use CAS here.
         s
