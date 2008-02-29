@@ -7,12 +7,13 @@ import ff.actord.Util._
 /**
  * Tracks key/value entries.
  *
- * We want MServer to clear of any dependencies on wire protocol.
+ * We use immutable tree structures for better multi-core read/get performance, 
+ * and for poor man's MVCC.
  *
  * Callers can pass in storage.SMap instead of TreeMap for data persistence.
  *
- * We use immutable tree structures for better multi-core read/get performance, 
- * and for poor man's MVCC.
+ * We ideally want this class to be as clear as possible of any 
+ * dependencies on transport or wire protocol.
  */
 class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   // TODO: Need to add LRU capability, see apache.commons.LRUMap.
@@ -70,7 +71,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	  getUnexpired(key) match {
 	    case None => "NOT_FOUND"
 	    case Some(el) => {
-        val v = Math.max(0, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + mod)
+        val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + mod)
         val s = v.toString
         data_i_!!(data + (el.key -> el.updateData(s.getBytes))) // TODO: Should use CAS here.
         s
@@ -87,6 +88,17 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
     getUnexpired(el.key) match {
       case Some(elPrev) => set(el.concat(elPrev, elPrev)) // TODO: Should use CAS here.
       case None => false
+    }
+
+  def checkAndSet(el: MEntry, cidPrev: Long) =
+    getUnexpired(el.key) match {
+      case Some(elPrev) => 
+        if (elPrev.cid == cidPrev) {
+          set(el)
+          "STORED"
+        } else
+          "EXISTS"
+      case None => "NOT_FOUND"
     }
 
 	def keys = data.keys
