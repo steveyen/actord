@@ -12,6 +12,29 @@ import org.apache.mina.transport.socket.nio._
 
 import ff.actord.Util._
 
+class MHandler(server: MServer) extends IoHandlerAdapter {
+  val log = LoggerFactory.getLogger(getClass)
+  
+  override def exceptionCaught(session: IoSession, cause: Throwable) = {
+    log.warn("unexpected exception: ", cause)
+    session.close
+  }
+  
+  override def messageReceived(session: IoSession, message: Object): Unit = {
+    log.info("received: " + message)
+    
+    message match {
+      case (spec: Spec, cmd: MCommand) => {
+        val res = spec.process(server, cmd, session)
+        if (cmd.noreply == false)
+          session.write(res)
+      }
+      case m: MResponse =>
+        session.write(List(m))
+    }
+  }
+}
+
 /**
  * Represents a specification, of a command in the protocol.
  *
@@ -66,9 +89,9 @@ class MDecoder extends MessageDecoder {
       Spec("decr <key> <value> [noreply]",
            (svr, cmd, sess) => reply(svr.delta(cmd.args(1), -1L * cmd.argToLong(2)))),
            
-      Spec("stats [<arg>]",
-           (svr, cmd, sess) => 
-             reply(svr.stats(cmd.argOrElse(1, null)))),
+//    Spec("stats [<arg>]",
+//         (svr, cmd, sess) => 
+//           reply(svr.stats(cmd.argOrElse(1, null)))),
 
       Spec("flush_all [<delay>] [noreply]",
            (svr, cmd, sess) => {
@@ -233,6 +256,43 @@ class MDecoder extends MessageDecoder {
   def finishDecode(session: IoSession, out: ProtocolDecoderOutput) = {
     // TODO: Do we need to do something here?  Or just drop the message on the floor?
   }
+
+  // ----------------------------------------
+
+//	def stats(arg: String) = {
+//	  var returnData = ""
+//
+//		if (arg == "keys") {
+//		  for ((key, el) <- data)
+//		    returnData += ("STAT key " + key + CRNL)
+//		  returnData + "END"
+//		} else {
+//      returnData += "STAT version " + version + CRNL
+//
+//      returnData += "STAT cmd_gets " + String.valueOf(get_cmds)+ CRNL
+//      returnData += "STAT cmd_sets " + String.valueOf(set_cmds)+ CRNL
+//      returnData += "STAT get_hits " + String.valueOf(get_hits)+ CRNL
+//      returnData += "STAT get_misses " + String.valueOf(get_misses)+ CRNL
+//
+//      returnData += "STAT curr_connections " + String.valueOf(curr_conns)+ CRNL
+//      returnData += "STAT total_connections " + String.valueOf(total_conns)+ CRNL
+//      returnData += "STAT time " + String.valueOf(Now()) + CRNL
+//      returnData += "STAT uptime " + String.valueOf(Now()-this.started) + CRNL
+//      returnData += "STAT cur_items " + String.valueOf(this.data.size()) + CRNL
+//      returnData += "STAT limit_maxbytes "+String.valueOf(maxbytes)+CRNL
+//      returnData += "STAT current_bytes "+String.valueOf(Runtime.getRuntime().totalMemory())+CRNL
+//      returnData += "STAT free_bytes "+String.valueOf(Runtime.getRuntime().freeMemory())+CRNL
+//      
+//      returnData += "STAT pid 0\r\n"
+//      returnData += "STAT rusage_user 0:0\r\n"
+//      returnData += "STAT rusage_system 0:0\r\n"
+//      returnData += "STAT connection_structures 0\r\n"
+//      returnData += "STAT bytes_read 0\r\n"
+//      returnData += "STAT bytes_written 0\r\n"
+//      returnData += "END\r\n"
+//      returnData
+//    }
+//	}
 }
 
 // -------------------------------------------------------
@@ -302,19 +362,9 @@ case class MResponseLineEntry(line: String, entry: MEntry) extends MResponse {
 
 // -------------------------------------------------------
 
-case class MEntry(key: String, 
-                  flags: Long, 
-                  expTime: Long, 
-                  dataSize: Int, 
-                  data: Array[Byte]) {
-  def isExpired = expTime < nowInSeconds
-  
-  def updateExpTime(e: Long) =
-    MEntry(key, flags, e, dataSize, data)
-
-  def updateData(d: Array[Byte]) =
-    MEntry(key, flags, expTime, d.length, d)    
-    
-  def cas = "CAS_TODO" // TODO
+class MStats(var set_cmds: Long,
+             var get_cmds: Long,
+             var get_hits: Long,
+             var get_misses: Long) {
+  def this() = this(0, 0, 0, 0)
 }
-
