@@ -70,14 +70,14 @@ class MDecoder extends MessageDecoder {
              ).toList ::: reply("END")
            }),
 
-//    Spec("gets <key>*",
-//         (svr, cmd, sess) => {
-//           (1 until cmd.args.length).flatMap(
-//             i => svr.get(cmd.args(i)).
-//                      map(el => MResponseLineEntry(asValueLineCAS(el), el)).
-//                      toList
-//           ).toList ::: reply("END")
-//         }),
+      Spec("gets <key>*",
+           (svr, cmd, sess) => {
+             (1 until cmd.args.length).flatMap(
+               i => svr.get(cmd.args(i)).
+                        map(el => MResponseLineEntry(asValueLineCAS(el), el)).
+                        toList
+             ).toList ::: reply("END")
+           }),
 
       Spec("delete <key> [<time>] [noreply]",
            (svr, cmd, sess) => 
