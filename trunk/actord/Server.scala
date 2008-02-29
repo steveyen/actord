@@ -18,7 +18,6 @@ import ff.actord.Util._
  * dependencies on transport or wire protocol.
  */
 class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
-  // TODO: Need to add LRU capability, see apache.commons.LRUMap.
   // TODO: Maybe just use volatile, or AtomicReference around data_i.
   //
   private var data_i = dataStart
