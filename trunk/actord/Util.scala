@@ -15,7 +15,7 @@ object Util {
       0L
       
   def parseLong(s: String, defaultVal: Long) = try { 
-    items(at).toLong 
+    s.toLong 
   } catch { 
     case _ => defaultVal
   }

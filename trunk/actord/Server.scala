@@ -100,18 +100,23 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 // -------------------------------------------------------
 
 case class MEntry(key: String, 
-                  flags: Long, 
-                  expTime: Long, 
+                  flags: Long,
+                  expTime: Long,     // Expiry timestamp, in seconds since epoch.
                   dataSize: Int, 
-                  data: Array[Byte]) {
+                  data: Array[Byte],
+                  cid: Long) {       // Unique id for CAS operations.
   def isExpired = expTime < nowInSeconds
   
   def updateExpTime(e: Long) =
-    MEntry(key, flags, e, dataSize, data)
+    MEntry(key, flags, e, dataSize, data, cid + 1L)
 
   def updateData(d: Array[Byte]) =
-    MEntry(key, flags, expTime, d.length, d)
-    
+    MEntry(key, flags, expTime, d.length, d, cid + 1L)
+  
+  /**
+   * Concatenate the data arrays from this with that,
+   * using the basis for all other fields.
+   */
   def concat(that: MEntry, basis: MEntry) = {
     val sizeNew = this.dataSize + that.dataSize
     val dataNew = new Array[Byte](sizeNew)
@@ -123,9 +128,8 @@ case class MEntry(key: String,
            basis.flags, 
            basis.expTime,
            sizeNew,
-           dataNew)
+           dataNew,
+           basis.cid + 1L)
   }
-    
-  def cas = "CAS_TODO" // TODO
 }
 

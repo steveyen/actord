@@ -126,7 +126,7 @@ class MDecoder extends MessageDecoder {
       Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.replace(cmd.entry), 
-                    "STORED", "NOT_STORED"))
+                    "STORED", "NOT_STORED")),
 
       Spec("append <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
@@ -136,7 +136,7 @@ class MDecoder extends MessageDecoder {
       Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.prepend(cmd.entry), 
-                    "STORED", "NOT_STORED")),
+                    "STORED", "NOT_STORED"))
            
 //    Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
 //         ...)
@@ -156,7 +156,7 @@ class MDecoder extends MessageDecoder {
       "VALUE " + e.key + " " + e.flags + " " + e.dataSize
   
   def asValueLineCAS(e: MEntry) =
-      asValueLine(e) + " " + e.cas
+      asValueLine(e) + " " + e.cid
   
   // ----------------------------------------
 
@@ -171,6 +171,7 @@ class MDecoder extends MessageDecoder {
   val SECONDS_IN_30_DAYS = 60*60*24*30
   val MIN_CMD_SIZE       = "quit \r\n".length
   val WAITING_FOR        = new AttributeKey(getClass, "waiting_for")  
+  val STATS              = new AttributeKey(getClass, "stats")  
   
   def decodable(session: IoSession, in: IoBuffer): MessageDecoderResult = {
     val waitingFor = session.getAttribute(WAITING_FOR, ZERO).asInstanceOf[java.lang.Integer].intValue
@@ -241,7 +242,8 @@ class MDecoder extends MessageDecoder {
                                            else
                                                expTime,
                                            dataSize,
-                                           data))))
+                                           data,
+                                           0L))))
             MessageDecoderResult.OK
           } else {
             session.setAttribute(WAITING_FOR, totalSize)
