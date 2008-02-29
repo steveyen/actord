@@ -8,6 +8,7 @@ import scala.testing.SUnit._
 class MServerTest extends TestConsoleMain {
   def suite = new TestSuite(
     ( "should be empty when created" ::
+      "should allow get after set" ::
       Nil
     ).map(name => new MServerTestCase(name)):_*
   )
@@ -30,6 +31,13 @@ class MServerTestCase(name: String) extends TestCase(name) {
       assertEquals(m.append(ea), false)
       assertEquals(m.prepend(ea), false)
       assertEquals(m.checkAndSet(ea, 0L), "NOT_FOUND")
+      
+    case "should allow get after set" =>
+      assertEquals(m.get("a"), None)
+      assertEquals(m.set(ea), true)
+      assertEquals(m.get("a"), Some(ea))
+      assertEquals(m.get("a"), Some(ea))           
+      assertEquals(m.add(ea), false)
       
     case "does SUnit work?" => 
       assertTrue(true)
