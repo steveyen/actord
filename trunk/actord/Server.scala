@@ -1,6 +1,8 @@
 package ff.actord
 
 import scala.collection._
+import scala.actors._
+import scala.actors.Actor._
 
 import ff.actord.Util._
 
@@ -38,7 +40,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   def get(key: String): Option[MEntry] = getUnexpired(key)
 	
   def set(el: MEntry) = {
-    data_i_!!(data_i + (el.key -> el))
+    data_i_!!(data + (el.key -> el))
     true
 	}
 	
@@ -60,7 +62,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 		    if (time != 0L) {
           if (el.expTime == 0L || 
               el.expTime > (nowInSeconds + time)) 
-              data_i_!!(data + (el.key -> el.updateExpTime(nowInSeconds + time)))
+              set(el.updateExpTime(nowInSeconds + time))
     		} else 
     		  data_i_!!(data - key)
         true
@@ -73,7 +75,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	    case Some(el) => {
         val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + mod)
         val s = v.toString
-        data_i_!!(data + (el.key -> el.updateData(s.getBytes))) // TODO: Should use CAS here.
+        set(el.updateData(s.getBytes)) // TODO: Should use CAS here.
         s
       }
     }
