@@ -37,15 +37,21 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 
   def get(key: String): Option[MEntry] =
     getUnexpired(key) match {
-      case x @ Some(el) => mod ! ModTouch(el); x
+      case x @ Some(el) => mod ! ModTouch(el, true); x
       case x @ None => x
     }
 	
-  def set(el: MEntry) = {
-    mod ! ModSet(el) // TODO: Async semantics might be unexpected.
+  def set(el: MEntry): Boolean = 
+      set(el, false)
+	
+  def set(el: MEntry, async: Boolean): Boolean = {
+    if (async)
+      mod ! ModSet(el, async)
+    else
+      mod !? ModSet(el, async)
     true
 	}
-	
+
   def add(el: MEntry) = 
     getUnexpired(el.key) match {
       case Some(_) => false
@@ -58,15 +64,22 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
       case None => false
     }
 
-  def delete(key: String, time: Long) = 
+  def delete(key: String, time: Long): Boolean = 
+      delete(key, time, false)
+
+  def delete(key: String, time: Long, async: Boolean) = 
 		getUnexpired(key).map(
 		  el => {
 		    if (time != 0L) {
           if (el.expTime == 0L || 
               el.expTime > (nowInSeconds + time)) 
-              set(el.updateExpTime(nowInSeconds + time))
-        } else 
-          mod ! ModDelete(el) // TODO: Async semantics might be unexpected.
+              set(el.updateExpTime(nowInSeconds + time), async)
+        } else {
+          if (async)
+            mod ! ModDelete(el, async)
+          else
+            mod !? ModDelete(el, async)
+        }
         true
       }
     ).getOrElse(false)
@@ -110,7 +123,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	def flushAll(expTime: Long) {
 	  for ((key, el) <- data)
       if (expTime == 0L) 
-        mod ! ModDelete(el)
+        mod ! ModDelete(el, false)
       else
         delete(key, expTime)
 	}
@@ -144,38 +157,38 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
     
     loop {
       react {
-        case ModSet(el) => {
+        case ModSet(el, noReply) => 
           if (el.lru == null) {
-              data.get(el.key).foreach(
-                existing => { el.lru = existing.lru }
-              )
-                
+              data.get(el.key).foreach(existing => { el.lru = existing.lru })               
               if (el.lru == null)
                   el.lru = new LRUList(el.key, null, null)
           }
           
           touch(el)
-
           data_i_!!(data + (el.key -> el))
-        }
+          if (!noReply) 
+              reply(true)
         
-        case ModDelete(el) => {
+        case ModDelete(el, noReply) => 
           if (el.lru != null) 
               el.lru.remove
-          
           data_i_!!(data - el.key)
-        }
+          if (!noReply) 
+              reply(true)
         
-        case ModTouch(el) => touch(el)
+        case ModTouch(el, noReply) => 
+          touch(el)
+          if (!noReply) 
+              reply(true)
       }
     }
   }
   
   mod.start
   
-  case class ModSet    (el: MEntry)
-  case class ModDelete (el: MEntry)
-  case class ModTouch  (el: MEntry)
+  case class ModSet    (el: MEntry, noReply: Boolean)
+  case class ModDelete (el: MEntry, noReply: Boolean)
+  case class ModTouch  (el: MEntry, noReply: Boolean)
 }
 
 // -------------------------------------------------------
@@ -186,7 +199,8 @@ case class MEntry(key: String,
                   dataSize: Int, 
                   data: Array[Byte],
                   cid: Long) {       // Unique id for CAS operations.
-  def isExpired = expTime < nowInSeconds
+  def isExpired = expTime != 0L &&
+                  expTime < nowInSeconds
   
   def updateExpTime(e: Long) =
     MEntry(key, flags, e, dataSize, data, cid + 1L).lru_!(lru)
