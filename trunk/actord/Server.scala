@@ -131,18 +131,23 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
     
     lruHead.append(lruTail)
     
+    def touch(el: MEntry) =
+      if (el.lru != null) {
+          el.lru.remove
+          lruTail.insert(el.lru)
+      }
+    
     loop {
       react {
         case ModSet(el) => {
-          data.get(el.key).foreach(
-            existing => { el.lru = existing.lru }
-          )
-            
-          if (el.lru == null)
-              el.lru = new LRUList(el.key, null, null)
-          else
-              el.lru.remove     
-          lruTail.insert(el.lru)
+          if (el.lru == null) {
+              data.get(el.key).foreach(
+                existing => { el.lru = existing.lru }
+              )
+                
+              if (el.lru == null)
+                  el.lru = new LRUList(el.key, null, null)
+          }
 
           data_i_!!(data + (el.key -> el))
         }
@@ -156,11 +161,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
           data_i_!!(data - key)
         }
         
-        case ModTouch(el) =>
-          if (el.lru != null) {
-              el.lru.remove
-              lruTail.insert(el.lru)
-          }
+        case ModTouch(el) => touch(el)
       }
     }
   }
