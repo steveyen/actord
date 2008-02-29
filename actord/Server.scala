@@ -170,3 +170,11 @@ case class MEntry(key: String,
   }
 }
 
+// -------------------------------------------------------
+
+class LRUList(var elem: String,
+              var next: LRUList,
+              var prev: LRUList) 
+  extends mutable.DoubleLinkedList[String, LRUList] {
+  def key = elem
+}
