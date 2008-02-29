@@ -136,11 +136,11 @@ class MDecoder extends MessageDecoder {
       Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.prepend(cmd.entry), 
-                    "STORED", "NOT_STORED"))
+                    "STORED", "NOT_STORED")),
            
-//    Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
-//         ...)
-      )
+      Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
+           (svr, cmd, sess) => 
+              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5)))))
       
   val lineOnlyCommands = 
       Map[String, Spec](lineOnlySpecs.
