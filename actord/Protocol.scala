@@ -2,7 +2,6 @@ package ff.actord
 
 import java.net._
 import java.nio.charset._
-import java.util.concurrent._
 
 import org.slf4j._
 
@@ -35,6 +34,110 @@ case class Spec(line: String,
  *       CummulativeProtocolDecoder, for more performance.
  */
 class MDecoder extends MessageDecoder {
+  /**
+   * Commands defined with a single line.
+   */
+  def lineOnlySpecs = List( 
+      Spec("get <key>*",
+           (svr, cmd, sess) => {
+             (1 until cmd.args.length).flatMap(
+               i => svr.get(cmd.args(i)).
+                        map(el => MResponseLineEntry(asValueLine(el), el)).
+                        toList
+             ).toList ::: reply("END")
+           }),
+
+//    Spec("gets <key>*",
+//         (svr, cmd, sess) => {
+//           (1 until cmd.args.length).flatMap(
+//             i => svr.get(cmd.args(i)).
+//                      map(el => MResponseLineEntry(asValueLineCAS(el), el)).
+//                      toList
+//           ).toList ::: reply("END")
+//         }),
+
+      Spec("delete <key> [<time>] [noreply]",
+           (svr, cmd, sess) => 
+             reply(svr.delete(cmd.args(1), cmd.argToLong(2)), 
+                   "DELETED", "NOT_FOUND")),
+
+      Spec("incr <key> <value> [noreply]",
+           (svr, cmd, sess) => reply(svr.delta(cmd.args(1), cmd.argToLong(2)))),
+      Spec("decr <key> <value> [noreply]",
+           (svr, cmd, sess) => reply(svr.delta(cmd.args(1), -1L * cmd.argToLong(2)))),
+           
+      Spec("stats [<arg>]",
+           (svr, cmd, sess) => 
+             reply(svr.stats(cmd.argOrElse(1, null)))),
+
+      Spec("flush_all [<delay>] [noreply]",
+           (svr, cmd, sess) => {
+              svr.flushAll(cmd.argToLong(1))
+              reply("OK")
+            }),
+
+      Spec("version",
+           (svr, cmd, sess) => reply("VERSION actord_0.0.0")),
+      Spec("verbosity",
+           (svr, cmd, sess) => reply("OK")),
+      Spec("quit",
+           (svr, cmd, sess) => {
+             sess.close
+             Nil
+           }))
+           
+  /**
+   * Commands that use a line followed by byte data.
+   */
+  def lineWithDataSpecs = List( 
+      Spec("set <key> <flags> <expTime> <bytes> [noreply]",
+           (svr, cmd, sess) => 
+              reply(svr.set(cmd.entry), 
+                    "STORED", "NOT_STORED")),
+
+      Spec("add <key> <flags> <expTime> <bytes> [noreply]",
+           (svr, cmd, sess) => 
+              reply(svr.add(cmd.entry), 
+                    "STORED", "NOT_STORED")),
+
+      Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
+           (svr, cmd, sess) => 
+              reply(svr.replace(cmd.entry), 
+                    "STORED", "NOT_STORED"))
+
+//    Spec("append <key> <flags> <expTime> <bytes> [noreply]",
+//         (svr, cmd, sess) => MResponseLine(svr.append(cmd.entry)) :: Nil),
+//    Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
+//         (svr, cmd, sess) => MResponseLine(svr.prepend(cmd.entry)) :: Nil),
+//    Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
+//         ...)
+      )
+      
+  val lineOnlyCommands = 
+      Map[String, Spec](lineOnlySpecs.
+                          map(s => Pair(s.name, s)):_*)
+
+  val lineWithDataCommands = 
+      Map[String, Spec](lineWithDataSpecs.
+                          map(s => Pair(s.name, s)):_*)
+                          
+  // ----------------------------------------
+
+  def asValueLine(e: MEntry) =
+      "VALUE " + e.key + " " + e.flags + " " + e.dataSize
+  
+  def asValueLineCAS(e: MEntry) =
+      asValueLine(e) + " " + e.cas
+  
+  // ----------------------------------------
+
+  def reply(s: String): List[MResponse] = List(MResponseLine(s))
+           
+  def reply(v: Boolean, t: String, f: String): List[MResponse] =
+      reply(if (v) t else f)
+                          
+  // ----------------------------------------
+
   val charsetDecoder     = Charset.forName("UTF-8").newDecoder
   val SECONDS_IN_30_DAYS = 60*60*24*30
   val MIN_CMD_SIZE       = "quit \r\n".length
@@ -55,76 +158,6 @@ class MDecoder extends MessageDecoder {
     	MessageDecoderResult.NEED_DATA
   }
   
-  /**
-   * Commands defined with a single line.
-   */
-  def lineOnlySpecs = List( 
-      Spec("get <key>*",
-           (svr, cmd, sess) => {
-             (1 until cmd.args.length).flatMap(
-               i => svr.get(cmd.args(i)).
-                        map(el => MResponseLineEntry(el.asValueLine, el)).
-                        toList
-             ).toList ::: MResponseLine("END") :: Nil
-           }),
-//    Spec("gets <key>*",
-//         (svr, cmd, sess) => {
-//           (1 until cmd.args.length).flatMap(
-//             i => svr.get(cmd.args(i)).
-//                      map(el => MResponseLineEntry(el.asValueLineCAS, el)).
-//                      toList
-//           ).toList ::: MResponseLine("END") :: Nil
-//         }),
-      Spec("delete <key> [<time>] [noreply]",
-           (svr, cmd, sess) => {
-             MResponseLine(svr.delete(cmd.args(1), cmd.argToLong(2))) :: Nil
-           }),
-      Spec("incr <key> <value> [noreply]",
-           (svr, cmd, sess) => MResponseLine(svr.delta(cmd.args(1), cmd.argToLong(2))) :: Nil),
-      Spec("decr <key> <value> [noreply]",
-           (svr, cmd, sess) => MResponseLine(svr.delta(cmd.args(1), -1L * cmd.argToLong(2))) :: Nil),
-      Spec("stats [<arg>]",
-           (svr, cmd, sess) => MResponseLine(svr.stats(cmd.argOrElse(1, null))) :: Nil),
-      Spec("flush_all [<delay>] [noreply]",
-           (svr, cmd, sess) => MResponseLine(svr.flushAll(cmd.argToLong(1))) :: Nil),
-      Spec("version",
-           (svr, cmd, sess) => MResponseLine("VERSION dunno") :: Nil),
-      Spec("verbosity",
-           (svr, cmd, sess) => MResponseLine("OK") :: Nil),
-      Spec("quit",
-           (svr, cmd, sess) => {
-             sess.close
-             Nil
-           }))
-           
-  /**
-   * Commands that use a line followed by byte data.
-   */
-  def lineWithDataSpecs = List( 
-      Spec("set <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => MResponseLine(svr.set(cmd.entry)) :: Nil),
-      Spec("add <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => MResponseLine(svr.add(cmd.entry)) :: Nil),
-      Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => MResponseLine(svr.replace(cmd.entry)) :: Nil)
-//    Spec("append <key> <flags> <expTime> <bytes> [noreply]",
-//         (svr, cmd, sess) => MResponseLine(svr.append(cmd.entry)) :: Nil),
-//    Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
-//         (svr, cmd, sess) => MResponseLine(svr.prepend(cmd.entry)) :: Nil),
-//    Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
-//         ...)
-      )
-      
-  val lineOnlyCommands = 
-      Map[String, Spec](lineOnlySpecs.
-                          map(s => Pair(s.name, s)):_*)
-
-  val lineWithDataCommands = 
-      Map[String, Spec](lineWithDataSpecs.
-                          map(s => Pair(s.name, s)):_*)
-                          
-  // ----------------------------------------
-
   def decode(session: IoSession, in: IoBuffer, out: ProtocolDecoderOutput): MessageDecoderResult = {
   	val remaining = in.remaining
     val waitingFor = session.getAttribute(WAITING_FOR, ZERO).asInstanceOf[java.lang.Integer].intValue
@@ -142,11 +175,6 @@ class MDecoder extends MessageDecoder {
   	if (indexCR + CRNL.length > remaining) 
   	    return MessageDecoderResult.NEED_DATA
   	    
-    // TODO: At this point, indexCR + CRNL.length <= remaining,
-    //       so we can handle one line.  But for single-line-only commands,
-    //       does mina do the right thing with any bytes that
-    //       come after indexCR + CRNL.length?
-    //
     val line = in.getString(indexCR + CRNL.length, charsetDecoder)
     if (line.endsWith(CRNL) == false)
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
@@ -192,18 +220,18 @@ class MDecoder extends MessageDecoder {
             MessageDecoderResult.NEED_DATA
           }
         } else {
-          out.write(MResponseLine("CLIENT_ERROR")) // Saw an ill-formed mutator command,
-          MessageDecoderResult.OK                  // but keep going, and decode the next command.
+          out.write(MResponseLine("CLIENT_ERROR " + cmdName)) // Saw an ill-formed mutator command,
+          MessageDecoderResult.OK                             // but keep going, and decode the next command.
         }
       }
     ) getOrElse {
-      out.write(MResponseLine("ERROR")) // Saw an unknown command,
-      MessageDecoderResult.OK           // but keep going, and decode the next command.
+      out.write(MResponseLine("ERROR " + cmdName)) // Saw an unknown command,
+      MessageDecoderResult.OK                      // but keep going, and decode the next command.
     }
   }
   
   def finishDecode(session: IoSession, out: ProtocolDecoderOutput) = {
-    // TODO: Do we need to do something here?
+    // TODO: Do we need to do something here?  Or just drop the message on the floor?
   }
 }
 
@@ -287,12 +315,6 @@ case class MEntry(key: String,
   def updateData(d: Array[Byte]) =
     MEntry(key, flags, expTime, d.length, d)    
     
-  def asValueLine =
-      "VALUE " + key + " " + flags + " " + dataSize
-  
-  def asValueLineCAS =
-      asValueLine + " " + cas
-      
   def cas = "CAS_TODO" // TODO
 }
 

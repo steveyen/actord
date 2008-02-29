@@ -2,7 +2,6 @@ package ff.actord
 
 import java.net._
 import java.nio.charset._
-import java.util.concurrent._
 
 import org.slf4j._
 
@@ -63,19 +62,19 @@ class MServer extends IoHandlerAdapter {
   def set(el: MEntry) = {
     set_cmds += 1
     data + (el.key -> el)
-    "STORED"
+    true
 	}
 	
   def add(el: MEntry) = 
     getUnexpired(el.key) match {
-      case Some(_) => "NOT_STORED"
+      case Some(_) => false
       case None => set(el)
     }
 
   def replace(el: MEntry) = 
     getUnexpired(el.key) match {
       case Some(_) => set(el)
-      case None => "NOT_STORED"
+      case None => false
     }
 
   def delete(key: String, time: Long) = 
@@ -87,9 +86,9 @@ class MServer extends IoHandlerAdapter {
               data + (el.key -> el.updateExpTime(nowInSeconds + time))
     		} else 
     		  data - key
-        "DELETED"
+        true
       }
-    ).getOrElse("NOT_FOUND")
+    ).getOrElse(false)
     
 	def delta(key: String, mod: Long) =
 	  getUnexpired(key) match {
@@ -158,13 +157,12 @@ class MServer extends IoHandlerAdapter {
     }
 	}
 	
-	def flushAll(expTime: Long): String = {
+	def flushAll(expTime: Long) {
 	  for ((key, el) <- data)
 	    if (expTime == 0L)
 	      data - key
 	    else
 	      delete(key, expTime)
-	  "OK"
 	}
 }
 
