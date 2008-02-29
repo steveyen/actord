@@ -12,6 +12,7 @@ class MServerTest extends TestConsoleMain {
       "should support set calls on the same key" ::
       "should support add and replace operations" ::
       "should support delete calls of 0 expTime" ::
+      "should support delta calls" ::
       Nil
     ).map(name => new MServerTestCase(name)):_*
   )
@@ -22,7 +23,7 @@ class MServerTestCase(name: String) extends TestCase(name) {
 
   val ea  = MEntry("a", 0L, 0L, 0, new Array[Byte](0), 0L)
   val ea2 = MEntry("a", 1L, 0L, 0, new Array[Byte](0), 0L)
-      
+  
   override def runTest = name match {
     case "should be empty after creation" =>
       assertEquals(None,  m.get("a"))
@@ -78,8 +79,46 @@ class MServerTestCase(name: String) extends TestCase(name) {
       assertEquals("get 1", true,  entrySame(m.get("a"), ea))
       assertEquals("del 1", true,  m.delete("a", 0L, false))
       assertEquals("get x", None,  m.get("a"))
+
+    case "should support delta calls" =>
+      assertEquals("get 0", None, m.get("a"))
+      assertEquals("set 0", true, m.set(simpleEntry("a", "0"), false))
+      assertEquals("get 0", true, entrySame(m.get("a"), simpleEntry("a", "0")))
+      assertEquals("inc 1", "1",  m.delta("a", 1L, false))
+      assertEquals("get x", true, dataSame(m.get("a"), simpleEntry("a", "1")))
+      assertEquals("inc 1", "2",  m.delta("a", 1L, false))
+      assertEquals("inc 1", "3",  m.delta("a", 1L, false))
+      assertEquals("inc 1", "4",  m.delta("a", 1L, false))
+      assertEquals("get y", true, dataSame(m.get("a"), simpleEntry("a", "4")))
+      assertEquals("dec 1", "3",  m.delta("a", -1L, false))
+      assertEquals("get z", true, dataSame(m.get("a"), simpleEntry("a", "3")))
+      assertEquals("dec 1", "2",  m.delta("a", -1L, false))
+      assertEquals("dec 1", "1",  m.delta("a", -1L, false))
+      assertEquals("dec 1", "0",  m.delta("a", -1L, false))
+      assertEquals("get w", true, dataSame(m.get("a"), simpleEntry("a", "0")))
+      
+      // Test underflow.
+      //
+      assertEquals("dec 1", "0",  m.delta("a", -1L, false))
+      assertEquals("get m", true, dataSame(m.get("a"), simpleEntry("a", "0")))
+      assertEquals("dec 1", "0",  m.delta("a", -1L, false))
+      assertEquals("get n", true, dataSame(m.get("a"), simpleEntry("a", "0")))
   }
   
+  def p(o: Option[MEntry]) =
+    println(asString(o))
+    
+  def asString(o: Option[MEntry]) =
+    o + "->" + o.map(e => new String(e.data, "US-ASCII")).getOrElse("")
+  
+  def simpleEntry(key: String, v: String) =
+    MEntry(key, 0L, 0L, v.getBytes.size, v.getBytes, 0L)
+      
+  def dataSame(aOpt: Option[MEntry], b: MEntry) =
+    aOpt.map(a => (a.dataSize == b.dataSize) &&
+                  (a.data == b.data || a.data.deepEquals(b.data))).
+         getOrElse(false)
+
   def entrySame(aOpt: Option[MEntry], b: MEntry) =
     aOpt.map(a => (a.key == b.key) &&
                   (a.flags == b.flags) &&
