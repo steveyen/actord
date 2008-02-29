@@ -1,38 +1,13 @@
 package ff.actord
 
-import java.net._
-import java.nio.charset._
-
-import org.slf4j._
-
-import org.apache.mina.common._
-import org.apache.mina.filter.codec._
-import org.apache.mina.filter.codec.demux._
-import org.apache.mina.transport.socket.nio._
-
 import ff.actord.Util._
 
-class MServer extends IoHandlerAdapter {
-  val log = LoggerFactory.getLogger(getClass)
-  
-  override def exceptionCaught(session: IoSession, cause: Throwable) = {
-    log.warn("unexpected exception: ", cause)
-    session.close
-  }
-  
-  override def messageReceived(session: IoSession, message: Object): Unit = {
-    log.info("received: " + message)
-    
-    message match {
-      case (spec: Spec, cmd: MCommand) =>
-        session.write(spec.process(this, cmd, session))
-      case m: MResponse =>
-        session.write(List(m))
-    }
-  }
-  
-  // ---------------------------------
-  
+/**
+ * Tracks key/value entries.
+ *
+ * We want MServer to clear of any dependencies on wire protocol.
+ */
+class MServer {
   // TODO: Use storage.SMap for data persistence and query capability.
   // TODO: Need to add LRU capability, see apache.commons.LRUMap.
   //
@@ -45,22 +20,10 @@ class MServer extends IoHandlerAdapter {
       case None => None
     }
 
-  def get(key: String): Option[MEntry] = {
-    get_cmds += 1
-    getUnexpired(key) match {
-	    case x @ None => {
-	      get_misses += 1
-        x
-	    }
-	    case x @ Some(el) => {
-	      get_hits += 1
-	      x
-	    }
-	  }
-	}
+  def get(key: String): Option[MEntry] =
+    getUnexpired(key)
 	
   def set(el: MEntry) = {
-    set_cmds += 1
     data + (el.key -> el)
     true
 	}
@@ -92,10 +55,7 @@ class MServer extends IoHandlerAdapter {
     
 	def delta(key: String, mod: Long) =
 	  getUnexpired(key) match {
-	    case None => {
-	      get_misses += 1
-        "NOT_FOUND"
-	    }
+	    case None => "NOT_FOUND"
 	    case Some(el) => {
 	      // TODO: Is US_ASCII right here?
 	      //
@@ -105,57 +65,8 @@ class MServer extends IoHandlerAdapter {
         s
       }
     }
-    
-	var set_cmds = 0
-	var get_cmds = 0
-	var get_hits = 0
-	var get_misses = 0
-	var curr_items = 0
-	var total_items = 0
-	
-	def initStats = {
-  	set_cmds = 0
-  	get_cmds = 0
-  	get_hits = 0
-  	get_misses = 0
-  	curr_items = 0
-  	total_items = 0
-	}
-	
-	def stats(arg: String) = {
-	  var returnData = ""
-
-		if (arg == "keys") {
-		  for ((key, el) <- data)
-		    returnData += ("STAT key " + key + CRNL)
-		  returnData + "END"
-		} else {
-//      returnData += "STAT version " + version + CRNL
-
-      returnData += "STAT cmd_gets " + String.valueOf(get_cmds)+ CRNL
-      returnData += "STAT cmd_sets " + String.valueOf(set_cmds)+ CRNL
-      returnData += "STAT get_hits " + String.valueOf(get_hits)+ CRNL
-      returnData += "STAT get_misses " + String.valueOf(get_misses)+ CRNL
-
-//      returnData += "STAT curr_connections " + String.valueOf(curr_conns)+ CRNL
-//      returnData += "STAT total_connections " + String.valueOf(total_conns)+ CRNL
-//      returnData += "STAT time " + String.valueOf(Now()) + CRNL
-//      returnData += "STAT uptime " + String.valueOf(Now()-this.started) + CRNL
-//      returnData += "STAT cur_items " + String.valueOf(this.data.size()) + CRNL
-//      returnData += "STAT limit_maxbytes "+String.valueOf(maxbytes)+CRNL
-//      returnData += "STAT current_bytes "+String.valueOf(Runtime.getRuntime().totalMemory())+CRNL
-//      returnData += "STAT free_bytes "+String.valueOf(Runtime.getRuntime().freeMemory())+CRNL
-      
-      returnData += "STAT pid 0\r\n"
-      returnData += "STAT rusage_user 0:0\r\n"
-      returnData += "STAT rusage_system 0:0\r\n"
-      returnData += "STAT connection_structures 0\r\n"
-      returnData += "STAT bytes_read 0\r\n"
-      returnData += "STAT bytes_written 0\r\n"
-      returnData += "END\r\n"
-      returnData
-    }
-	}
+  
+	def keys = data.keys
 	
 	def flushAll(expTime: Long) {
 	  for ((key, el) <- data)
@@ -164,5 +75,23 @@ class MServer extends IoHandlerAdapter {
 	    else
 	      delete(key, expTime)
 	}
+}
+
+// -------------------------------------------------------
+
+case class MEntry(key: String, 
+                  flags: Long, 
+                  expTime: Long, 
+                  dataSize: Int, 
+                  data: Array[Byte]) {
+  def isExpired = expTime < nowInSeconds
+  
+  def updateExpTime(e: Long) =
+    MEntry(key, flags, e, dataSize, data)
+
+  def updateData(d: Array[Byte]) =
+    MEntry(key, flags, expTime, d.length, d)    
+    
+  def cas = "CAS_TODO" // TODO
 }
 

@@ -14,14 +14,16 @@ import ff.actord.Util._
 object Main
 {
   def main(args: Array[String]) {
-    startAcceptor(Runtime.getRuntime.availableProcessors, 11211)
+    startAcceptor(new MServer, Runtime.getRuntime.availableProcessors, 11211)
+
     println("listening on port " + 11211)
   }
   
-  def startAcceptor(numProcessors: Int, port: Int) = 
-    initAcceptor(new NioSocketAcceptor(numProcessors)).bind(new InetSocketAddress(port))
+  def startAcceptor(server: MServer, numProcessors: Int, port: Int) = 
+    initAcceptor(server, 
+                 new NioSocketAcceptor(numProcessors)).bind(new InetSocketAddress(port))
   
-  def initAcceptor(acceptor: IoAcceptor) = {
+  def initAcceptor(server: MServer, acceptor: IoAcceptor) = {
     val codecFactory = new DemuxingProtocolCodecFactory
 
     codecFactory.addMessageDecoder(new MDecoder)
@@ -29,7 +31,7 @@ object Main
     
     acceptor.getFilterChain.
              addLast("codec", new ProtocolCodecFilter(codecFactory))  
-    acceptor.setHandler(new MServer)
+    acceptor.setHandler(new MHandler(server))
     acceptor
   }
 }
