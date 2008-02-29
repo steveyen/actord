@@ -145,10 +145,10 @@ case class MEntry(key: String,
   def isExpired = expTime < nowInSeconds
   
   def updateExpTime(e: Long) =
-    MEntry(key, flags, e, dataSize, data, cid + 1L)
+    MEntry(key, flags, e, dataSize, data, cid + 1L).lru_!(lru)
 
   def updateData(d: Array[Byte]) =
-    MEntry(key, flags, expTime, d.length, d, cid + 1L)
+    MEntry(key, flags, expTime, d.length, d, cid + 1L).lru_!(lru)
   
   /**
    * Concatenate the data arrays from this with that,
@@ -166,8 +166,11 @@ case class MEntry(key: String,
            basis.expTime,
            sizeNew,
            dataNew,
-           basis.cid + 1L)
+           basis.cid + 1L).lru_!(basis.lru)
   }
+  
+  var lru: LRUList = null
+  def lru_!(x: LRUList) = { lru = x; this }
 }
 
 // -------------------------------------------------------
