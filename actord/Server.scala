@@ -114,16 +114,43 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 
   // --------------------------------------------
   
-  // Only this actor is allowed to update the data, 
-  // effectively serializing writes.
+  // Only this actor is allowed to update the data_i root, 
+  // which serializing writes.  
+  //
+  // Also, this actor manages the LRU list.
   //
   // TODO: Should the mod actor be on its own separate real thread?
   //
   private val mod = actor {
+    val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
+    val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
+    
+    lruHead.append(lruTail)
+    
     loop {
       react {
-        case ModSet(el)     => data_i_!!(data + (el.key -> el))
-        case ModDelete(key) => data_i_!!(data - key)
+        case ModSet(el) => {
+          data.get(el.key).foreach(
+            existing => { el.lru = existing.lru }
+          )
+            
+          if (el.lru == null)
+              el.lru = new LRUList(el.key, null, null)
+          else
+              el.lru.remove
+              
+          lruTail.insert(el.lru)
+
+          data_i_!!(data + (el.key -> el))
+        }
+        case ModDelete(key) => {
+          data.get(key).foreach(
+            existing => if (existing.lru != null) 
+                            existing.lru.remove
+          )
+          
+          data_i_!!(data - key)
+        }
       }
     }
   }
@@ -181,3 +208,4 @@ class LRUList(var elem: String,
   extends mutable.DoubleLinkedList[String, LRUList] {
   def key = elem
 }
+
