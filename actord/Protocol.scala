@@ -128,10 +128,16 @@ class MDecoder extends MessageDecoder {
               reply(svr.replace(cmd.entry), 
                     "STORED", "NOT_STORED"))
 
-//    Spec("append <key> <flags> <expTime> <bytes> [noreply]",
-//         (svr, cmd, sess) => MResponseLine(svr.append(cmd.entry)) :: Nil),
-//    Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
-//         (svr, cmd, sess) => MResponseLine(svr.prepend(cmd.entry)) :: Nil),
+      Spec("append <key> <flags> <expTime> <bytes> [noreply]",
+           (svr, cmd, sess) => 
+              reply(svr.append(cmd.entry), 
+                    "STORED", "NOT_STORED")),
+
+      Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
+           (svr, cmd, sess) => 
+              reply(svr.prepend(cmd.entry), 
+                    "STORED", "NOT_STORED")),
+           
 //    Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
 //         ...)
       )
@@ -319,11 +325,7 @@ class MEncoder extends MessageEncoder {
 case class MCommand(args: Array[String], entry: MEntry) {
   def noreply = args.last == "noreply"
   
-  def argToLong(at: Int) =
-    if (args.length > at) {
-      try { args(at).toLong } catch { case _ => 0L }
-    } else 
-      0L
+  def argToLong(at: Int) = itemToLong(args, at)
   
   def argOrElse(at: Int, defaultValue: String) = 
     if (args.length > at)

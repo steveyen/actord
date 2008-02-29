@@ -71,11 +71,23 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	      //
         val v = Math.max(0, (try { new String(el.data, "US_ASCII").toLong } catch { case _ => 0L }) + mod)
         val s = v.toString
-        data_i_!!(data + (el.key -> el.updateData(s.getBytes)))
+        data_i_!!(data + (el.key -> el.updateData(s.getBytes))) // TODO: Should use CAS here.
         s
       }
     }
+    
+  def append(el: MEntry) =
+    getUnexpired(el.key) match {
+      case Some(elPrev) => set(elPrev.concat(el, elPrev)) // TODO: Should use CAS here.
+      case None => false
+    }
   
+  def prepend(el: MEntry) =
+    getUnexpired(el.key) match {
+      case Some(elPrev) => set(el.concat(elPrev, elPrev)) // TODO: Should use CAS here.
+      case None => false
+    }
+
 	def keys = data.keys
 	
 	def flushAll(expTime: Long) {
@@ -100,7 +112,21 @@ case class MEntry(key: String,
     MEntry(key, flags, e, dataSize, data)
 
   def updateData(d: Array[Byte]) =
-    MEntry(key, flags, expTime, d.length, d)    
+    MEntry(key, flags, expTime, d.length, d)
+    
+  def concat(that: MEntry, basis: MEntry) = {
+    val sizeNew = this.dataSize + that.dataSize
+    val dataNew = new Array[Byte](sizeNew)
+
+    System.arraycopy(this.data, 0, dataNew, 0,             this.dataSize)
+    System.arraycopy(that.data, 0, dataNew, this.dataSize, that.dataSize)    
+    
+    MEntry(basis.key, 
+           basis.flags, 
+           basis.expTime,
+           sizeNew,
+           dataNew)
+  }
     
   def cas = "CAS_TODO" // TODO
 }
