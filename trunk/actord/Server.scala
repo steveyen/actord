@@ -36,7 +36,11 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
       case None => None
     }
 
-  def get(key: String): Option[MEntry] = getUnexpired(key)
+  def get(key: String): Option[MEntry] =
+    getUnexpired(key) match {
+      case x @ Some(el) => mod ! ModTouch(el); x
+      case x @ None => x
+    }
 	
   def set(el: MEntry) = {
     mod ! ModSet(el) // TODO: Async semantics might be unexpected.
@@ -94,7 +98,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   def checkAndSet(el: MEntry, cidPrev: Long) =
     getUnexpired(el.key) match {
       case Some(elPrev) => 
-        if (elPrev.cid == cidPrev) {
+        if (elPrev.cid == cidPrev) { // TODO: Need to move this into mod actor?
           set(el)
           "STORED"
         } else
@@ -137,12 +141,12 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
           if (el.lru == null)
               el.lru = new LRUList(el.key, null, null)
           else
-              el.lru.remove
-              
+              el.lru.remove     
           lruTail.insert(el.lru)
 
           data_i_!!(data + (el.key -> el))
         }
+        
         case ModDelete(key) => {
           data.get(key).foreach(
             existing => if (existing.lru != null) 
@@ -151,6 +155,12 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
           
           data_i_!!(data - key)
         }
+        
+        case ModTouch(el) =>
+          if (el.lru != null) {
+              el.lru.remove
+              lruTail.insert(el.lru)
+          }
       }
     }
   }
@@ -159,6 +169,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   
   case class ModSet(el: MEntry)
   case class ModDelete(key: String)
+  case class ModTouch(el: MEntry)
 }
 
 // -------------------------------------------------------
