@@ -243,7 +243,8 @@ class MDecoder extends MessageDecoder {
                                                expTime,
                                            dataSize,
                                            data,
-                                           0L))))
+                                           (session.getId << 32) + 
+                                           (session.getReadMessages & 0xFFFFFFFFL)))))
             MessageDecoderResult.OK
           } else {
             session.setAttribute(WAITING_FOR, totalSize)

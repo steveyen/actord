@@ -202,6 +202,10 @@ case class MEntry(key: String,
   def isExpired = expTime != 0L &&
                   expTime < nowInSeconds
   
+  // TODO: Revisit the cid + 1L update, as concurrent threads could
+  //       generate the same updated cid number.  Not sure if that's
+  //       a problem.
+  // 
   def updateExpTime(e: Long) =
     MEntry(key, flags, e, dataSize, data, cid + 1L).lru_!(lru)
 
