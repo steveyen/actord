@@ -39,7 +39,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   def get(key: String): Option[MEntry] = getUnexpired(key)
 	
   def set(el: MEntry) = {
-    mod ! ModSet(el) // TODO: Async semantics here might be unexpected.
+    mod ! ModSet(el) // TODO: Async semantics might be unexpected.
     true
 	}
 	
@@ -63,7 +63,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
               el.expTime > (nowInSeconds + time)) 
               set(el.updateExpTime(nowInSeconds + time))
         } else 
-          mod ! ModDelete(key)
+          mod ! ModDelete(key) // TODO: Async semantics might be unexpected.
         true
       }
     ).getOrElse(false)
