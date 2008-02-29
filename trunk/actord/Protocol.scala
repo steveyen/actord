@@ -26,7 +26,7 @@ class MHandler(server: MServer) extends IoHandlerAdapter {
     message match {
       case (spec: Spec, cmd: MCommand) => {
         val res = spec.process(server, cmd, session)
-        if (cmd.noreply == false)
+        if (cmd.noReply == false)
           session.write(res)
       }
       case m: MResponse =>
@@ -81,13 +81,13 @@ class MDecoder extends MessageDecoder {
 
       Spec("delete <key> [<time>] [noreply]",
            (svr, cmd, sess) => 
-             reply(svr.delete(cmd.args(1), cmd.argToLong(2)), 
+             reply(svr.delete(cmd.args(1), cmd.argToLong(2), cmd.noReply), 
                    "DELETED", "NOT_FOUND")),
 
       Spec("incr <key> <value> [noreply]",
-           (svr, cmd, sess) => reply(svr.delta(cmd.args(1), cmd.argToLong(2)))),
+           (svr, cmd, sess) => reply(svr.delta(cmd.args(1),  cmd.argToLong(2), cmd.noReply))),
       Spec("decr <key> <value> [noreply]",
-           (svr, cmd, sess) => reply(svr.delta(cmd.args(1), -1L * cmd.argToLong(2)))),
+           (svr, cmd, sess) => reply(svr.delta(cmd.args(1), -cmd.argToLong(2), cmd.noReply))),
            
 //    Spec("stats [<arg>]",
 //         (svr, cmd, sess) => 
@@ -115,32 +115,32 @@ class MDecoder extends MessageDecoder {
   def lineWithDataSpecs = List( 
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.set(cmd.entry), 
+              reply(svr.set(cmd.entry, cmd.noReply), 
                     "STORED", "NOT_STORED")),
 
       Spec("add <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.add(cmd.entry), 
+              reply(svr.add(cmd.entry, cmd.noReply), 
                     "STORED", "NOT_STORED")),
 
       Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.replace(cmd.entry), 
+              reply(svr.replace(cmd.entry, cmd.noReply), 
                     "STORED", "NOT_STORED")),
 
       Spec("append <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.append(cmd.entry), 
+              reply(svr.append(cmd.entry, cmd.noReply), 
                     "STORED", "NOT_STORED")),
 
       Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.prepend(cmd.entry), 
+              reply(svr.prepend(cmd.entry, cmd.noReply), 
                     "STORED", "NOT_STORED")),
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5)))))
+              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply))))
       
   val lineOnlyCommands = 
       Map[String, Spec](lineOnlySpecs.
@@ -326,7 +326,7 @@ class MEncoder extends MessageEncoder {
 // -------------------------------------------------------
 
 case class MCommand(args: Array[String], entry: MEntry) {
-  def noreply = args.last == "noreply"
+  def noReply = args.last == "noreply"
   
   def argToLong(at: Int) = itemToLong(args, at)
   

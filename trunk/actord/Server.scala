@@ -41,10 +41,7 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
       case x @ None => x
     }
 	
-  def set(el: MEntry): Boolean = 
-      set(el, false)
-	
-  def set(el: MEntry, async: Boolean): Boolean = {
+  def set(el: MEntry, async: Boolean) = {
     if (async)
       mod ! ModSet(el, async)
     else
@@ -52,20 +49,17 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
     true
 	}
 
-  def add(el: MEntry) = 
+  def add(el: MEntry, async: Boolean) = 
     getUnexpired(el.key) match {
       case Some(_) => false
-      case None => set(el)
+      case None => set(el, async)
     }
 
-  def replace(el: MEntry) = 
+  def replace(el: MEntry, async: Boolean) = 
     getUnexpired(el.key) match {
-      case Some(_) => set(el)
+      case Some(_) => set(el, async)
       case None => false
     }
-
-  def delete(key: String, time: Long): Boolean = 
-      delete(key, time, false)
 
   def delete(key: String, time: Long, async: Boolean) = 
 		getUnexpired(key).map(
@@ -84,34 +78,34 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
       }
     ).getOrElse(false)
     
-	def delta(key: String, mod: Long) =
+	def delta(key: String, mod: Long, async: Boolean) =
 	  getUnexpired(key) match {
 	    case None => "NOT_FOUND"
 	    case Some(el) => {
         val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + mod)
         val s = v.toString
-        set(el.updateData(s.getBytes)) // TODO: Should use CAS here.
+        set(el.updateData(s.getBytes), async) // TODO: Should use CAS here.
         s
       }
     }
     
-  def append(el: MEntry) =
+  def append(el: MEntry, async: Boolean) =
     getUnexpired(el.key) match {
-      case Some(elPrev) => set(elPrev.concat(el, elPrev)) // TODO: Should use CAS here.
+      case Some(elPrev) => set(elPrev.concat(el, elPrev), async) // TODO: Should use CAS here.
       case None => false
     }
   
-  def prepend(el: MEntry) =
+  def prepend(el: MEntry, async: Boolean) =
     getUnexpired(el.key) match {
-      case Some(elPrev) => set(el.concat(elPrev, elPrev)) // TODO: Should use CAS here.
+      case Some(elPrev) => set(el.concat(elPrev, elPrev), async) // TODO: Should use CAS here.
       case None => false
     }
 
-  def checkAndSet(el: MEntry, cidPrev: Long) =
+  def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
     getUnexpired(el.key) match {
       case Some(elPrev) => 
         if (elPrev.cid == cidPrev) { // TODO: Need to move this into mod actor?
-          set(el)
+          set(el, async)
           "STORED"
         } else
           "EXISTS"
@@ -123,9 +117,9 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
 	def flushAll(expTime: Long) {
 	  for ((key, el) <- data)
       if (expTime == 0L) 
-        mod ! ModDelete(el, false)
+        mod ! ModDelete(el, true)
       else
-        delete(key, expTime)
+        delete(key, expTime, true)
 	}
 
   // --------------------------------------------
