@@ -2,6 +2,7 @@ package gg.scalabase
 
 import java.net._
 import java.nio.charset._
+import java.util.concurrent._
 
 import org.slf4j._
 
@@ -13,13 +14,15 @@ import org.apache.mina.transport.socket.nio._
 object Main
 {
   def main(args: Array[String]) {
-    createAcceptor.bind(new InetSocketAddress(11211))
-    println("Listening on port " + 11211)
-  }     
-
-  def createAcceptor = {
+    startAcceptor(Runtime.getRuntime.availableProcessors, 11211)
+    println("listening on port " + 11211)
+  }
+  
+  def startAcceptor(numProcessors: Int, port: Int) = 
+    initAcceptor(new NioSocketAcceptor(numProcessors)).bind(new InetSocketAddress(port))
+  
+  def initAcceptor(acceptor: IoAcceptor) = {
     val codecFactory = new DemuxingProtocolCodecFactory
-    val acceptor     = new NioSocketAcceptor
 
     codecFactory.addMessageDecoder(new MDecoder)
     codecFactory.addMessageEncoder(classOf[List[MResponse]], new MEncoder)
