@@ -10,6 +10,9 @@ import ff.actord.Util._
  * We want MServer to clear of any dependencies on wire protocol.
  *
  * Callers can pass in storage.SMap instead of TreeMap for data persistence.
+ *
+ * We use immutable tree structures for better multi-core read/get performance, 
+ * and for poor man's MVCC.
  */
 class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
   // TODO: Need to add LRU capability, see apache.commons.LRUMap.
