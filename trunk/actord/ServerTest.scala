@@ -13,12 +13,16 @@ class MServerTest extends TestConsoleMain {
       "should support add and replace operations" ::
       "should support delete calls of 0 expTime" ::
       "should support delta calls" ::
+      "simple benchmark" ::
       Nil
     ).map(name => new MServerTestCase(name)):_*
   )
 }
 
-class MServerTestCase(name: String) extends TestCase(name) {
+/**
+ * Tests data methods of MServer, but not any transport/protocol.
+ */
+class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
   val m: MServer = new MServer(new immutable.TreeMap[String, MEntry])
 
   val ea  = MEntry("a", 0L, 0L, 0, new Array[Byte](0), 0L)
@@ -103,8 +107,34 @@ class MServerTestCase(name: String) extends TestCase(name) {
       assertEquals("get m", true, dataSame(m.get("a"), simpleEntry("a", "0")))
       assertEquals("dec 1", "0",  m.delta("a", -1L, false))
       assertEquals("get n", true, dataSame(m.get("a"), simpleEntry("a", "0")))
-  }
+      
+    case "simple benchmark" =>
+      val lots = 40000
+      
+      def calc(verb: String, result: Long) =
+        "msecs to " + verb + " " + lots + " keys: " + result + 
+        "\n  " + verb + "s/sec: " + ((1000 * lots) / result)
+        
+      println(calc("set",
+                   benchMarkAvgMillis(1, 
+                     for (i <- 0 until lots)
+                       m.set(simpleEntry(i.toString, i.toString), false))))
+
+      println(calc("re-set",
+                   benchMarkAvgMillis(10, 
+                     for (i <- 0 until lots)
+                       m.set(simpleEntry(i.toString, i.toString), false))))
   
+      println(calc("get",
+                   benchMarkAvgMillis(10, 
+                     for (i <- 0 until lots)
+                       m.get(i.toString))))
+  }
+}
+
+// -------------------------------------------
+
+trait MTestUtil {
   def p(o: Option[MEntry]) =
     println(asString(o))
     
@@ -127,4 +157,23 @@ class MServerTestCase(name: String) extends TestCase(name) {
                   (a.data == b.data || a.data.deepEquals(b.data)) &&
                   (a.cid == b.cid)).
          getOrElse(false)
+         
+  def benchMark(repeat: Int, f: => Unit): List[Long] =
+    (0 until repeat).map(
+      i => {
+        val startTime = System.currentTimeMillis
+        f
+        val endTime = System.currentTimeMillis
+        
+        endTime - startTime      
+      }
+    ).toList
+  
+  def benchMarkAvgMillis(repeat: Int, f: => Unit) = {
+    val results = benchMark(repeat, f)
+    results.foldLeft(0L)(_ + _) / results.length.toLong
+  }
+
+  def benchMarkAvgSecs(repeat: Int, f: => Unit) = 
+      benchMarkAvgMillis(repeat, f) / 1000
 }
