@@ -179,6 +179,12 @@ class MDecoder extends MessageDecoder {
            
   def reply(v: Boolean, t: String, f: String): List[MResponse] =
       reply(if (v) t else f)
+      
+  def reply(v: Long): List[MResponse] =
+      reply(if (v < 0)
+              "NOT_FOUND"
+            else
+              v.toString)
                           
   // ----------------------------------------
 
