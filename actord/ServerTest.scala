@@ -14,6 +14,7 @@ class MServerTest extends TestConsoleMain {
       "should support delete calls of 0 expTime" ::
       "should support delta calls" ::
       "should support checkAndSet" ::
+      "should be empty after flushAll" ::
       "simple benchmark" ::
       "simple multithreaded benchmark" ::
       Nil
@@ -125,6 +126,18 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         assertEquals("cas c1", "STORED", m.checkAndSet(c1, 0L, false))
         assertEquals("get c1", true,     entrySame(m.get("c"), c1))
         
+      case "should be empty after flushAll" =>
+        assertEquals(true, m.set(simpleEntry("a1", "0"), false))
+        assertEquals(true, m.set(simpleEntry("a2", "0"), false))
+        assertEquals(true, m.set(simpleEntry("a3", "0"), false))
+        assertEquals(3, m.keys.toList.length)
+        m.flushAll(0L)
+        Thread.sleep(2) // flushAll is asynchronous.
+        assertEquals(0, m.keys.toList.length)
+        assertEquals(None, m.get("a1"))
+        assertEquals(None, m.get("a2"))
+        assertEquals(None, m.get("a3"))
+      
       case "simple benchmark" =>
         val n = 4000
         println(calc(n, "set",
