@@ -22,14 +22,20 @@ import scala.actors.Actor._
 import ff.actord.Util._
 
 /**
- * Tracks key/value entries.
+ * Tracks key/value entries and their LRU (least-recently-used) history.
  *
- * We use immutable tree structures for better multi-core read/get performance, 
- * and for poor man's MVCC.
+ * We use immutable tree structures for better concurrent multi-core 
+ * read/get performance, and for poor man's MVCC.  
+ *
+ * However, the cost might be slower write/set performance.  
+ * All write/set operations are serialized, optionally asynchronously,
+ * behind an actor which handles all modifications.  Callers might
+ * thus want to spread their data across a set of MServer's,
+ * such as one MServer per CPU.
  *
  * Callers can pass in storage.SMap instead of TreeMap for data persistence.
  *
- * We ideally want this class to be as clear as possible of any 
+ * We ideally want this class to be as free as possible of any 
  * dependencies on transport or wire protocol.
  */
 class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
@@ -93,14 +99,14 @@ class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
       }
     ).getOrElse(false)
     
-	def delta(key: String, mod: Long, async: Boolean) =
+	def delta(key: String, mod: Long, async: Boolean): Long =
 	  getUnexpired(key) match {
-	    case None => "NOT_FOUND"
+	    case None => -1L
 	    case Some(el) => {
         val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + mod)
         val s = v.toString
         set(el.updateData(s.getBytes), async) // TODO: Should use CAS here.
-        s
+        v
       }
     }
     
