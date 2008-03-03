@@ -249,20 +249,25 @@ class MDecoder extends MessageDecoder {
   
             in.get(data)
             
-            out.write(Pair(spec,
-                           MCommand(args,
-                                    MEntry(args(1),
-                                           args(2).toLong,
-                                           if (expTime != 0 &&
-                                               expTime <= SECONDS_IN_30_DAYS)
-                                               expTime + nowInSeconds
-                                           else
-                                               expTime,
-                                           dataSize,
-                                           data,
-                                           (session.getId << 32) + 
-                                           (session.getReadMessages & 0xFFFFFFFFL)))))
-            MessageDecoderResult.OK
+            if (in.getString(CRNL.length, charsetDecoder) == CRNL) {
+              out.write(Pair(spec,
+                             MCommand(args,
+                                      MEntry(args(1),
+                                             args(2).toLong,
+                                             if (expTime != 0 &&
+                                                 expTime <= SECONDS_IN_30_DAYS)
+                                                 expTime + nowInSeconds
+                                             else
+                                                 expTime,
+                                             dataSize,
+                                             data,
+                                             (session.getId << 32) + 
+                                             (session.getReadMessages & 0xFFFFFFFFL)))))
+              MessageDecoderResult.OK
+            } else {
+              out.write(MResponseLine("CLIENT_ERROR missing CRNL after data"))
+              MessageDecoderResult.OK
+            }
           } else {
             session.setAttribute(WAITING_FOR, new java.lang.Integer(totalSize))
             in.rewind
