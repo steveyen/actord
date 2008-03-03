@@ -51,7 +51,26 @@ class MServer(subServerNum: Int) {
     if (subServerNum <= 1)
         subServers(0)
     else
-        subServers(key.hashCode % subServerNum)
+        subServers(subServerIndexForKey(key))
+        
+  def subServerIndexForKey(key: String) = key.hashCode % subServerNum   
+        
+  def getMulti(keys: Array[String], out: (MEntry) => Unit): Unit = {
+    // First group the keys for each subServer, for better 
+    // cache locality and synchronization avoidance.
+    //
+    val groupedKeys = new Array[List[String]](subServerNum) 
+    for (i <- 0 until subServerNum)
+      groupedKeys(i) = Nil
+
+    for (key <- keys) {
+      val i = subServerIndexForKey(key)
+      groupedKeys(i) = key :: groupedKeys(i)
+    }
+
+    for (i <- 0 until subServerNum)
+      subServers(i).getMulti(groupedKeys(i), out)
+  }
 
   def get(key: String): Option[MEntry] =
     subServerForKey(key).get(key)
@@ -113,10 +132,22 @@ class MSubServer {
   // --------------------------------------------
 
   def getUnexpired(key: String): Option[MEntry] =
-    data.get(key) match {
+      getUnexpired(key, data)
+    
+  def getUnexpired(key: String, d: immutable.SortedMap[String, MEntry]): Option[MEntry] =
+    d.get(key) match {
       case s @ Some(el) => if (el.isExpired) None else s
       case None => None
     }
+
+  def getMulti(keys: List[String], out: (MEntry) => Unit): Unit = {
+    val d = data
+    for (key <- keys)
+      getUnexpired(key, d) match {
+        case Some(el) => out(el)
+        case None =>
+      }
+  }
 
   def get(key: String): Option[MEntry] =
     getUnexpired(key) match {
