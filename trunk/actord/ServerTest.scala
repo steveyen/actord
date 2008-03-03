@@ -20,6 +20,9 @@ import scala.collection._
 import scala.testing.SUnit
 import scala.testing.SUnit._
 
+/**
+ * Tests data methods of MServer, but not any transport/protocol.
+ */
 class MServerTest extends TestConsoleMain {
   def suite = new TestSuite(
     ( "should be empty after creation" ::
@@ -31,6 +34,7 @@ class MServerTest extends TestConsoleMain {
       "should support checkAndSet" ::
       "should be empty after flushAll" ::
       "should support getMulti" ::
+      "should expire entries" ::      
       "simple benchmark" ::
       "simple multithreaded benchmark" ::
       Nil
@@ -38,9 +42,6 @@ class MServerTest extends TestConsoleMain {
   )
 }
 
-/**
- * Tests data methods of MServer, but not any transport/protocol.
- */
 class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
   val m: MServer = new MServer
 
@@ -183,6 +184,17 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         results = Nil
         m.getMulti(List("c0", "c1", "c2").toArray, addResult)
         assertEquals("getMulti 03", true, results.map(_.key).sort(_ < _) == List("c1"))
+        
+      case "should expire entries" =>
+        val c0 = MEntry("c0", 0L, Util.nowInSeconds + 1L, 5, "hello".getBytes, 0L) // Expires in 1 sec.
+
+        assertEquals("get 00", None, m.get("c0"))
+        assertEquals("set c0", true, m.set(c0, false))
+        assertEquals("get c0", true, dataSame(m.get("c0"), c0))       
+        
+        Thread.sleep(2100)
+        
+        assertEquals("get xx", None, m.get("c0"))
 
       case "simple benchmark" =>
         val n = 4000
