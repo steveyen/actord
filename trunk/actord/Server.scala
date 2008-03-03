@@ -138,7 +138,7 @@ class MSubServer {
     d.get(key) match {
       case s @ Some(el) => {
         if (el.isExpired) {
-          mod ! ModDelete(el, true) // TODO: Need CAS here, in case some ModSet's are already queued.
+          mod ! ModDelete(el, true) // Queue delete of expired entry.
           None 
         } else 
           s
@@ -279,11 +279,16 @@ class MSubServer {
               reply(true)
         
         case ModDelete(el, noReply) => 
-          if (el.lru != null) 
-              el.lru.remove
-          data_i_!!(data - el.key)
-          if (!noReply) 
-              reply(true)
+          data.get(el.key).foreach(
+            current => 
+              if (current.cid == el.cid) {
+                if (el.lru != null) 
+                    el.lru.remove
+                data_i_!!(data - el.key)
+                if (!noReply) 
+                    reply(true)
+              }
+          )
         
         case ModTouch(el, noReply) => 
           touch(el)
