@@ -241,10 +241,10 @@ class MDecoder extends MessageDecoder {
         //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
   			//
         if (args.length >= 5) {
-          var dataSize  = args(4).toInt
+          var dataSize  = args(4).trim.toInt
           val totalSize = line.length + dataSize + CRNL.length
           if (totalSize <= remaining) {
-            val expTime = args(3).toLong
+            val expTime = args(3).trim.toLong
             val data    = new Array[Byte](dataSize) // TODO: Handle this better when dataSize is huge.
   
             in.get(data)
