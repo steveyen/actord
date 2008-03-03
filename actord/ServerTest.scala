@@ -41,7 +41,7 @@ class MServerTest extends TestConsoleMain {
  * Tests data methods of MServer, but not any transport/protocol.
  */
 class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
-  val m: MServer = new MServer(new immutable.TreeMap[String, MEntry])
+  val m: MServer = new MServer
 
   val ea  = MEntry("a", 0L, 0L, 0, new Array[Byte](0), 0L)
   val ea2 = MEntry("a", 1L, 0L, 0, new Array[Byte](0), 0L)

@@ -16,7 +16,7 @@ import ff.actord.Util._
 object Main
 {
   def main(args: Array[String]) {
-    startAcceptor(new MServer(new immutable.TreeMap[String, MEntry]), 
+    startAcceptor(new MServer, 
                   Runtime.getRuntime.availableProcessors, 
                   11211)
 

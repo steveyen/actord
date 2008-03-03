@@ -33,15 +33,20 @@ import ff.actord.Util._
  * thus want to spread their data across a set of MServer's,
  * such as one MServer per CPU.
  *
- * Callers can pass in storage.SMap instead of TreeMap for data persistence.
- *
  * We ideally want this class to be as free as possible of any 
  * dependencies on transport or wire protocol.
  */
-class MServer(dataStart: immutable.SortedMap[String, MEntry]) {
-  // TODO: Maybe just use volatile, or AtomicReference around data_i.
-  //
-  private var data_i = dataStart
+class MServer {
+  /**
+   * Override to pass in other implementations, such as storage.SMap for persistence.
+   */
+  def createSortedMap: immutable.SortedMap[String, MEntry] =
+                   new immutable.TreeMap[String, MEntry]
+
+  /**
+   * TODO: Maybe just use volatile, or AtomicReference around data_i.
+   */
+  private var data_i = createSortedMap
   
   private def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
     synchronized { data_i = d }  
