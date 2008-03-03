@@ -144,7 +144,7 @@ class MSubServer {
     val d = data
     for (key <- keys)
       getUnexpired(key, d) match {
-        case Some(el) => out(el)
+        case Some(el) => mod ! ModTouch(el, true); out(el)
         case None =>
       }
   }
