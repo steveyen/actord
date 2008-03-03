@@ -279,16 +279,23 @@ class MSubServer {
               reply(true)
         
         case ModDelete(el, noReply) => 
-          data.get(el.key).foreach(
-            current => 
+          data.get(el.key) match {
+            case Some(current) =>
               if (current.cid == el.cid) {
                 if (el.lru != null) 
                     el.lru.remove
                 data_i_!!(data - el.key)
                 if (!noReply) 
                     reply(true)
+              } else {
+                if (!noReply) 
+                    reply(false)
               }
-          )
+              
+            case None =>
+              if (!noReply) 
+                  reply(false)
+          }
         
         case ModTouch(el, noReply) => 
           touch(el)
