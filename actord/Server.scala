@@ -25,18 +25,70 @@ import ff.actord.Util._
  * Tracks key/value entries and their LRU (least-recently-used) history.
  *
  * We use immutable tree structures for better concurrent multi-core 
- * read/get performance, and for poor man's MVCC.  
+ * read/query/get performance, and for poor man's MVCC.  
  *
  * However, the cost might be slower write/set performance.  
- * All write/set operations are serialized, optionally asynchronously,
- * behind an actor which handles all modifications.  Callers might
- * thus want to spread their data across a set of MServer's,
- * such as one MServer per CPU.
+ * For higher write multi-core concurrency, we internally shard 
+ * the key/value data into separate MSubServer instances, with 
+ * usually one MSubServer per CPU processor.  All write/set operations 
+ * within a MSubServer instance are serialized, optionally asynchronously,
+ * behind an per-MSubServer-actor which handles all modifications for that
+ * MSubServer instance.  
  *
- * We ideally want this class to be as free as possible of any 
- * dependencies on transport or wire protocol.
+ * We ideally want the MServer/MSubServer classes to independent 
+ * of transport or wire protocol.
  */
-class MServer {
+class MServer(subServerNum: Int) {
+  def this() = this(Runtime.getRuntime.availableProcessors)
+  
+  private val subServers = new Array[MSubServer](subServerNum)
+  for (i <- 0 until subServerNum)
+    subServers(i) = createSubServer
+    
+  def createSubServer: MSubServer = new MSubServer // For overridability.
+  
+  def subServerForKey(key: String) = 
+    if (subServerNum <= 1)
+        subServers(0)
+    else
+        subServers(key.hashCode % subServerNum)
+
+  def get(key: String): Option[MEntry] =
+    subServerForKey(key).get(key)
+	
+  def set(el: MEntry, async: Boolean) = 
+    subServerForKey(el.key).set(el, async)
+
+  def add(el: MEntry, async: Boolean) = 
+    subServerForKey(el.key).add(el, async)
+
+  def replace(el: MEntry, async: Boolean) = 
+    subServerForKey(el.key).replace(el, async)
+
+  def delete(key: String, time: Long, async: Boolean) = 
+    subServerForKey(key).delete(key, time, async)
+    
+	def delta(key: String, mod: Long, async: Boolean): Long =
+    subServerForKey(key).delta(key, mod, async)
+    
+  def append(el: MEntry, async: Boolean) =
+    subServerForKey(el.key).append(el, async)
+  
+  def prepend(el: MEntry, async: Boolean) =
+    subServerForKey(el.key).prepend(el, async)
+
+  def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
+    subServerForKey(el.key).checkAndSet(el, cidPrev, async)
+    
+	def keys = subServers.foldLeft(List[String]().elements)(
+	            (accum, next) => next.keys.append(accum))
+	
+	def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
+}
+
+// --------------------------------------------
+
+class MSubServer {
   /**
    * Override to pass in other implementations, such as storage.SMap for persistence.
    */
@@ -132,7 +184,7 @@ class MServer {
       case Some(elPrev) => 
         if (elPrev.cid == cidPrev) { // TODO: Need to move this into mod actor?
           set(el, async)
-          "STORED"
+          "STORED"                   // TODO: Get rid of transport/protocol-ism here.
         } else
           "EXISTS"
       case None => "NOT_FOUND"
@@ -157,11 +209,6 @@ class MServer {
   //
   // TODO: Should the mod actor be on its own separate real thread?
   // TODO: Need to flush LRU when memory gets tight.
-  // TODO: For multi-core write scalability, need to have more than
-  //       one writer actor?  Possibly via more than one tree root,
-  //       such as one tree root (or MServer) per CPU processor thread.
-  //       In that world, transport protocol handlers have to dispatch
-  //       to the right MServer.
   //
   private val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
