@@ -226,7 +226,7 @@ class MDecoder extends MessageDecoder {
     if (line.endsWith(CRNL) == false)
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
         
-    val args    = line.split(" ")
+    val args    = line.trim.split(" ")
     val cmdName = args(0)
 
     lineOnlyCommands.get(cmdName).map(
