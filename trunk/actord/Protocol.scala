@@ -54,7 +54,8 @@ class MHandler(server: MServer) extends IoHandlerAdapter {
  * Represents a specification, of a command in the protocol.
  *
  * TODO: Need a better process() signature if we want to handle async streaming?
- *       Research how mina allows request and response streaming.
+ * TODO: Research how mina allows request and response streaming.
+ * TODO: Is there an equivalent of writev/readv in mina?
  */
 case class Spec(line: String,
                 process: (MServer, MCommand, IoSession) => List[MResponse]) {
@@ -245,7 +246,12 @@ class MDecoder extends MessageDecoder {
           val totalSize = line.length + dataSize + CRNL.length
           if (totalSize <= remaining) {
             val expTime = args(3).trim.toLong
-            val data    = new Array[Byte](dataSize) // TODO: Handle this better when dataSize is huge.
+            
+            // TODO: Handle this better when dataSize is huge.
+            //       Perhaps use mmap, or did mina read it entirely 
+            //       into memory by this point already?
+            //
+            val data = new Array[Byte](dataSize) 
   
             in.get(data)
             
