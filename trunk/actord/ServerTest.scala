@@ -34,6 +34,8 @@ class MServerTest extends TestConsoleMain {
       "should support checkAndSet" ::
       "should be empty after flushAll" ::
       "should support getMulti" ::
+      "should append data correctly" ::      
+      "should prepend data correctly" ::      
       "should expire entries" ::      
       "simple benchmark" ::
       "simple multithreaded benchmark" ::
@@ -185,6 +187,36 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         m.getMulti(List("c0", "c1", "c2").toArray, addResult)
         assertEquals("getMulti 03", true, results.map(_.key).sort(_ < _) == List("c1"))
         
+      case "should append data correctly" =>
+        val c0 = MEntry("c0", 0L, 0L, 5, "hello".getBytes, 0L)
+        val c1 = MEntry("c0", 0L, 0L, 5, "world".getBytes, 0L)
+        val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
+        
+        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("apd 00", false, m.append(c0, false))
+        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("set c0", true,  m.set(c0, false))
+        assertEquals("get c0", true,  entrySame(m.get("c0"), c0))       
+        assertEquals("apd c1", true,  m.append(c1, false))
+        assertEquals("get c1", true,  dataEquals(m.get("c0"), "helloworld".getBytes))
+        assertEquals("apd c2", true,  m.append(c2, false))
+        assertEquals("get c2", true,  dataEquals(m.get("c0"), "helloworldthere".getBytes))
+
+      case "should prepend data correctly" =>
+        val c0 = MEntry("c0", 0L, 0L, 5, "hello".getBytes, 0L)
+        val c1 = MEntry("c0", 0L, 0L, 5, "world".getBytes, 0L)
+        val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
+        
+        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("apd 00", false, m.append(c0, false))
+        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("set c0", true,  m.set(c0, false))
+        assertEquals("get c0", true,  entrySame(m.get("c0"), c0))       
+        assertEquals("ppd c1", true,  m.prepend(c1, false))
+        assertEquals("get c1", true,  dataEquals(m.get("c0"), "worldhello".getBytes))
+        assertEquals("ppd c2", true,  m.prepend(c2, false))
+        assertEquals("get c2", true,  dataEquals(m.get("c0"), "thereworldhello".getBytes))
+
       case "should expire entries" =>
         val c0 = MEntry("c0", 0L, Util.nowInSeconds + 1L, 5, "hello".getBytes, 0L) // Expires in 1 sec.
 
@@ -195,7 +227,7 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         Thread.sleep(2100)
         
         assertEquals("get xx", None, m.get("c0"))
-
+        
       case "simple benchmark" =>
         val n = 4000
         println(calc(n, "set",
@@ -253,6 +285,11 @@ trait MTestUtil {
   def dataSame(aOpt: Option[MEntry], b: MEntry) =
     aOpt.map(a => (a.dataSize == b.dataSize) &&
                   (a.data == b.data || a.data.deepEquals(b.data))).
+         getOrElse(false)
+
+  def dataEquals(aOpt: Option[MEntry], b: Array[Byte]) =
+    aOpt.map(a => (a.dataSize == b.size) &&
+                  (a.data == b || a.data.deepEquals(b))).
          getOrElse(false)
 
   def entrySame(aOpt: Option[MEntry], b: MEntry) =
