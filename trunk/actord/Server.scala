@@ -333,7 +333,10 @@ case class MEntry(key: String,
            dataNew,
            basis.cid + 1L).lru_!(basis.lru)
   }
-  
+
+  /**
+   * Only the MSubServer mod actor should read or use the lru field.
+   */  
   var lru: LRUList = null
   def lru_!(x: LRUList) = { lru = x; this }
 }
