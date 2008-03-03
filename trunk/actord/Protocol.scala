@@ -352,6 +352,9 @@ case class MCommand(args: Array[String], entry: MEntry) {
       args(at)
     else
       defaultValue
+      
+  override def toString = 
+    args.mkString(" ") + (if (entry != null) (" " + entry.toString) else "")
 }
 
 // -------------------------------------------------------
