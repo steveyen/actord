@@ -35,8 +35,8 @@ import ff.actord.Util._
  * behind an per-MSubServer-actor which handles all modifications for that
  * MSubServer instance.  
  *
- * We ideally want the MServer/MSubServer classes to independent 
- * of transport or wire protocol.
+ * We ideally want the MServer/MSubServer classes to be 
+ * independent of transport or wire protocol.
  */
 class MServer(subServerNum: Int) {
   def this() = this(Runtime.getRuntime.availableProcessors)
