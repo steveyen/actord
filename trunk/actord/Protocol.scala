@@ -335,7 +335,7 @@ class MEncoder extends MessageEncoder {
       res.put(buf)
       buf.flip
       out.write(buf)
-      buf.reset
+      buf.clear
     }
   }
 }
