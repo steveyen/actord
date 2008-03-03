@@ -79,9 +79,14 @@ class MServer(subServerNum: Int) {
 
   def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
     subServerForKey(el.key).checkAndSet(el, cidPrev, async)
-    
-	def keys = subServers.foldLeft(List[String]().elements)(
-	            (accum, next) => next.keys.append(accum))
+
+  /**
+   * The keys in the returned Iterator are unsorted.
+   */
+	def keys: Iterator[String] = {
+	  val empty = List[String]().elements
+	  subServers.foldLeft(empty)((accum, next) => next.keys.append(accum))
+	}
 	
 	def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
 }
