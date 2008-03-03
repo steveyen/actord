@@ -273,6 +273,31 @@ class MSubServer {
           el.lru.remove
           lruTail.insert(el.lru)
       }
+      
+    def evict(numBytes: Int): Int = {
+      var dataMod = data           // Snapshot data outside of loop.
+      var evicted = 0              // Total number of bytes actually evicted.
+      var current = lruHead.next   // Start from least recently used.
+      
+      while (evicted < numBytes &&
+             evicted >= 0 &&       // Handles overflow siutation.
+             current != lruTail &&
+             current != null) {
+        val n = current.next
+        current.remove
+        dataMod.get(current.key).foreach(
+          existing => {
+            dataMod = dataMod - current.key
+            evicted = evicted + existing.dataSize
+          }
+        )
+        current = n
+      }
+      
+      data_i_!!(dataMod)
+      
+      evicted
+    }
     
     loop {
       react {
