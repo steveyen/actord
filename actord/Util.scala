@@ -30,7 +30,7 @@ object Util {
       0L
       
   def parseLong(s: String, defaultVal: Long) = try { 
-    s.toLong 
+    s.trim.toLong 
   } catch { 
     case _ => defaultVal
   }
