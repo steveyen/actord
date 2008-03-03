@@ -147,7 +147,7 @@ class MSubServer {
     }
 
   def getMulti(keys: List[String], out: (MEntry) => Unit): Unit = {
-    val d = data
+    val d = data // Grab the data snapshot just once, outside the loop.
     for (key <- keys)
       getUnexpired(key, d) match {
         case Some(el) => mod ! ModTouch(el, true); out(el)
