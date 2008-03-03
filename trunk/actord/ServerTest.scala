@@ -30,6 +30,7 @@ class MServerTest extends TestConsoleMain {
       "should support delta calls" ::
       "should support checkAndSet" ::
       "should be empty after flushAll" ::
+      "should support getMulti" ::
       "simple benchmark" ::
       "simple multithreaded benchmark" ::
       Nil
@@ -153,6 +154,36 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         assertEquals(None, m.get("a2"))
         assertEquals(None, m.get("a3"))
       
+      case "should support getMulti" =>
+        val c0 = MEntry("c0", 0L, 0L, 0, new Array[Byte](0), 0L)
+        val c1 = MEntry("c1", 1L, 0L, 0, new Array[Byte](0), 1L)
+  
+        assertEquals("get 00", None, m.get("c0"))
+        assertEquals("get 00", None, m.get("c1"))
+        assertEquals("get 00", None, m.get("c2"))
+        
+        var results: List[MEntry] = Nil
+        def addResult(el: MEntry): Unit = { results = el :: results }
+
+        results = Nil
+        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
+        assertEquals("getMulti 00", true, results.isEmpty)
+        
+        assertEquals("set c0", true, m.set(c0, false))
+        results = Nil
+        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
+        assertEquals("getMulti 01", true, results.map(_.key).sort(_ < _) == List("c0"))
+
+        assertEquals("set c1", true, m.set(c1, false))
+        results = Nil
+        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
+        assertEquals("getMulti 02", true, results.map(_.key).sort(_ < _) == List("c0", "c1"))
+
+        assertEquals("del c0", true, m.delete("c0", 0L, false))
+        results = Nil
+        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
+        assertEquals("getMulti 03", true, results.map(_.key).sort(_ < _) == List("c1"))
+
       case "simple benchmark" =>
         val n = 4000
         println(calc(n, "set",
