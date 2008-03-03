@@ -268,7 +268,7 @@ class MDecoder extends MessageDecoder {
                                            (session.getReadMessages & 0xFFFFFFFFL)))))
             MessageDecoderResult.OK
           } else {
-            session.setAttribute(WAITING_FOR, totalSize)
+            session.setAttribute(WAITING_FOR, new java.lang.Integer(totalSize))
             in.rewind
             MessageDecoderResult.NEED_DATA
           }
