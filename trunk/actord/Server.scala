@@ -136,7 +136,13 @@ class MSubServer {
     
   def getUnexpired(key: String, d: immutable.SortedMap[String, MEntry]): Option[MEntry] =
     d.get(key) match {
-      case s @ Some(el) => if (el.isExpired) None else s
+      case s @ Some(el) => {
+        if (el.isExpired) {
+          mod ! ModDelete(el, true) // TODO: Need CAS here, in case some ModSet's are already queued.
+          None 
+        } else 
+          s
+      }
       case None => None
     }
 
