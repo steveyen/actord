@@ -147,17 +147,27 @@ class MSubServer {
     }
 
   def getMulti(keys: List[String], out: (MEntry) => Unit): Unit = {
-    val d = data // Grab the data snapshot just once, outside the loop.
+    var els: List[MEntry] = Nil
+
+    // Grab the data snapshot just once, outside the loop.
+    //
+    val d = data 
+
     for (key <- keys)
       getUnexpired(key, d) match {
-        case Some(el) => mod ! ModTouch(el, true); out(el)
+        case Some(el) => 
+          els = el :: els
+          out(el)
         case None =>
       }
+
+    if (!els.isEmpty)
+      mod ! ModTouch(els, true)
   }
 
   def get(key: String): Option[MEntry] =
     getUnexpired(key) match {
-      case x @ Some(el) => mod ! ModTouch(el, true); x
+      case x @ Some(el) => mod ! ModTouch(List(el), true); x
       case x @ None => x
     }
 	
@@ -297,8 +307,11 @@ class MSubServer {
                   reply(false)
           }
         
-        case ModTouch(el, noReply) => 
-          touch(el)
+        case ModTouch(els, noReply) => 
+          for (el <- els)
+            if (el.lru.next != null && // The entry might have been deleted already
+                el.lru.prev != null)   // so don't put it back.
+              touch(el)
           if (!noReply) 
               reply(true)
       }
@@ -309,7 +322,7 @@ class MSubServer {
   
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (el: MEntry, noReply: Boolean)
-  case class ModTouch  (el: MEntry, noReply: Boolean)
+  case class ModTouch  (els: Seq[MEntry], noReply: Boolean)
 }
 
 // -------------------------------------------------------
