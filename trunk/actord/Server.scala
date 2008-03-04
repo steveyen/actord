@@ -277,64 +277,81 @@ class MSubServer(val id: Int, val maxMemory: Long) {
       }
       
     var usedMemory = 0L // In bytes.
+    var evictions  = 0L // Number of valid entries that were evicted.
     
     def evictCheck: Unit =
       if (maxMemory > 0L &&
           maxMemory <= usedMemory)    // TODO: Need some slop when doing eviction check?
         evict(usedMemory - maxMemory) // TODO: Should evict slightly more as padding?
       
-    def evict(numBytes: Long): Long = {
-      var dataMod = data           // Snapshot data outside of loop.
-      var evicted = 0L             // Total number of bytes actually evicted.
-      var current = lruHead.next   // Start from least recently used.
+    def evict(numBytes: Long): Unit = {
+      val now       = nowInSeconds
+      var dataMod   = data         // Snapshot data outside of loop.
+      var reclaimed = 0L           // Total number of bytes reclaimed in this call.
+      var current   = lruHead.next // Start from least recently used.
       
-      while (evicted < numBytes &&
+      while (reclaimed < numBytes &&
              current != lruTail &&
              current != null) {
         val n = current.next
         current.remove
         dataMod.get(current.key).foreach(
           existing => {
-            dataMod = dataMod - current.key
-            evicted = evicted + existing.dataSize
+            dataMod   = dataMod - current.key
+            reclaimed = reclaimed + existing.dataSize
+
+            if (!existing.isExpired(now))
+              evictions = evictions + 1
           }
         )
         current = n
       }
       
       data_i_!!(dataMod)
-      usedMemory = usedMemory - evicted
-      
-      evicted
+      usedMemory = usedMemory - reclaimed
     }
     
     loop {
       react {
-        case ModSet(el, noReply) => 
+        case ModSet(el, noReply) => {
+          val dataMod = data
+
           if (el.lru == null) {
-              data.get(el.key).foreach(existing => { el.lru = existing.lru })               
+              dataMod.get(el.key).foreach(
+                existing => { 
+                  el.lru = existing.lru 
+                  
+                  // Keep stats correct on update/set to existing key.
+                  //
+                  usedMemory = usedMemory - existing.dataSize
+                }
+              )
+
               if (el.lru == null)
                   el.lru = new LRUList(el.key, null, null)
           }
           
           touch(el)
 
-          data_i_!!(data + (el.key -> el))
+          data_i_!!(dataMod + (el.key -> el))
           usedMemory = usedMemory + el.dataSize
-          
+        
           if (!noReply) 
               reply(true)
 
           evictCheck
-        
-        case ModDelete(el, noReply) => 
-          data.get(el.key) match {
+        }
+
+        case ModDelete(el, noReply) => {
+          val dataMod = data
+          
+          dataMod.get(el.key) match {
             case Some(current) =>
               if (current.cid == el.cid) {
                 if (el.lru != null) 
                     el.lru.remove
                 
-                data_i_!!(data - el.key)
+                data_i_!!(dataMod - el.key)
                 usedMemory = usedMemory - el.dataSize
                 
                 if (!noReply) 
@@ -348,8 +365,9 @@ class MSubServer(val id: Int, val maxMemory: Long) {
               if (!noReply) 
                   reply(false)
           }
+        }
         
-        case ModTouch(els, noReply) => 
+        case ModTouch(els, noReply) => {
           for (el <- els) {
             if (el.lru != null &&
                 el.lru.next != null && // The entry might have been deleted already
@@ -359,6 +377,7 @@ class MSubServer(val id: Int, val maxMemory: Long) {
           
           if (!noReply) 
               reply(true)
+        }
       }
     }
   }
@@ -378,18 +397,22 @@ case class MEntry(key: String,
                   dataSize: Int, 
                   data: Array[Byte],
                   cid: Long) {       // Unique id for CAS operations.
-  def isExpired = expTime != 0L &&
-                  expTime < nowInSeconds
+  def isExpired: Boolean = 
+      isExpired(nowInSeconds)
   
+  def isExpired(now: Long): Boolean = 
+    expTime != 0L &&
+    expTime < now
+
   // TODO: Revisit the cid + 1L update, as concurrent threads could
   //       generate the same updated cid number.  Not sure if that's
   //       a problem.
   // 
   def updateExpTime(e: Long) =
-    MEntry(key, flags, e, dataSize, data, cid + 1L).lru_!(lru)
+    MEntry(key, flags, e, dataSize, data, cid + 1L)
 
   def updateData(d: Array[Byte]) =
-    MEntry(key, flags, expTime, d.length, d, cid + 1L).lru_!(lru)
+    MEntry(key, flags, expTime, d.length, d, cid + 1L)
   
   /**
    * Concatenate the data arrays from this with that,
@@ -407,14 +430,15 @@ case class MEntry(key: String,
            basis.expTime,
            sizeNew,
            dataNew,
-           basis.cid + 1L).lru_!(basis.lru)
+           basis.cid + 1L)
   }
 
   /**
    * Only the MSubServer mod actor should read or use the lru field.
+   * Note that we don't copy the lru field during updateXxx() or concat()
+   * so that the mod actor can do proper stats accounting.
    */  
   var lru: LRUList = null
-  def lru_!(x: LRUList) = { lru = x; this }
 }
 
 // -------------------------------------------------------
