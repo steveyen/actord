@@ -191,13 +191,13 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 	}
 
   def add(el: MEntry, async: Boolean) = 
-    getUnexpired(el.key) match {
+    getUnexpired(el.key) match { // TODO: Concurrent modification issue.
       case Some(_) => false
       case None => set(el, async)
     }
 
   def replace(el: MEntry, async: Boolean) = 
-    getUnexpired(el.key) match {
+    getUnexpired(el.key) match { // TODO: Concurrent modification issue.
       case Some(_) => set(el, async)
       case None => false
     }
@@ -206,8 +206,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 		getUnexpired(key).map(
 		  el => {
 		    if (time != 0L) {
-		      // TODO: Concurrent dirty writer issue here, so move into mod actor?
-		      //       The case when time != 0L is very special, however.
+		      // TODO: Concurrent modification issue here, so move into mod actor?
+		      //       The case when time != 0L is very special, however,
+		      //       mostly during flushAll.
 		      //
           if (el.expTime == 0L || 
               el.expTime > (nowInSeconds + time)) 
@@ -237,15 +238,11 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       (mod !? ModXPend(el, append, async)).asInstanceOf[Boolean]
 
   def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
-    getUnexpired(el.key) match {
-      case Some(elPrev) => 
-        if (elPrev.cid == cidPrev) { // TODO: Need to move this into mod actor?
-          set(el, async)
-          "STORED"                   // TODO: Get rid of transport/protocol-ism here.
-        } else
-          "EXISTS"
-      case None => "NOT_FOUND"
-    }
+    if (async) {
+      mod ! ModCAS(el, cidPrev, async)
+      "N/A"
+    } else
+      (mod !? ModCAS(el, cidPrev, async)).asInstanceOf[String]
 
 	def keys = data.keys
 	
@@ -422,6 +419,20 @@ class MSubServer(val id: Int, val limitMemory: Long) {
             reply(result)
         }
         
+        case ModCAS(el, cidPrev, noReply) => {
+          val result = (getUnexpired(el.key) match {
+            case Some(elPrev) => 
+              if (elPrev.cid == cidPrev) {
+                setEntry(el)
+                "STORED"                   
+              } else
+                "EXISTS"
+            case None => "NOT_FOUND" // TODO: Get rid of transport/protocol-isms.
+          })
+          if (!noReply)
+            reply(result)
+        }
+        
         case MServerStatsRequest() =>
           reply(MServerStats(data.size, usedMemory, evictions))
       }
@@ -432,9 +443,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (el: MEntry, noReply: Boolean)
-  case class ModTouch  (els: Iterator[MEntry], noReply: Boolean)
-  case class ModDelta  (key: String, delta: Long, noReply: Boolean)
-  case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean)
+  case class ModTouch  (els: Iterator[MEntry],        noReply: Boolean)
+  case class ModDelta  (key: String, delta: Long,     noReply: Boolean)
+  case class ModXPend  (el: MEntry,  append: Boolean, noReply: Boolean)
+  case class ModCAS    (el: MEntry,  cidPrev: Long,   noReply: Boolean)
 }
 
 case class MServerStatsRequest
