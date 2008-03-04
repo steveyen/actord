@@ -206,6 +206,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 		getUnexpired(key).map(
 		  el => {
 		    if (time != 0L) {
+		      // TODO: Concurrent dirty writer issue here, so move into mod actor?
+		      //       The case when time != 0L is very special, however.
+		      //
           if (el.expTime == 0L || 
               el.expTime > (nowInSeconds + time)) 
               set(el.updateExpTime(nowInSeconds + time), async)
