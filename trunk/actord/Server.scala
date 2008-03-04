@@ -43,6 +43,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def this() = this(Runtime.getRuntime.availableProcessors, 0L)
   
   val createdAt = System.currentTimeMillis
+  def version   = "actord-0.0.0"
   
   private val subServers = new Array[MSubServer](subServerNum)
   for (i <- 0 until subServerNum)
@@ -114,10 +115,8 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 	def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
 	
 	def stats = {
-	  val empty = MSubServerStats(0L, 0L, 0L)
-	  val subServerStats = 
-	      subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
-	  subServerStats
+	  val empty = MServerStats(0L, 0L, 0L)
+	  subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
 	}
 }
 
@@ -263,8 +262,8 @@ class MSubServer(val id: Int, val limitMemory: Long) {
         delete(key, expTime, true)
 	}
 	
-	def stats: MSubServerStats = 
-	  (mod !? MSubServerStatsRequest).asInstanceOf[MSubServerStats]
+	def stats: MServerStats = 
+	  (mod !? MServerStatsRequest).asInstanceOf[MServerStats]
 
   // --------------------------------------------
   
@@ -391,8 +390,8 @@ class MSubServer(val id: Int, val limitMemory: Long) {
               reply(true)
         }
         
-        case MSubServerStatsRequest() =>
-             MSubServerStats(data.size, usedMemory, evictions)
+        case MServerStatsRequest() =>
+             MServerStats(data.size, usedMemory, evictions)
       }
     }
   }
@@ -404,14 +403,14 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModTouch  (els: Seq[MEntry], noReply: Boolean)
 }
 
-case class MSubServerStatsRequest
-case class MSubServerStats(numEntries: Long,
-                           usedMemory: Long,
-                           evictions: Long) {
-  def +(that: MSubServerStats) =
-    MSubServerStats(numEntries + that.numEntries, 
-                    usedMemory + that.usedMemory, 
-                    evictions  + that.evictions)
+case class MServerStatsRequest
+case class MServerStats(numEntries: Long,
+                        usedMemory: Long,
+                        evictions: Long) {
+  def +(that: MServerStats) =
+    MServerStats(numEntries + that.numEntries, 
+                 usedMemory + that.usedMemory, 
+                 evictions  + that.evictions)
 }
 
 // -------------------------------------------------------

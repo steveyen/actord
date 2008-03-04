@@ -112,7 +112,7 @@ class MDecoder extends MessageDecoder {
             }),
 
       Spec("version",
-           (svr, cmd, sess) => reply("VERSION actord_0.0.0")),
+           (svr, cmd, sess) => reply("VERSION " + svr.version)),
       Spec("verbosity",
            (svr, cmd, sess) => reply("OK")),
       Spec("quit",
