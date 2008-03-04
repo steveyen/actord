@@ -123,7 +123,7 @@ class MDecoder extends MessageDecoder {
 
       // Extensions to basic protocol.
       //
-      Spec("range <key_from> <key_to>", // key_from is inclusive, key_to is exclusive
+      Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
            (svr, cmd, sess) => { 
              svr.range(cmd.args(1), cmd.args(2)).
                  foreach(el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
