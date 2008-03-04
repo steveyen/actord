@@ -332,34 +332,48 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       usedMemory = usedMemory - reclaimed
     }
     
+    def setEntry(el: MEntry): Unit = {
+      val dataMod = data
+
+      if (el.lru == null) {
+          dataMod.get(el.key).foreach(
+            existing => { 
+              el.lru = existing.lru 
+              
+              // Keep stats correct on update/set to existing key.
+              //
+              usedMemory = usedMemory - existing.dataSize
+            }
+          )
+
+          if (el.lru == null)
+              el.lru = new LRUList(el.key, null, null)
+      }
+      
+      touch(el)
+
+      data_i_!!(dataMod + (el.key -> el))
+      usedMemory = usedMemory + el.dataSize
+    }
+    
     loop {
       react {
-        case ModSet(el, noReply) => {
-          val dataMod = data
-
-          if (el.lru == null) {
-              dataMod.get(el.key).foreach(
-                existing => { 
-                  el.lru = existing.lru 
-                  
-                  // Keep stats correct on update/set to existing key.
-                  //
-                  usedMemory = usedMemory - existing.dataSize
-                }
-              )
-
-              if (el.lru == null)
-                  el.lru = new LRUList(el.key, null, null)
+        case ModTouch(els, noReply) => {
+          for (el <- els) {
+            if (el.lru != null &&
+                el.lru.next != null && // The entry might have been deleted already
+                el.lru.prev != null)   // so don't put it back.
+              touch(el)
           }
           
-          touch(el)
-
-          data_i_!!(dataMod + (el.key -> el))
-          usedMemory = usedMemory + el.dataSize
-        
           if (!noReply) 
               reply(true)
-
+        }
+        
+        case ModSet(el, noReply) => {
+          setEntry(el)
+          if (!noReply) 
+              reply(true)
           evictCheck
         }
 
@@ -388,18 +402,6 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           }
         }
         
-        case ModTouch(els, noReply) => {
-          for (el <- els) {
-            if (el.lru != null &&
-                el.lru.next != null && // The entry might have been deleted already
-                el.lru.prev != null)   // so don't put it back.
-              touch(el)
-          }
-          
-          if (!noReply) 
-              reply(true)
-        }
-        
         case MServerStatsRequest() =>
           reply(MServerStats(data.size, usedMemory, evictions))
       }
@@ -411,6 +413,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (el: MEntry, noReply: Boolean)
   case class ModTouch  (els: Iterator[MEntry], noReply: Boolean)
+  case class ModDelta  (key: String, delta: Long, noReply: Boolean)
+  case class ModAppend  (el: MEntry, noReply: Boolean)
+  case class ModPrepend (el: MEntry, noReply: Boolean)  
 }
 
 case class MServerStatsRequest
