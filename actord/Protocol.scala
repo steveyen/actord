@@ -125,8 +125,8 @@ class MDecoder extends MessageDecoder {
       //
       Spec("range <key_from> <key_to>", // key_from is inclusive, key_to is exclusive
            (svr, cmd, sess) => { 
-             svr.range(cmd.args(1), cmd.args(2),
-                       el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
+             svr.range(cmd.args(1), cmd.args(2)).
+                 foreach(el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
              reply("END")
            }))
            
