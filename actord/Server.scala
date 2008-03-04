@@ -275,8 +275,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   //
   // Also, this actor manages the LRU list and evicts items when necessary.
   //
-  // TODO: Should the mod actor be on its own separate real thread?
-  // TODO: Need to flush LRU when memory gets tight.
+  // TODO: Should the mod actor be on its own separate real, receive-based thread?
   //
   private val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
