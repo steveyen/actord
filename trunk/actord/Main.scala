@@ -24,8 +24,8 @@ object Main
       }
       if (spec.flag == "h") {
         println("actord -- simple mesh of actors\n")
-        println("version: TBD")
-        println("usage: <big-java-command-line> [flags*]\n")
+        println(" version : TBD")
+        println(" usage   : <java-invocation> [flags*]\n")
         for (s <- flagSpecs)
           println(s.spec + "\n " + s.description.split("\n").mkString("\n "))
         System.exit(1)
@@ -57,7 +57,7 @@ object Main
   
   // ------------------------------------------------------
   
-  def parseArgs(args: Array[String]): List[Pair[FlagSpec, Array[String]]] = {
+  def parseArgs(args: Array[String]): List[Pair[FlagSpec, Array[String]]] =
     if (args.isEmpty)
       Nil
     else {
@@ -80,7 +80,6 @@ object Main
                        getOrElse(Pair(errSpec, argParts))
            })
     }
-  }
 
   case class FlagSpec(spec: String, description: String) {
     val parts = spec.split(" ").toList
