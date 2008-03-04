@@ -337,15 +337,14 @@ Name              Type     Meaning
 n/a or unknown...
   connection_structures 32u  Number of connection structures allocated 
                              by the server
-os...
+o.s. or not available in pure java...
   pid               32u      Process id of this server process
   pointer_size      32       Default size of pointers on the host OS
                              (generally 32 or 64)
   rusage_user       32u:32u  Accumulated user time for this process 
                              (seconds:microseconds)
   rusage_system     32u:32u  Accumulated system time for this process 
-                             (seconds:microseconds)
-                             ever since it started
+                             (seconds:microseconds) ever since it started
 global...
   time              32u      current UNIX time according to the server
 mina...
@@ -356,6 +355,8 @@ mina...
                              from network
   bytes_written     64u      Total number of bytes sent by this server to 
                              network
+  threads           32u      Number of worker threads requested.
+                             (see doc/threads.txt)
 session...
   cmd_get           64u      Cumulative number of retrieval requests
   cmd_set           64u      Cumulative number of storage requests
@@ -377,8 +378,6 @@ server...
   uptime            32u      Number of seconds this server has been running
   limit_maxbytes    32u      Number of bytes this server is allowed to
                              use for storage. 
-  threads           32u      Number of worker threads requested.
-                             (see doc/threads.txt)
 */
 }
 
