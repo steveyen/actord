@@ -38,22 +38,23 @@ import ff.actord.Util._
  * We ideally want the MServer/MSubServer classes to be 
  * independent of transport or wire protocol.
  */
-class MServer(subServerNum: Int) {
-  def this() = this(Runtime.getRuntime.availableProcessors)
+class MServer(val subServerNum: Int, val maxMemory: Long) {
+  def this() = this(Runtime.getRuntime.availableProcessors, 0L)
   
   private val subServers = new Array[MSubServer](subServerNum)
   for (i <- 0 until subServerNum)
-    subServers(i) = createSubServer
+    subServers(i) = createSubServer(i)
     
-  def createSubServer: MSubServer = new MSubServer // For overridability.
+  def createSubServer(id: Int): MSubServer = // For overridability.
+    new MSubServer(id, maxMemory / subServerNum)
   
   def subServerForKey(key: String) = 
     if (subServerNum <= 1)
         subServers(0)
     else
-        subServers(subServerIndexForKey(key))
+        subServers(subServerIdForKey(key))
         
-  def subServerIndexForKey(key: String) = key.hashCode % subServerNum   
+  def subServerIdForKey(key: String) = key.hashCode % subServerNum   
         
   def getMulti(keys: Array[String], out: (MEntry) => Unit): Unit = {
     // First group the keys for each subServer, for better 
@@ -64,7 +65,7 @@ class MServer(subServerNum: Int) {
       groupedKeys(i) = Nil
 
     for (key <- keys) {
-      val i = subServerIndexForKey(key)
+      val i = subServerIdForKey(key)
       groupedKeys(i) = key :: groupedKeys(i)
     }
 
@@ -112,7 +113,7 @@ class MServer(subServerNum: Int) {
 
 // --------------------------------------------
 
-class MSubServer {
+class MSubServer(val id: Int, val maxMemory: Long) {
   /**
    * Override to pass in other implementations, such as storage.SMap for persistence.
    */
@@ -274,7 +275,14 @@ class MSubServer {
           lruTail.insert(el.lru)
       }
       
-    def evict(numBytes: Int): Int = {
+    var usedMemory = 0L
+    
+    def evictNow: Unit =
+      if (maxMemory > 0L &&
+          maxMemory <= usedMemory)
+        evict(usedMemory - maxMemory) // TODO: Should evict slightly more as padding?
+      
+    def evict(numBytes: Long): Long = {
       var dataMod = data           // Snapshot data outside of loop.
       var evicted = 0              // Total number of bytes actually evicted.
       var current = lruHead.next   // Start from least recently used.
@@ -312,6 +320,8 @@ class MSubServer {
           data_i_!!(data + (el.key -> el))
           if (!noReply) 
               reply(true)
+              
+          evictNow
         
         case ModDelete(el, noReply) => 
           data.get(el.key) match {
