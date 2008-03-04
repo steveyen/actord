@@ -391,7 +391,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
         }
         
         case MServerStatsRequest() =>
-             MServerStats(data.size, usedMemory, evictions)
+          reply(MServerStats(data.size, usedMemory, evictions))
       }
     }
   }
