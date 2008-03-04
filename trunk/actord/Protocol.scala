@@ -101,9 +101,9 @@ class MDecoder extends MessageDecoder {
       Spec("decr <key> <value> [noreply]",
            (svr, cmd, sess) => reply(svr.delta(cmd.args(1), -cmd.argToLong(2), cmd.noReply))),
            
-//    Spec("stats [<arg>]",
-//         (svr, cmd, sess) => 
-//           reply(svr.stats(cmd.argOrElse(1, null)))),
+      Spec("stats [<arg>]",
+           (svr, cmd, sess) => 
+             reply(stats(svr, cmd.argOrElse(1, null)))),
 
       Spec("flush_all [<delay>] [noreply]",
            (svr, cmd, sess) => {
@@ -296,40 +296,56 @@ class MDecoder extends MessageDecoder {
 
   // ----------------------------------------
 
-//	def stats(arg: String) = {
-//	  var returnData = ""
-//
-//		if (arg == "keys") {
-//		  for ((key, el) <- data)
-//		    returnData += ("STAT key " + key + CRNL)
-//		  returnData + "END"
-//		} else {
-//      returnData += "STAT version " + version + CRNL
-//
-//      returnData += "STAT cmd_gets " + String.valueOf(get_cmds)+ CRNL
-//      returnData += "STAT cmd_sets " + String.valueOf(set_cmds)+ CRNL
-//      returnData += "STAT get_hits " + String.valueOf(get_hits)+ CRNL
-//      returnData += "STAT get_misses " + String.valueOf(get_misses)+ CRNL
-//
-//      returnData += "STAT curr_connections " + String.valueOf(curr_conns)+ CRNL
-//      returnData += "STAT total_connections " + String.valueOf(total_conns)+ CRNL
-//      returnData += "STAT time " + String.valueOf(Now()) + CRNL
-//      returnData += "STAT uptime " + String.valueOf(Now()-this.started) + CRNL
-//      returnData += "STAT cur_items " + String.valueOf(this.data.size()) + CRNL
-//      returnData += "STAT limit_maxbytes "+String.valueOf(maxbytes)+CRNL
-//      returnData += "STAT current_bytes "+String.valueOf(Runtime.getRuntime().totalMemory())+CRNL
-//      returnData += "STAT free_bytes "+String.valueOf(Runtime.getRuntime().freeMemory())+CRNL
-//      
-//      returnData += "STAT pid 0\r\n"
-//      returnData += "STAT rusage_user 0:0\r\n"
-//      returnData += "STAT rusage_system 0:0\r\n"
-//      returnData += "STAT connection_structures 0\r\n"
-//      returnData += "STAT bytes_read 0\r\n"
-//      returnData += "STAT bytes_written 0\r\n"
-//      returnData += "END\r\n"
-//      returnData
-//    }
-//	}
+	def stats(svr: MServer, arg: String) = {
+	  var sb = new StringBuffer
+	  
+	  def statLine(k: String, v: String) = {
+	    sb.append("STAT ")
+	    sb.append(k)
+	    sb.append(" ")		    
+	    sb.append(v)		    
+	    sb.append(CRNL)
+	  }
+		
+		if (arg == "keys") {
+		  for (key <- svr.keys)
+		    statLine("key", key)
+		} else {
+		  val svrStats = svr.stats
+		
+      statLine("version", svr.version)
+
+//    statLine("cmd_gets",   String.valueOf(get_cmds))
+//    statLine("cmd_sets",   String.valueOf(set_cmds))
+//    statLine("get_hits",   String.valueOf(get_hits))
+//    statLine("get_misses", String.valueOf(get_misses))
+
+//    statLine("curr_connections",  String.valueOf(curr_conns))
+//    statLine("total_connections", String.valueOf(total_conns))
+//    statLine("bytes_read",    0.toString)
+//    statLine("bytes_written", 0.toString)
+
+      statLine("time",   new java.util.Date() + " " + System.currentTimeMillis)
+      statLine("uptime", (System.currentTimeMillis - svr.createdAt).toString)
+
+      statLine("curr_items",     svrStats.numEntries.toString)
+      statLine("evictions",      svrStats.evictions.toString)
+      statLine("bytes",          svrStats.usedMemory.toString)
+      statLine("limit_maxbytes", svr.limitMemory.toString)
+      statLine("current_bytes",  Runtime.getRuntime.totalMemory.toString)
+      statLine("free_bytes",     Runtime.getRuntime.freeMemory.toString)
+      
+//    statLine("pid",           0.toString)
+//    statLine("pointer_size",  0.toString)
+//    statLine("rusage_user",   "0:0")
+//    statLine("rusage_system", "0:0")
+//    statLine("threads",       0.toString)
+//    statLine("connection_structures", 0.toString)
+    }
+
+    sb.append("END")
+    sb.toString
+	}
 
 /*
 Name              Type     Meaning
