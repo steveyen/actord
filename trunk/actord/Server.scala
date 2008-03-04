@@ -150,17 +150,16 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   // --------------------------------------------
 
   def getUnexpired(key: String): Option[MEntry] =
-      getUnexpired(key, data)
+      getUnexpired(key, data, true)
     
-  def getUnexpired(key: String, d: immutable.SortedMap[String, MEntry]): Option[MEntry] =
-    d.get(key) match {
+  def getUnexpired(key: String, 
+                   dataMap: immutable.SortedMap[String, MEntry],
+                   queueExpired: Boolean): Option[MEntry] =
+    dataMap.get(key) match {
       case s @ Some(el) => {
         if (el.isExpired) {
-          // Queue delete of expired entry.
-          //
-          // TODO: Many reads of an expired entry will queue up many redundant ModDelete's.
-          //
-          mod ! ModDelete(el, true) 
+          if (queueExpired)
+            mod ! ModDelete(el, true) // TODO: Many readers of expired entries means redundant ModDelete messages.
           None 
         } else 
           s
@@ -172,7 +171,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     // Grab the data snapshot just once, outside the loop.
     //
     val d = data     
-    var r = keys.flatMap(key => getUnexpired(key, d))
+    var r = keys.flatMap(key => getUnexpired(key, d, true))
 
     if (!r.isEmpty)
       mod ! ModTouch(r.elements, true)
