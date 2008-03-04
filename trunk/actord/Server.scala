@@ -112,6 +112,13 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 	}
 	
 	def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
+	
+	def stats = {
+	  val empty = MSubServerStats(0L, 0L, 0L)
+	  val subServerStats = 
+	      subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
+	  subServerStats
+	}
 }
 
 // --------------------------------------------
@@ -255,6 +262,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       else
         delete(key, expTime, true)
 	}
+	
+	def stats: MSubServerStats = 
+	  (mod !? MSubServerStats(0L, 0L, 0L)).asInstanceOf[MSubServerStats]
 
   // --------------------------------------------
   
@@ -380,6 +390,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           if (!noReply) 
               reply(true)
         }
+        
+        case x: MSubServerStats =>
+                MSubServerStats(data.size, usedMemory, evictions)
       }
     }
   }
@@ -389,6 +402,15 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (el: MEntry, noReply: Boolean)
   case class ModTouch  (els: Seq[MEntry], noReply: Boolean)
+}
+
+case class MSubServerStats(numEntries: Long,
+                           usedMemory: Long,
+                           evictions: Long) {
+  def +(that: MSubServerStats) =
+    MSubServerStats(numEntries + that.numEntries, 
+                    usedMemory + that.usedMemory, 
+                    evictions  + that.evictions)
 }
 
 // -------------------------------------------------------
