@@ -61,9 +61,9 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         assertEquals(None,  m.get("a"))
         assertEquals(false, m.replace(ea, false))
         assertEquals(None,  m.get("a"))
-        assertEquals(false, m.append(ea, false))
+        assertEquals(false, m.xpend(ea, true, false))
         assertEquals(None,  m.get("a"))
-        assertEquals(false, m.prepend(ea, false))
+        assertEquals(false, m.xpend(ea, false, false))
         assertEquals(None,  m.get("a"))
         assertEquals(-1L,   m.delta("a", 1L, false))
         assertEquals(None,  m.get("a"))
@@ -185,13 +185,13 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
         
         assertEquals("get 00", None,  m.get("c0"))
-        assertEquals("apd 00", false, m.append(c0, false))
+        assertEquals("apd 00", false, m.xpend(c0, true, false))
         assertEquals("get 00", None,  m.get("c0"))
         assertEquals("set c0", true,  m.set(c0, false))
         assertEquals("get c0", true,  entrySame(m.get("c0"), c0))       
-        assertEquals("apd c1", true,  m.append(c1, false))
+        assertEquals("apd c1", true,  m.xpend(c1, true, false))
         assertEquals("get c1", true,  dataEquals(m.get("c0"), "helloworld".getBytes))
-        assertEquals("apd c2", true,  m.append(c2, false))
+        assertEquals("apd c2", true,  m.xpend(c2, true, false))
         assertEquals("get c2", true,  dataEquals(m.get("c0"), "helloworldthere".getBytes))
 
       case "should prepend data correctly" =>
@@ -200,13 +200,13 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
         
         assertEquals("get 00", None,  m.get("c0"))
-        assertEquals("apd 00", false, m.append(c0, false))
+        assertEquals("apd 00", false, m.xpend(c0, true, false))
         assertEquals("get 00", None,  m.get("c0"))
         assertEquals("set c0", true,  m.set(c0, false))
         assertEquals("get c0", true,  entrySame(m.get("c0"), c0))       
-        assertEquals("ppd c1", true,  m.prepend(c1, false))
+        assertEquals("ppd c1", true,  m.xpend(c1, false, false))
         assertEquals("get c1", true,  dataEquals(m.get("c0"), "worldhello".getBytes))
-        assertEquals("ppd c2", true,  m.prepend(c2, false))
+        assertEquals("ppd c2", true,  m.xpend(c2, false, false))
         assertEquals("get c2", true,  dataEquals(m.get("c0"), "thereworldhello".getBytes))
 
       case "should expire entries" =>

@@ -97,12 +97,9 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 	def delta(key: String, mod: Long, async: Boolean): Long =
     subServerForKey(key).delta(key, mod, async)
     
-  def append(el: MEntry, async: Boolean) =
-    subServerForKey(el.key).append(el, async)
+  def xpend(el: MEntry, append: Boolean, async: Boolean) =
+    subServerForKey(el.key).xpend(el, append, async)
   
-  def prepend(el: MEntry, async: Boolean) =
-    subServerForKey(el.key).prepend(el, async)
-
   def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
     subServerForKey(el.key).checkAndSet(el, cidPrev, async)
 
@@ -222,28 +219,19 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       }
     ).getOrElse(false)
     
-	def delta(key: String, mod: Long, async: Boolean): Long =
-	  getUnexpired(key) match {
-	    case None => -1L
-	    case Some(el) => {
-        val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + mod)
-        val s = v.toString
-        set(el.updateData(s.getBytes), async) // TODO: Should use CAS here.
-        v
-      }
-    }
+  def delta(key: String, v: Long, async: Boolean): Long =
+    if (async) {
+      mod ! ModDelta(key, v, async)
+      0L
+    } else
+      (mod !? ModDelta(key, v, async)).asInstanceOf[Long]
     
-  def append(el: MEntry, async: Boolean) =
-    getUnexpired(el.key) match {
-      case Some(elPrev) => set(elPrev.concat(el, elPrev), async) // TODO: Should use CAS here.
-      case None => false
-    }
-  
-  def prepend(el: MEntry, async: Boolean) =
-    getUnexpired(el.key) match {
-      case Some(elPrev) => set(el.concat(elPrev, elPrev), async) // TODO: Should use CAS here.
-      case None => false
-    }
+  def xpend(el: MEntry, append: Boolean, async: Boolean) =
+    if (async) {
+      mod ! ModXPend(el, append, async)
+      true
+    } else
+      (mod !? ModXPend(el, append, async)).asInstanceOf[Boolean]
 
   def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
     getUnexpired(el.key) match {
@@ -332,7 +320,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       usedMemory = usedMemory - reclaimed
     }
     
-    def setEntry(el: MEntry): Unit = {
+    def setEntry(el: MEntry): Boolean = {
       val dataMod = data
 
       if (el.lru == null) {
@@ -354,6 +342,8 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 
       data_i_!!(dataMod + (el.key -> el))
       usedMemory = usedMemory + el.dataSize
+      
+      true
     }
     
     loop {
@@ -401,6 +391,33 @@ class MSubServer(val id: Int, val limitMemory: Long) {
                   reply(false)
           }
         }
+
+        case ModDelta(key, delta, noReply) => {
+      	  val result = (getUnexpired(key) match {
+      	    case None => -1L
+      	    case Some(el) => {
+              val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + delta)
+              val s = v.toString
+              setEntry(el.updateData(s.getBytes))
+              v
+            }
+          })
+          if (!noReply)
+            reply(result)
+        }
+    
+        case ModXPend(el, append, noReply) => {
+          val result = (getUnexpired(el.key) match {
+            case Some(elPrev) => 
+              if (append)
+                setEntry(elPrev.concat(el, elPrev))
+              else
+                setEntry(el.concat(elPrev, elPrev))
+            case None => false
+          })
+          if (!noReply)
+            reply(result)
+        }
         
         case MServerStatsRequest() =>
           reply(MServerStats(data.size, usedMemory, evictions))
@@ -414,8 +431,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModDelete (el: MEntry, noReply: Boolean)
   case class ModTouch  (els: Iterator[MEntry], noReply: Boolean)
   case class ModDelta  (key: String, delta: Long, noReply: Boolean)
-  case class ModAppend  (el: MEntry, noReply: Boolean)
-  case class ModPrepend (el: MEntry, noReply: Boolean)  
+  case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean)
 }
 
 case class MServerStatsRequest
