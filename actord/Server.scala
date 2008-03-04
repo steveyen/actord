@@ -271,7 +271,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   // --------------------------------------------
   
   // Only this actor is allowed to update the data_i root, 
-  // which serializing modifications.  
+  // which serializes modifications.  
   //
   // Also, this actor manages the LRU list and evicts items when necessary.
   //
