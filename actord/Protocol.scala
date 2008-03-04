@@ -119,6 +119,15 @@ class MDecoder extends MessageDecoder {
            (svr, cmd, sess) => {
              sess.close
              Nil
+           }),
+
+      // Extensions to basic protocol.
+      //
+      Spec("range <key_from> <key_to>", // key_from is inclusive, key_to is exclusive
+           (svr, cmd, sess) => { 
+             svr.range(cmd.args(1), cmd.args(2),
+                       el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
+             reply("END")
            }))
            
   /**

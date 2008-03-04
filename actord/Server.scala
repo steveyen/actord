@@ -118,6 +118,13 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 	  val empty = MServerStats(0L, 0L, 0L)
 	  subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
 	}
+
+  /**
+   * The keyFrom is the range's lower-bound, inclusive.
+   * The keyTo is the range's upper-bound, exclusive.
+   */
+  def range(keyFrom: String, keyTo: String, out: (MEntry) => Unit): Unit = 
+    subServers.foreach(_.range(keyFrom, keyTo, out))
 }
 
 // --------------------------------------------
@@ -157,7 +164,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     }
 
   def getMulti(keys: List[String], out: (MEntry) => Unit): Unit = {
-    var els: List[MEntry] = Nil
+    var els = new mutable.ArrayBuffer[MEntry]
 
     // Grab the data snapshot just once, outside the loop.
     //
@@ -166,18 +173,18 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     for (key <- keys)
       getUnexpired(key, d) match {
         case Some(el) => 
-          els = el :: els
+          els += el
           out(el)
         case None =>
       }
 
     if (!els.isEmpty)
-      mod ! ModTouch(els, true)
+      mod ! ModTouch(els.elements, true)
   }
 
   def get(key: String): Option[MEntry] =
     getUnexpired(key) match {
-      case x @ Some(el) => mod ! ModTouch(List(el), true); x
+      case x @ Some(el) => mod ! ModTouch(Iterator.single(el), true); x
       case x @ None => x
     }
 	
@@ -265,6 +272,13 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 	def stats: MServerStats = 
 	  (mod !? MServerStatsRequest).asInstanceOf[MServerStats]
 
+  def range(keyFrom: String, keyTo: String, out: (MEntry) => Unit): Unit = {
+    var r = data.range(keyFrom, keyTo)
+    for (el <- r.values)
+      out(el)
+    mod ! ModTouch(r.values, true)
+  }
+  
   // --------------------------------------------
   
   // Only this actor is allowed to update the data_i root, 
@@ -400,7 +414,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (el: MEntry, noReply: Boolean)
-  case class ModTouch  (els: Seq[MEntry], noReply: Boolean)
+  case class ModTouch  (els: Iterator[MEntry], noReply: Boolean)
 }
 
 case class MServerStatsRequest
