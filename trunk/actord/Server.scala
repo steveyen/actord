@@ -38,7 +38,8 @@ import ff.actord.Util._
  * We ideally want the MServer/MSubServer classes to be 
  * independent of transport or wire protocol.
  */
-class MServer(val subServerNum: Int, val maxMemory: Long) {
+class MServer(val subServerNum: Int, // Number of local "shards" for this server.
+              val maxMemory: Long) { // Measured in bytes.
   def this() = this(Runtime.getRuntime.availableProcessors, 0L)
   
   private val subServers = new Array[MSubServer](subServerNum)
@@ -256,9 +257,9 @@ class MSubServer(val id: Int, val maxMemory: Long) {
   // --------------------------------------------
   
   // Only this actor is allowed to update the data_i root, 
-  // which serializing writes.  
+  // which serializing modifications.  
   //
-  // Also, this actor manages the LRU list.
+  // Also, this actor manages the LRU list and evicts items when necessary.
   //
   // TODO: Should the mod actor be on its own separate real thread?
   // TODO: Need to flush LRU when memory gets tight.
@@ -275,20 +276,19 @@ class MSubServer(val id: Int, val maxMemory: Long) {
           lruTail.insert(el.lru)
       }
       
-    var usedMemory = 0L
+    var usedMemory = 0L // In bytes.
     
     def evictNow: Unit =
       if (maxMemory > 0L &&
-          maxMemory <= usedMemory)
+          maxMemory <= usedMemory)    // TODO: Need some slop when doing eviction check?
         evict(usedMemory - maxMemory) // TODO: Should evict slightly more as padding?
       
     def evict(numBytes: Long): Long = {
       var dataMod = data           // Snapshot data outside of loop.
-      var evicted = 0              // Total number of bytes actually evicted.
+      var evicted = 0L             // Total number of bytes actually evicted.
       var current = lruHead.next   // Start from least recently used.
       
       while (evicted < numBytes &&
-             evicted >= 0 &&       // Handles overflow siutation.
              current != lruTail &&
              current != null) {
         val n = current.next
@@ -303,6 +303,7 @@ class MSubServer(val id: Int, val maxMemory: Long) {
       }
       
       data_i_!!(dataMod)
+      usedMemory = usedMemory - evicted
       
       evicted
     }
@@ -317,10 +318,13 @@ class MSubServer(val id: Int, val maxMemory: Long) {
           }
           
           touch(el)
+
           data_i_!!(data + (el.key -> el))
+          usedMemory = usedMemory + el.dataSize
+          
           if (!noReply) 
               reply(true)
-              
+
           evictNow
         
         case ModDelete(el, noReply) => 
@@ -329,7 +333,10 @@ class MSubServer(val id: Int, val maxMemory: Long) {
               if (current.cid == el.cid) {
                 if (el.lru != null) 
                     el.lru.remove
+                
                 data_i_!!(data - el.key)
+                usedMemory = usedMemory - el.dataSize
+                
                 if (!noReply) 
                     reply(true)
               } else {
