@@ -278,7 +278,7 @@ class MSubServer(val id: Int, val maxMemory: Long) {
       
     var usedMemory = 0L // In bytes.
     
-    def evictNow: Unit =
+    def evictCheck: Unit =
       if (maxMemory > 0L &&
           maxMemory <= usedMemory)    // TODO: Need some slop when doing eviction check?
         evict(usedMemory - maxMemory) // TODO: Should evict slightly more as padding?
@@ -325,7 +325,7 @@ class MSubServer(val id: Int, val maxMemory: Long) {
           if (!noReply) 
               reply(true)
 
-          evictNow
+          evictCheck
         
         case ModDelete(el, noReply) => 
           data.get(el.key) match {
@@ -350,10 +350,13 @@ class MSubServer(val id: Int, val maxMemory: Long) {
           }
         
         case ModTouch(els, noReply) => 
-          for (el <- els)
-            if (el.lru.next != null && // The entry might have been deleted already
+          for (el <- els) {
+            if (el.lru != null &&
+                el.lru.next != null && // The entry might have been deleted already
                 el.lru.prev != null)   // so don't put it back.
               touch(el)
+          }
+          
           if (!noReply) 
               reply(true)
       }
