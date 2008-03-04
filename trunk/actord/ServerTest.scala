@@ -165,28 +165,20 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         assertEquals("get 00", None, m.get("c1"))
         assertEquals("get 00", None, m.get("c2"))
         
-        var results: List[MEntry] = Nil
-        def addResult(el: MEntry): Unit = { results = el :: results }
-
-        results = Nil
-        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
-        assertEquals("getMulti 00", true, results.isEmpty)
+        assertEquals("getMulti 00", true, m.getMulti(List("c0", "c1", "c2")).toList.isEmpty)
         
         assertEquals("set c0", true, m.set(c0, false))
-        results = Nil
-        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
-        assertEquals("getMulti 01", true, results.map(_.key).sort(_ < _) == List("c0"))
+        assertEquals("getMulti 01", true, m.getMulti(List("c0", "c1", "c2")).
+                                            toList.map(_.key).sort(_ < _) == List("c0"))
 
         assertEquals("set c1", true, m.set(c1, false))
-        results = Nil
-        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
-        assertEquals("getMulti 02", true, results.map(_.key).sort(_ < _) == List("c0", "c1"))
+        assertEquals("getMulti 02", true, m.getMulti(List("c0", "c1", "c2")).
+                                            toList.map(_.key).sort(_ < _) == List("c0", "c1"))
 
         assertEquals("del c0", true, m.delete("c0", 0L, false))
-        results = Nil
-        m.getMulti(List("c0", "c1", "c2").toArray, addResult)
-        assertEquals("getMulti 03", true, results.map(_.key).sort(_ < _) == List("c1"))
-        
+        assertEquals("getMulti 03", true, m.getMulti(List("c0", "c1", "c2")).
+                                            toList.map(_.key).sort(_ < _) == List("c1"))
+
       case "should append data correctly" =>
         val c0 = MEntry("c0", 0L, 0L, 5, "hello".getBytes, 0L)
         val c1 = MEntry("c0", 0L, 0L, 5, "world".getBytes, 0L)

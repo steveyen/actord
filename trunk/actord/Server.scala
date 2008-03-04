@@ -60,21 +60,23 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
         
   def subServerIdForKey(key: String) = key.hashCode % subServerNum   
         
-  def getMulti(keys: Array[String], out: (MEntry) => Unit): Unit = {
+  def getMulti(keys: Seq[String]): Iterator[MEntry] = {
     // First group the keys for each subServer, for better 
     // cache locality and synchronization avoidance.
     //
-    val groupedKeys = new Array[List[String]](subServerNum) 
+    val groupedKeys = new Array[mutable.ArrayBuffer[String]](subServerNum) 
     for (i <- 0 until subServerNum)
-      groupedKeys(i) = Nil
+      groupedKeys(i) = new mutable.ArrayBuffer[String]
 
     for (key <- keys) {
       val i = subServerIdForKey(key)
-      groupedKeys(i) = key :: groupedKeys(i)
+      groupedKeys(i) += key
     }
+    
+    val empty: Iterator[MEntry] = Iterator.empty 
 
-    for (i <- 0 until subServerNum)
-      subServers(i).getMulti(groupedKeys(i), out)
+    (0 until subServerNum).
+      foldLeft(empty)((result, i) => result.append(subServers(i).getMulti(groupedKeys(i))))
   }
 
   def get(key: String): Option[MEntry] =
@@ -163,23 +165,16 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       case None => None
     }
 
-  def getMulti(keys: List[String], out: (MEntry) => Unit): Unit = {
-    var els = new mutable.ArrayBuffer[MEntry]
-
+  def getMulti(keys: Seq[String]): Iterator[MEntry] = {
     // Grab the data snapshot just once, outside the loop.
     //
-    val d = data 
+    val d = data     
+    var r = keys.flatMap(key => getUnexpired(key, d))
 
-    for (key <- keys)
-      getUnexpired(key, d) match {
-        case Some(el) => 
-          els += el
-          out(el)
-        case None =>
-      }
-
-    if (!els.isEmpty)
-      mod ! ModTouch(els.elements, true)
+    if (!r.isEmpty)
+      mod ! ModTouch(r.elements, true)
+      
+    r.elements
   }
 
   def get(key: String): Option[MEntry] =
