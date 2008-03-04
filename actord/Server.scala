@@ -38,8 +38,8 @@ import ff.actord.Util._
  * We ideally want the MServer/MSubServer classes to be 
  * independent of transport or wire protocol.
  */
-class MServer(val subServerNum: Int, // Number of local "shards" for this server.
-              val maxMemory: Long) { // Measured in bytes.
+class MServer(val subServerNum: Int,   // Number of internal "shards" for this server.
+              val limitMemory: Long) { // Measured in bytes.
   def this() = this(Runtime.getRuntime.availableProcessors, 0L)
   
   private val subServers = new Array[MSubServer](subServerNum)
@@ -47,7 +47,7 @@ class MServer(val subServerNum: Int, // Number of local "shards" for this server
     subServers(i) = createSubServer(i)
     
   def createSubServer(id: Int): MSubServer = // For overridability.
-    new MSubServer(id, maxMemory / subServerNum)
+    new MSubServer(id, limitMemory / subServerNum)
   
   def subServerForKey(key: String) = 
     if (subServerNum <= 1)
@@ -114,7 +114,7 @@ class MServer(val subServerNum: Int, // Number of local "shards" for this server
 
 // --------------------------------------------
 
-class MSubServer(val id: Int, val maxMemory: Long) {
+class MSubServer(val id: Int, val limitMemory: Long) {
   /**
    * Override to pass in other implementations, such as storage.SMap for persistence.
    */
@@ -280,9 +280,9 @@ class MSubServer(val id: Int, val maxMemory: Long) {
     var evictions  = 0L // Number of valid entries that were evicted.
     
     def evictCheck: Unit =
-      if (maxMemory > 0L &&
-          maxMemory <= usedMemory)    // TODO: Need some slop when doing eviction check?
-        evict(usedMemory - maxMemory) // TODO: Should evict slightly more as padding?
+      if (limitMemory > 0L &&
+          limitMemory <= usedMemory)    // TODO: Need some slop when doing eviction check?
+        evict(usedMemory - limitMemory) // TODO: Should evict slightly more as padding?
       
     def evict(numBytes: Long): Unit = {
       val now       = nowInSeconds
