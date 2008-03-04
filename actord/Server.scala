@@ -264,7 +264,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 	}
 	
 	def stats: MSubServerStats = 
-	  (mod !? MSubServerStats(0L, 0L, 0L)).asInstanceOf[MSubServerStats]
+	  (mod !? MSubServerStatsRequest).asInstanceOf[MSubServerStats]
 
   // --------------------------------------------
   
@@ -391,8 +391,8 @@ class MSubServer(val id: Int, val limitMemory: Long) {
               reply(true)
         }
         
-        case x: MSubServerStats =>
-                MSubServerStats(data.size, usedMemory, evictions)
+        case MSubServerStatsRequest() =>
+             MSubServerStats(data.size, usedMemory, evictions)
       }
     }
   }
@@ -404,6 +404,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModTouch  (els: Seq[MEntry], noReply: Boolean)
 }
 
+case class MSubServerStatsRequest
 case class MSubServerStats(numEntries: Long,
                            usedMemory: Long,
                            evictions: Long) {
