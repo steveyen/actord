@@ -334,12 +334,11 @@ class MDecoder extends MessageDecoder {
 /*
 Name              Type     Meaning
 ----------------------------------
-n/a
+n/a or unknown...
   connection_structures 32u  Number of connection structures allocated 
                              by the server
-os
+os...
   pid               32u      Process id of this server process
-  time              32u      current UNIX time according to the server
   pointer_size      32       Default size of pointers on the host OS
                              (generally 32 or 64)
   rusage_user       32u:32u  Accumulated user time for this process 
@@ -347,6 +346,8 @@ os
   rusage_system     32u:32u  Accumulated system time for this process 
                              (seconds:microseconds)
                              ever since it started
+global...
+  time              32u      current UNIX time according to the server
 mina...
   curr_connections  32u      Number of open connections
   total_connections 32u      Total number of connections opened since 
