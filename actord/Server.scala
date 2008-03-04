@@ -156,7 +156,11 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     d.get(key) match {
       case s @ Some(el) => {
         if (el.isExpired) {
-          mod ! ModDelete(el, true) // Queue delete of expired entry.
+          // Queue delete of expired entry.
+          //
+          // TODO: Many reads of an expired entry will queue up many redundant ModDelete's.
+          //
+          mod ! ModDelete(el, true) 
           None 
         } else 
           s
@@ -190,18 +194,6 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     true
 	}
 
-  def add(el: MEntry, async: Boolean) = 
-    getUnexpired(el.key) match { // TODO: Concurrent modification issue.
-      case Some(_) => false
-      case None => set(el, async)
-    }
-
-  def replace(el: MEntry, async: Boolean) = 
-    getUnexpired(el.key) match { // TODO: Concurrent modification issue.
-      case Some(_) => set(el, async)
-      case None => false
-    }
-
   def delete(key: String, time: Long, async: Boolean) = 
 		getUnexpired(key).map(
 		  el => {
@@ -223,6 +215,20 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       }
     ).getOrElse(false)
     
+  def add(el: MEntry, async: Boolean) = 
+    if (async) {
+      mod ! ModAdd(el, true, async)
+      true
+    } else
+      (mod !? ModAdd(el, true, async)).asInstanceOf[Boolean]
+
+  def replace(el: MEntry, async: Boolean) = 
+    if (async) {
+      mod ! ModAdd(el, false, async)
+      true
+    } else
+      (mod !? ModAdd(el, false, async)).asInstanceOf[Boolean]
+
   def delta(key: String, v: Long, async: Boolean): Long =
     if (async) {
       mod ! ModDelta(key, v, async)
@@ -392,6 +398,15 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           }
         }
 
+        case ModAdd(el, add, noReply) => {
+          val result = (getUnexpired(el.key) match {
+            case Some(_) => if (add) false else setEntry(el)
+            case None    => if (add) setEntry(el) else false
+          })
+          if (!noReply) 
+              reply(result)
+        }
+
         case ModDelta(key, delta, noReply) => {
       	  val result = (getUnexpired(key) match {
       	    case None => -1L
@@ -445,8 +460,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModDelete (el: MEntry, noReply: Boolean)
   case class ModTouch  (els: Iterator[MEntry],        noReply: Boolean)
   case class ModDelta  (key: String, delta: Long,     noReply: Boolean)
-  case class ModXPend  (el: MEntry,  append: Boolean, noReply: Boolean)
+  case class ModXPend  (el: MEntry,  append: Boolean, noReply: Boolean) // For append/prepend.
   case class ModCAS    (el: MEntry,  cidPrev: Long,   noReply: Boolean)
+  case class ModAdd    (el: MEntry,  add: Boolean,    noReply: Boolean) // For add/replace.
 }
 
 case class MServerStatsRequest
