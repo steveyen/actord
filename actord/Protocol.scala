@@ -61,6 +61,10 @@ case class Spec(line: String,
                 process: (MServer, MCommand, IoSession) => List[MResponse]) {
   val args = line.split(" ")
   val name = args(0)
+  
+  val minArgs = 1 + args.filter(_.startsWith("<")).length
+
+  def checkArgs(a: Seq[String]) = a.length >= minArgs
 }
 
 // -------------------------------------------------------
@@ -241,8 +245,13 @@ class MDecoder extends MessageDecoder {
 
     lineOnlyCommands.get(cmdName).map(
       spec => {
-        out.write(Pair(spec, MCommand(args, null)))
-        MessageDecoderResult.OK
+        if (spec.checkArgs(args)) {
+          out.write(Pair(spec, MCommand(args, null)))
+          MessageDecoderResult.OK
+        } else {
+          out.write(MResponseLine("CLIENT_ERROR args: " + args.mkString(" ")))
+          MessageDecoderResult.OK
+        }
       }
     ) orElse lineWithDataCommands.get(cmdName).map(
       spec => {
@@ -250,7 +259,7 @@ class MDecoder extends MessageDecoder {
   			//   <cmdName> <key> <flags> <expTime> <bytes> [noreply]\r\n
         //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
   			//
-        if (args.length >= 5) {
+        if (spec.checkArgs(args)) {
           var dataSize  = args(4).trim.toInt
           val totalSize = line.length + dataSize + CRNL.length
           if (totalSize <= remaining) {
@@ -289,8 +298,8 @@ class MDecoder extends MessageDecoder {
             MessageDecoderResult.NEED_DATA
           }
         } else {
-          out.write(MResponseLine("CLIENT_ERROR " + cmdName)) // Saw an ill-formed mutator command,
-          MessageDecoderResult.OK                             // but keep going, and decode the next command.
+          out.write(MResponseLine("CLIENT_ERROR args: " + args.mkString(" ")))
+          MessageDecoderResult.OK
         }
       }
     ) getOrElse {
