@@ -73,8 +73,8 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
       groupedKeys(i) += key
     }
     
-    val empty: Iterator[MEntry] = Iterator.empty 
-
+    val empty: Iterator[MEntry] = Iterator.empty
+    
     (0 until subServerNum).
       foldLeft(empty)((result, i) => result.append(subServers(i).getMulti(groupedKeys(i))))
   }
@@ -125,8 +125,10 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
    * The keyFrom is the range's lower-bound, inclusive.
    * The keyTo is the range's upper-bound, exclusive.
    */
-  def range(keyFrom: String, keyTo: String, out: (MEntry) => Unit): Unit = 
-    subServers.foreach(_.range(keyFrom, keyTo, out))
+  def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
+    val empty: Iterator[MEntry] = Iterator.empty 
+    subServers.foldLeft(empty)((result, s) => result.append(s.range(keyFrom, keyTo)))
+  }
 }
 
 // --------------------------------------------
@@ -267,11 +269,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 	def stats: MServerStats = 
 	  (mod !? MServerStatsRequest).asInstanceOf[MServerStats]
 
-  def range(keyFrom: String, keyTo: String, out: (MEntry) => Unit): Unit = {
+  def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
     var r = data.range(keyFrom, keyTo)
-    for (el <- r.values)
-      out(el)
     mod ! ModTouch(r.values, true)
+    r.values
   }
   
   // --------------------------------------------
