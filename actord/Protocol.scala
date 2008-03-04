@@ -151,12 +151,12 @@ class MDecoder extends MessageDecoder {
 
       Spec("append <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.append(cmd.entry, cmd.noReply), 
+              reply(svr.xpend(cmd.entry, true, cmd.noReply), 
                     "STORED", "NOT_STORED")),
 
       Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.prepend(cmd.entry, cmd.noReply), 
+              reply(svr.xpend(cmd.entry, false, cmd.noReply), 
                     "STORED", "NOT_STORED")),
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
