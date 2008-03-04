@@ -347,8 +347,6 @@ rusage_system     32u:32u  Accumulated system time for this process
 curr_items        32u      Current number of items stored by the server
 total_items       32u      Total number of items stored by this server 
                            ever since it started
-bytes             64u      Current number of bytes used by this server 
-                           to store items
 curr_connections  32u      Number of open connections
 total_connections 32u      Total number of connections opened since 
                            the server started running
@@ -360,12 +358,16 @@ get_hits          64u      Number of keys that have been requested and
                            found present
 get_misses        64u      Number of items that have been requested 
                            and not found
-evictions         64u      Number of valid items removed from cache                                                                           
-                           to free memory for new items                                                                                       
 bytes_read        64u      Total number of bytes read by this server 
                            from network
 bytes_written     64u      Total number of bytes sent by this server to 
                            network
+                           
+bytes             64u      Current number of bytes used by this server 
+                           to store items
+evictions         64u      Number of valid items removed from cache                                                                           
+                           to free memory for new items                                                                                       
+
 limit_maxbytes    32u      Number of bytes this server is allowed to
                            use for storage. 
 threads           32u      Number of worker threads requested.
