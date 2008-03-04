@@ -42,7 +42,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
               val limitMemory: Long) { // Measured in bytes.
   def this() = this(Runtime.getRuntime.availableProcessors, 0L)
   
-  val createdAt = new java.util.Date().getTime
+  val createdAt = System.currentTimeMillis
   
   private val subServers = new Array[MSubServer](subServerNum)
   for (i <- 0 until subServerNum)
