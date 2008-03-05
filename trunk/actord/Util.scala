@@ -15,6 +15,9 @@
  */
 package ff.actord
 
+/**
+ * Utilities that are independent of server or client.
+ */
 object Util {
   final val ZERO      = java.lang.Integer.valueOf(0)
   final val CR        = '\r'.asInstanceOf[Byte]
