@@ -31,6 +31,12 @@ import ff.actord.Util._
 object Main
 {
   def main(args: Array[String]) {
+    new MainProg().start(args)
+  }
+}
+
+class MainProg {
+  def start(args: Array[String]) {
     val flagValueList = parseFlags(args)
 
     for (FlagValue(spec, values) <- flagValueList) {
@@ -54,10 +60,10 @@ object Main
     val m = immutable.Map(flagValueList.map(x => (x.spec.name -> x)):_*)
     
     val port      = getFlagValue(m, "port",     "11211").toInt
-    val limitMem  = getFlagValue(m, "limitMem", "64"   ).toInt * 1024 * 1024
+    val limitMem  = getFlagValue(m, "limitMem", "64"   ).toLong * 1024L * 1024L
     val availCpus = Runtime.getRuntime.availableProcessors
     
-    startAcceptor(new MServer(availCpus, limitMem), availCpus, port)
+    startAcceptor(createServer(availCpus, limitMem), availCpus, port)
 
     println("limit memory      : " + limitMem)
     println("available cpus    : " + availCpus)
@@ -67,20 +73,29 @@ object Main
   // ------------------------------------------------------
   
   def startAcceptor(server: MServer, numProcessors: Int, port: Int) = 
-    initAcceptor(server, 
-                 new NioSocketAcceptor(numProcessors)).bind(new InetSocketAddress(port))
+    initAcceptor(server, createAcceptor(numProcessors)).bind(new InetSocketAddress(port))
   
-  def initAcceptor(server: MServer, acceptor: IoAcceptor) = {
-    val codecFactory = new DemuxingProtocolCodecFactory
+  def initAcceptor(server: MServer, acceptor: IoAcceptor): IoAcceptor = {
+    val codecFactory = createCodecFactory
 
-    codecFactory.addMessageDecoder(new MDecoder)
-    codecFactory.addMessageEncoder(classOf[List[MResponse]], new MEncoder)
+    codecFactory.addMessageDecoder(createMessageDecoder)
+    codecFactory.addMessageEncoder(classOf[List[MResponse]], createMessageEncoder)
     
     acceptor.getFilterChain.
-             addLast("codec", new ProtocolCodecFilter(codecFactory))  
-    acceptor.setHandler(new MHandler(server))
+             addLast("codec", createCodecFilter(codecFactory))  
+    acceptor.setHandler(createHandler(server))
     acceptor
   }
+  
+  // Using several simple constructors for easier fine-grained overridability by subclasses.
+  //
+  def createHandler(server: MServer): IoHandler = new MHandler(server)
+  def createServer(numProcessors: Int, limitMem: Long) = new MServer(numProcessors, limitMem)
+  def createAcceptor(numProcessors: Int): IoAcceptor   = new NioSocketAcceptor(numProcessors)
+  def createMessageDecoder: MessageDecoder = new MDecoder
+  def createMessageEncoder: MessageEncoder = new MEncoder
+  def createCodecFactory: DemuxingProtocolCodecFactory     = new DemuxingProtocolCodecFactory
+  def createCodecFilter(f: ProtocolCodecFactory): IoFilter = new ProtocolCodecFilter(f)
   
   // ------------------------------------------------------
 
@@ -99,7 +114,7 @@ object Main
              "Show the version of the server and a summary of options."),
     FlagSpec("verbose", 
              "-v" :: Nil,
-             "Be verbose during the event loop; print out errors and warnings."),
+             "Be verbose during processing; print out errors and warnings."),
     FlagSpec("veryVerbose", 
              "-vv" :: Nil,
              "Be even more verbose; for example, also print client requests and responses.")
