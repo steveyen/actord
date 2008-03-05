@@ -49,6 +49,8 @@ object Main
     println("listening on port : " + port)
   }
   
+  // ------------------------------------------------------
+  
   def startAcceptor(server: MServer, numProcessors: Int, port: Int) = 
     initAcceptor(server, 
                  new NioSocketAcceptor(numProcessors)).bind(new InetSocketAddress(port))
@@ -66,49 +68,7 @@ object Main
   }
   
   // ------------------------------------------------------
-  
-  def parseFlags(args: Array[String]): List[FlagValue] = {
-    val xs = (" " + args.mkString(" ")). // " -a 1 -b -c 2"
-               split(" -")               // ["", "a 1", "b", "c 2"]
-    if (xs.headOption.
-           map(_.trim.length > 0).
-           getOrElse(false))
-      List(FlagValue(errSpec, xs.toList))
-    else
-      xs.drop(1).                        // ["a 1", "b", "c 2"]
-         toList.
-         map(arg => { 
-           val argParts = ("-" + arg).split(" ").toList
-           flagSpecs.find(_.flags.contains(argParts(0))).
-                     map(spec => if (spec.check(argParts))
-                                   FlagValue(spec, argParts.tail)
-                                 else
-                                   FlagValue(errSpec, argParts)).
-                     getOrElse(FlagValue(errSpec, argParts))
-         })
-  }
-  
-  def getFlagValue(flagValues: immutable.Map[String, FlagValue],
-                   flagName: String, defaultVal: String) =
-    flagValues.get(flagName).map(_.value.head).getOrElse(defaultVal)
-  
-  case class FlagValue(spec: FlagSpec, value: List[String])
 
-  case class FlagSpec(name: String, specs: List[String], description: String) {
-    val flags = specs.map(_.split(" ")(0))
-    
-    def check(argParts: List[String]) = 
-      specs.filter(
-        spec => { 
-          val specParts = spec.split(" ")
-          specParts(0) == argParts(0) && 
-          specParts.length == argParts.length
-        }
-      ).isEmpty == false
-  }
-  
-  val errSpec = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")
-  
   def flagSpecs = List(
 //  FlagSpec("ipAddr", 
 //           "-l <ip_addr>" :: Nil,
@@ -153,4 +113,48 @@ object Main
 //           "-P <filename>" :: Nil,
 //           "Print pidfile to <filename>, only used under -d option.")
   )
+  
+  // ------------------------------------------------------
+  
+  def parseFlags(args: Array[String]): List[FlagValue] = {
+    val xs = (" " + args.mkString(" ")). // " -a 1 -b -c 2"
+               split(" -")               // ["", "a 1", "b", "c 2"]
+    if (xs.headOption.
+           map(_.trim.length > 0).
+           getOrElse(false))
+      List(FlagValue(errSpec, xs.toList))
+    else
+      xs.drop(1).                        // ["a 1", "b", "c 2"]
+         toList.
+         map(arg => { 
+           val argParts = ("-" + arg).split(" ").toList
+           flagSpecs.find(_.flags.contains(argParts(0))).
+                     map(spec => if (spec.check(argParts))
+                                   FlagValue(spec, argParts.tail)
+                                 else
+                                   FlagValue(errSpec, argParts)).
+                     getOrElse(FlagValue(errSpec, argParts))
+         })
+  }
+  
+  def getFlagValue(flagValues: immutable.Map[String, FlagValue],
+                   flagName: String, defaultVal: String) =
+    flagValues.get(flagName).map(_.value.head).getOrElse(defaultVal)
+  
+  case class FlagValue(spec: FlagSpec, value: List[String])
+
+  case class FlagSpec(name: String, specs: List[String], description: String) {
+    val flags = specs.map(_.split(" ")(0))
+    
+    def check(argParts: List[String]) = 
+      specs.filter(
+        spec => { 
+          val specParts = spec.split(" ")
+          specParts(0) == argParts(0) && 
+          specParts.length == argParts.length
+        }
+      ).isEmpty == false
+  }
+  
+  val errSpec = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")
 }
