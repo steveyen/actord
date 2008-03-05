@@ -36,7 +36,7 @@ object Main
       }
     }
     
-    val m = immutable.Map(flagValueList.map(x => (x.spec.name -> x.value)):_*)
+    val m = immutable.Map(flagValueList.map(x => (x.spec.name -> x)):_*)
     
     val port      = getFlagValue(m, "port",     "11211").toInt
     val limitMem  = getFlagValue(m, "limitMem", "64"   ).toInt * 1024 * 1024
@@ -88,9 +88,9 @@ object Main
          })
   }
   
-  def getFlagValue(flagValues: immutable.Map[String, List[String]],
+  def getFlagValue(flagValues: immutable.Map[String, FlagValue],
                    flagName: String, defaultVal: String) =
-    flagValues.get(flagName).map(_.head).getOrElse(defaultVal)
+    flagValues.get(flagName).map(_.value.head).getOrElse(defaultVal)
   
   case class FlagValue(spec: FlagSpec, value: List[String])
 
@@ -116,18 +116,9 @@ object Main
     FlagSpec("limitMem", 
              "-m <num>" :: Nil,
              "Use <num> MB memory max for object storage; the default is 64 MB."),
-    FlagSpec("noExpire", 
-             "-M" :: Nil,
-             "Instead of expiring items when max memory is reached, throw an error."),
-    FlagSpec("maxConn", 
-             "-c <num>" :: Nil,
-             "Use <num> max simultaneous connections; the default is 1024."),
     FlagSpec("port", 
              "-p <num>" :: Nil,
              "Listen on port <num>, the default is port 11211."),
-    FlagSpec("growCore", 
-             "-r" :: Nil,
-             "Raise the core file size limit to the maximum allowable."),
     FlagSpec("help", 
              "-h" :: "-?" :: "--help" :: Nil,
              "Show the version of the server and a summary of options."),
@@ -137,6 +128,15 @@ object Main
     FlagSpec("veryVerbose", 
              "-vv" :: Nil,
              "Be even more verbose; for example, also print client requests and responses.")
+//  FlagSpec("noExpire", 
+//           "-M" :: Nil,
+//           "Instead of expiring items when max memory is reached, throw an error."),
+//  FlagSpec("maxConn", 
+//           "-c <num>" :: Nil,
+//           "Use <num> max simultaneous connections; the default is 1024."),
+//  FlagSpec("growCore", 
+//           "-r" :: Nil,
+//           "Raise the core file size limit to the maximum allowable."),
 //  FlagSpec("daemon", 
 //           "-d" :: Nil,
 //           "Run server as a daemon."),
