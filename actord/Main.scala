@@ -16,9 +16,9 @@ import ff.actord.Util._
 object Main
 {
   def main(args: Array[String]) {
-    val flags = parseArgs(args)
+    val flagValueList = parseFlags(args)
 
-    for ((spec, values) <- flags) {
+    for (FlagValue(spec, values) <- flagValueList) {
       if (spec == errSpec) {
         println("error: " + spec.specs.mkString(" | ") + " : " + values.mkString(" ").trim)
         System.exit(1)
@@ -36,11 +36,17 @@ object Main
       }
     }
     
-    startAcceptor(new MServer, 
-                  Runtime.getRuntime.availableProcessors, 
-                  11211)
+    val m = immutable.Map(flagValueList.map(x => (x.spec.name -> x.value)):_*)
+    
+    val port      = getFlagValue(m, "port",     "11211").toInt
+    val limitMem  = getFlagValue(m, "limitMem", "64"   ).toInt * 1024 * 1024
+    val availCpus = Runtime.getRuntime.availableProcessors
+    
+    startAcceptor(new MServer(availCpus, limitMem), availCpus, port)
 
-    println("listening on port " + 11211)
+    println("limit memory      : " + limitMem)
+    println("available cpus    : " + availCpus)
+    println("listening on port : " + port)
   }
   
   def startAcceptor(server: MServer, numProcessors: Int, port: Int) = 
@@ -61,41 +67,44 @@ object Main
   
   // ------------------------------------------------------
   
-  def parseArgs(args: Array[String]): List[Pair[FlagSpec, Array[String]]] = {
+  def parseFlags(args: Array[String]): List[FlagValue] = {
     val xs = (" " + args.mkString(" ")). // " -a 1 -b -c 2"
                split(" -")               // ["", "a 1", "b", "c 2"]
     if (xs.headOption.
            map(_.trim.length > 0).
            getOrElse(false))
-      List(Pair(errSpec, xs))
+      List(FlagValue(errSpec, xs.toList))
     else
       xs.drop(1).                        // ["a 1", "b", "c 2"]
          toList.
          map(arg => { 
-           val argParts = arg.split(" ")
-           val flag     = "-" + argParts(0)
-           flagSpecs.find(_.flags.contains(flag)).
+           val argParts = ("-" + arg).split(" ").toList
+           flagSpecs.find(_.flags.contains(argParts(0))).
                      map(spec => if (spec.check(argParts))
-                                   Pair(spec, argParts)
+                                   FlagValue(spec, argParts.tail)
                                  else
-                                   Pair(errSpec, argParts)).
-                     getOrElse(Pair(errSpec, argParts))
+                                   FlagValue(errSpec, argParts)).
+                     getOrElse(FlagValue(errSpec, argParts))
          })
   }
+  
+  def getFlagValue(flagValues: immutable.Map[String, List[String]],
+                   flagName: String, defaultVal: String) =
+    flagValues.get(flagName).map(_.head).getOrElse(defaultVal)
+  
+  case class FlagValue(spec: FlagSpec, value: List[String])
 
   case class FlagSpec(name: String, specs: List[String], description: String) {
     val flags = specs.map(_.split(" ")(0))
     
-    def check(argParts: Array[String]) = {
-      val flag = "-" + argParts(0)
+    def check(argParts: List[String]) = 
       specs.filter(
         spec => { 
           val specParts = spec.split(" ")
-          specParts(0) == flag && 
+          specParts(0) == argParts(0) && 
           specParts.length == argParts.length
         }
       ).isEmpty == false
-    }
   }
   
   val errSpec = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")
@@ -104,7 +113,7 @@ object Main
 //  FlagSpec("ipAddr", 
 //           "-l <ip_addr>" :: Nil,
 //           "Listen on <ip_addr>; default to INDRR_ANY.\nThis is an important option to consider for security.\nBinding to an internal or firewalled network interface is suggested."),
-    FlagSpec("limitMemory", 
+    FlagSpec("limitMem", 
              "-m <num>" :: Nil,
              "Use <num> MB memory max for object storage; the default is 64 MB."),
     FlagSpec("noExpire", 
