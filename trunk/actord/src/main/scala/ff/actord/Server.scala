@@ -79,14 +79,14 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   
   // --------------------------------------------------
   
-  var getPf: MServer.MGetPf = createGetPf
-  var setPf: MServer.MSetPf = createSetPf
+  var getPf: MServer.MGetPf = defaultGetPf
+  var setPf: MServer.MSetPf = defaultSetPf
   
-  def createGetPf: MServer.MGetPf = { 
+  def defaultGetPf: MServer.MGetPf = { 
     case _ => { k => subServerForKey(k).get(k) }
   }
 	
-  def createSetPf: MServer.MSetPf = { 
+  def defaultSetPf: MServer.MSetPf = { 
     case ("set", _, _)     => { (el, async) => subServerForKey(el.key).set(el, async) }
     case ("add", _, _)     => { (el, async) => subServerForKey(el.key).add(el, async) }
     case ("replace", _, _) => { (el, async) => subServerForKey(el.key).replace(el, async) }
