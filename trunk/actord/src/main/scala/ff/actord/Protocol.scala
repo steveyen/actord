@@ -479,11 +479,3 @@ case class MResponseLineEntry(line: String, entry: MEntry) extends MResponse {
   }
 }
 
-// -------------------------------------------------------
-
-class MStats(var set_cmds: Long,
-             var get_cmds: Long,
-             var get_hits: Long,
-             var get_misses: Long) {
-  def this() = this(0, 0, 0, 0)
-}
