@@ -24,7 +24,7 @@ import ff.actord.Util._
 object MServer {
   def version = "actord-0.1.0"
 
-  type MGetPf    = PartialFunction[String, String => Option[MEntry]]
+  type MGetPf    = PartialFunction[Seq[String], Seq[String] => Iterator[MEntry]]
   type MSetPf    = PartialFunction[(String, MEntry, Boolean), (MEntry, Boolean) => Boolean]
   type MDeletePf = PartialFunction[(String, Long, Boolean), (String, Long, Boolean) => Boolean]
   type MActPf    = PartialFunction[(MEntry, Boolean), (MEntry, Boolean) => Iterator[MEntry]]
@@ -81,13 +81,13 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   
   // --------------------------------------------------
   
-  var getPf: MServer.MGetPf       = defaultGetPf
-  var setPf: MServer.MSetPf       = defaultSetPf
+  var getPf:    MServer.MGetPf    = defaultGetPf
+  var setPf:    MServer.MSetPf    = defaultSetPf
   var deletePf: MServer.MDeletePf = defaultDeletePf
-  var actPf: MServer.MActPf       = defaultActPf
+  var actPf:    MServer.MActPf    = defaultActPf
   
   def defaultGetPf: MServer.MGetPf = { 
-    case _ => { k => subServerForKey(k).get(k) }
+    case _ => { getMulti _ }
   }
 	
   def defaultSetPf: MServer.MSetPf = { 
@@ -106,6 +106,14 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   
   // --------------------------------------------------
 
+  def get(keys: Seq[String]): Iterator[MEntry] = getPf(keys)(keys)
+
+  /**
+   * This is the default implementation of get (see the defaultGetPf partial function)
+   * that groups the keys into the buckets to efficiently send to the right subServer.
+   * Note that the ordering of the result Iterator[MEntry] will not follow the 
+   * ordering of the input keys.
+   */  
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
     // First group the keys for each subServer, for better 
     // cache locality and synchronization avoidance.
@@ -125,7 +133,6 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
       foldLeft(empty)((result, i) => result.append(subServers(i).getMulti(groupedKeys(i))))
   }
 
-  def get(key: String): Option[MEntry]    = getPf(key)(key)
   def set(el: MEntry, async: Boolean)     = setPf("set",     el, async)(el, async)
   def add(el: MEntry, async: Boolean)     = setPf("add",     el, async)(el, async)
   def replace(el: MEntry, async: Boolean) = setPf("replace", el, async)(el, async)
@@ -225,12 +232,6 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     r.elements
   }
 
-  def get(key: String): Option[MEntry] =
-    getUnexpired(key) match {
-      case x @ Some(el) => mod ! ModTouch(Iterator.single(el), true); x
-      case x @ None => x
-    }
-	
   def set(el: MEntry, async: Boolean) = {
     if (async)
       mod ! ModSet(el, async)
