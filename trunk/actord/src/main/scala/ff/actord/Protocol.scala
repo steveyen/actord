@@ -50,6 +50,8 @@ class MHandler(server: MServer) extends IoHandlerAdapter {
   }
 }
 
+// -------------------------------------------------------
+
 /**
  * Represents a specification, of a command in the protocol.
  *
@@ -79,6 +81,8 @@ case class Spec(line: String,
 class MDecoder extends MessageDecoder {
   /**
    * Commands defined with a single line.
+   *
+   * Subclasses might override this list to add custom commands.
    */
   def lineOnlySpecs = List( 
       Spec("get <key>*",
@@ -136,6 +140,8 @@ class MDecoder extends MessageDecoder {
            
   /**
    * Commands that use a line followed by byte data.
+   *
+   * Subclasses might override this list to add custom commands.
    */
   def lineWithDataSpecs = List( 
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
@@ -366,52 +372,54 @@ class MDecoder extends MessageDecoder {
 	}
 
 /*
-Name              Type     Meaning
-----------------------------------
-n/a or unknown...
-  connection_structures 32u  Number of connection structures allocated 
-                             by the server
-o.s. or not available in pure java...
-  pid               32u      Process id of this server process
-  pointer_size      32       Default size of pointers on the host OS
-                             (generally 32 or 64)
-  rusage_user       32u:32u  Accumulated user time for this process 
-                             (seconds:microseconds)
-  rusage_system     32u:32u  Accumulated system time for this process 
-                             (seconds:microseconds) ever since it started
-global...
-  time              32u      current UNIX time according to the server
-mina...
-  curr_connections  32u      Number of open connections
-  total_connections 32u      Total number of connections opened since 
-                             the server started running
-  bytes_read        64u      Total number of bytes read by this server 
-                             from network
-  bytes_written     64u      Total number of bytes sent by this server to 
-                             network
-  threads           32u      Number of worker threads requested.
-                             (see doc/threads.txt)
-session...
-  cmd_get           64u      Cumulative number of retrieval requests
-  cmd_set           64u      Cumulative number of storage requests
-  get_hits          64u      Number of keys that have been requested and 
-                             found present
-  get_misses        64u      Number of items that have been requested 
-                             and not found
-subServer...                           
-  curr_items        32u      Current number of items stored by the server
-  total_items       32u      Total number of items stored by this server 
-    note: not sure what's the difference between total_items and cmd_set
+    Info on how stats should work, from memcached protocol.txt...
     
-  bytes             64u      Current number of bytes used by this server 
-                             to store items
-  evictions         64u      Number of valid items removed from cache                                                                           
-                             to free memory for new items                                                                                       
-server...
-  version           string   Version string of this server
-  uptime            32u      Number of seconds this server has been running
-  limit_maxbytes    32u      Number of bytes this server is allowed to
-                             use for storage. 
+    Name              Type     Meaning
+    ----------------------------------
+    n/a or unknown...
+      connection_structures 32u  Number of connection structures allocated 
+                                 by the server
+    o.s. or not available in pure java...
+      pid               32u      Process id of this server process
+      pointer_size      32       Default size of pointers on the host OS
+                                 (generally 32 or 64)
+      rusage_user       32u:32u  Accumulated user time for this process 
+                                 (seconds:microseconds)
+      rusage_system     32u:32u  Accumulated system time for this process 
+                                 (seconds:microseconds) ever since it started
+    global...
+      time              32u      current UNIX time according to the server
+    mina...
+      curr_connections  32u      Number of open connections
+      total_connections 32u      Total number of connections opened since 
+                                 the server started running
+      bytes_read        64u      Total number of bytes read by this server 
+                                 from network
+      bytes_written     64u      Total number of bytes sent by this server to 
+                                 network
+      threads           32u      Number of worker threads requested.
+                                 (see doc/threads.txt)
+    session...
+      cmd_get           64u      Cumulative number of retrieval requests
+      cmd_set           64u      Cumulative number of storage requests
+      get_hits          64u      Number of keys that have been requested and 
+                                 found present
+      get_misses        64u      Number of items that have been requested 
+                                 and not found
+    subServer...                           
+      curr_items        32u      Current number of items stored by the server
+      total_items       32u      Total number of items stored by this server 
+        note: not sure what's the difference between total_items and cmd_set
+        
+      bytes             64u      Current number of bytes used by this server 
+                                 to store items
+      evictions         64u      Number of valid items removed from cache                                                                           
+                                 to free memory for new items                                                                                       
+    server...
+      version           string   Version string of this server
+      uptime            32u      Number of seconds this server has been running
+      limit_maxbytes    32u      Number of bytes this server is allowed to
+                                 use for storage. 
 */
 }
 

@@ -44,12 +44,19 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   
   val createdAt = System.currentTimeMillis
   def version   = "actord-0.0.0"
-  
+
+  /**
+   * Track an array of MSubServers, meant to locally "shard" the 
+   * key/value data across multiple cores.
+   */
   private val subServers = new Array[MSubServer](subServerNum)
   for (i <- 0 until subServerNum)
     subServers(i) = createSubServer(i)
-    
-  def createSubServer(id: Int): MSubServer = // For overridability.
+  
+  /**
+   * Subclasses might override to provide a custom MSubServer.
+   */
+  def createSubServer(id: Int): MSubServer = 
     new MSubServer(id, limitMemory / subServerNum)
   
   def subServerForKey(key: String) = 
@@ -57,9 +64,14 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
         subServers(0)
     else
         subServers(subServerIdForKey(key))
-        
+
+  /**
+   * Subclasses might override to provide a better hashing.
+   */
   def subServerIdForKey(key: String) = key.hashCode % subServerNum   
-        
+  
+  // --------------------------------------------------
+
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
     // First group the keys for each subServer, for better 
     // cache locality and synchronization avoidance.
@@ -145,7 +157,12 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   private def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
     synchronized { data_i = d }  
   
-  def data = synchronized { data_i } // Allows threads to snapshot the tree's root.
+  /**
+   * The data method allows threads to snapshot the immutable tree's root,
+   * which is great for concurrent readers, who can then 
+   * concurrently walk the tree.
+   */
+  def data = synchronized { data_i } 
   
   // --------------------------------------------
 
@@ -270,13 +287,15 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   
   // --------------------------------------------
   
-  // Only this actor is allowed to update the data_i root, 
-  // which serializes modifications.  
-  //
-  // Also, this actor manages the LRU list and evicts items when necessary.
-  //
-  // TODO: Should the mod actor be on its own separate real, receive-based thread?
-  //
+  /**
+   * Only the "mod" actor is allowed to update the data_i root. 
+   * Also, the mod actor manages the LRU list and evicts entries when necessary.
+   * This design serializes modifications, which is why we usually create one 
+   * MSubServer (and a matching mod actor) per processor core, to increase
+   * writer concurrency.
+   *
+   * TODO: Should the mod actor be on its own separate real, receive-based thread?
+   */
   private val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
     val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
@@ -290,8 +309,11 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       }
       
     var usedMemory = 0L // In bytes.
-    var evictions  = 0L // Number of valid entries that were evicted.
-    
+    var evictions  = 0L // Number of valid entries that were evicted since server start.
+
+    /**
+     * Runs eviction if memory is over limits.
+     */    
     def evictCheck: Unit =
       if (limitMemory > 0L &&
           limitMemory <= usedMemory)    // TODO: Need some slop when doing eviction check?

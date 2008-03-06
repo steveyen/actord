@@ -36,6 +36,9 @@ object Main
 }
 
 class MainProg {
+  /**
+   * Start a server, parsing command-line arguments.
+   */
   def start(args: Array[String]) {
     val flagValueList = parseFlags(args)
 
@@ -87,7 +90,7 @@ class MainProg {
     acceptor
   }
   
-  // Using several simple constructors for easier fine-grained overridability by subclasses.
+  // Here are simple constructors that can be easily overridden by subclasses.
   //
   def createHandler(server: MServer): IoHandler = new MHandler(server)
   def createServer(numProcessors: Int, limitMem: Long) = new MServer(numProcessors, limitMem)
@@ -99,6 +102,10 @@ class MainProg {
   
   // ------------------------------------------------------
 
+  /**
+   * Specifications of command-line parameters or flags.  
+   * Subclasses might override this method to add/remove entries to the list.
+   */
   def flagSpecs = List(
 //  FlagSpec("ipAddr", 
 //           "-l <ip_addr>" :: Nil,
@@ -145,7 +152,12 @@ class MainProg {
   )
   
   // ------------------------------------------------------
-  
+
+  /**
+   * Parse the flags on a command-line.  The returned list
+   * might have an entry of FlagValue(errSpec, ...) to signal 
+   * a parsing error.
+   */
   def parseFlags(args: Array[String]): List[FlagValue] = {
     val xs = (" " + args.mkString(" ")). // " -a 1 -b -c 2"
                split(" -")               // ["", "a 1", "b", "c 2"]
@@ -185,6 +197,9 @@ class MainProg {
         }
       ).isEmpty == false
   }
-  
+
+  /**
+   * A sentinel value or singleton that signals a parseFlags error.
+   */  
   val errSpec = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")
 }
