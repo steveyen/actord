@@ -50,7 +50,7 @@ class MainProg {
 
       if (spec.name == "help") {
         println("actord -- simple mesh of actors\n")
-        println(" version : TBD")
+        println(" version : " + MServer.version)
         println(" usage   : <java-invocation> [flags*]\n")
         for (s <- flagSpecs) {
           println(s.specs.mkString(" | "))

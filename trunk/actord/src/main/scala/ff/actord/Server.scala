@@ -21,6 +21,10 @@ import scala.actors.Actor._
 
 import ff.actord.Util._
 
+object MServer {
+  def version = "actord-0.1.0"
+}
+
 /**
  * Tracks key/value entries and their LRU (least-recently-used) history.
  *
@@ -43,7 +47,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def this() = this(Runtime.getRuntime.availableProcessors, 0L)
   
   val createdAt = System.currentTimeMillis
-  def version   = "actord-0.0.0"
+  def version   = MServer.version
 
   /**
    * Track an array of MSubServers, meant to locally "shard" the 
