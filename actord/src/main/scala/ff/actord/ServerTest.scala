@@ -54,96 +54,96 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
     println("test: " + name)
     name match {
       case "should be empty after creation" =>
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         assertEquals(false, m.delete("a", 0L, false))
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         assertEquals(false, m.delete("a", 1L, false))      
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         assertEquals(false, m.replace(ea, false))
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         assertEquals(false, m.xpend(ea, true, false))
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         assertEquals(false, m.xpend(ea, false, false))
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         assertEquals(-1L,   m.delta("a", 1L, false))
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         assertEquals("NOT_FOUND", m.checkAndSet(ea, 0L, false))
-        assertEquals(None,  m.get("a"))
+        assertEquals(true,  m.get(List("a")).toList.isEmpty)
         
       case "should support get after set" =>
-        assertEquals("get 0", None, m.get("a"))
+        assertEquals("get 0", true, m.get(List("a")).toList.isEmpty)
         assertEquals("set 1", true, m.set(ea, false))
-        assertEquals("get 1", true, entrySame(m.get("a"), ea))
-        assertEquals("get 1", true, entrySame(m.get("a"), ea))
+        assertEquals("get 1", true, entrySame(m.get(List("a")), ea))
+        assertEquals("get 1", true, entrySame(m.get(List("a")), ea))
         assertEquals("add x", false, m.add(ea, false))
   
       case "should support set calls on the same key" =>
-        assertEquals("get 0", None, m.get("a"))
+        assertEquals("get 0", true, m.get(List("a")).toList.isEmpty)
         assertEquals("set 1", true, m.set(ea, false))
-        assertEquals("get 1", true, entrySame(m.get("a"), ea))
+        assertEquals("get 1", true, entrySame(m.get(List("a")), ea))
         assertEquals("set 2", true, m.set(ea, false))
-        assertEquals("get 2", true, entrySame(m.get("a"), ea))
+        assertEquals("get 2", true, entrySame(m.get(List("a")), ea))
         assertEquals("set 3", true, m.set(ea2, false))
-        assertEquals("get 3", true, entrySame(m.get("a"), ea2))
+        assertEquals("get 3", true, entrySame(m.get(List("a")), ea2))
   
       case "should support add and replace operations" =>
-        assertEquals("get 0", None,  m.get("a"))
+        assertEquals("get 0", true,  m.get(List("a")).toList.isEmpty)
         assertEquals("rep x", false, m.replace(ea2, false))
-        assertEquals("get 0", None,  m.get("a"))
+        assertEquals("get 0", true,  m.get(List("a")).toList.isEmpty)
         assertEquals("add 1", true,  m.add(ea, false))
-        assertEquals("get 1", true,  entrySame(m.get("a"), ea))
+        assertEquals("get 1", true,  entrySame(m.get(List("a")), ea))
         assertEquals("add x", false, m.add(ea2, false))
-        assertEquals("get 1", true,  entrySame(m.get("a"), ea))
+        assertEquals("get 1", true,  entrySame(m.get(List("a")), ea))
         assertEquals("rep 1", true,  m.replace(ea, false))
-        assertEquals("get 1", true,  entrySame(m.get("a"), ea))
+        assertEquals("get 1", true,  entrySame(m.get(List("a")), ea))
         assertEquals("rep 2", true,  m.replace(ea2, false))
-        assertEquals("get 2", true,  entrySame(m.get("a"), ea2))
+        assertEquals("get 2", true,  entrySame(m.get(List("a")), ea2))
   
       case "should support delete calls of 0 expTime" =>
-        assertEquals("get 0", None,  m.get("a"))
+        assertEquals("get 0", true,  m.get(List("a")).toList.isEmpty)
         assertEquals("del 0", false, m.delete("a", 0L, false))
-        assertEquals("get 0", None,  m.get("a"))
+        assertEquals("get 0", true,  m.get(List("a")).toList.isEmpty)
         assertEquals("set 1", true,  m.set(ea, false))
-        assertEquals("get 1", true,  entrySame(m.get("a"), ea))
+        assertEquals("get 1", true,  entrySame(m.get(List("a")), ea))
         assertEquals("del 1", true,  m.delete("a", 0L, false))
-        assertEquals("get x", None,  m.get("a"))
+        assertEquals("get x", true,  m.get(List("a")).toList.isEmpty)
   
       case "should support delta calls" =>
-        assertEquals("get 0", None, m.get("a"))
+        assertEquals("get 0", true, m.get(List("a")).toList.isEmpty)
         assertEquals("set 0", true, m.set(simpleEntry("a", "0"), false))
-        assertEquals("get 0", true, entrySame(m.get("a"), simpleEntry("a", "0")))
+        assertEquals("get 0", true, entrySame(m.get(List("a")), simpleEntry("a", "0")))
         assertEquals("inc 1", 1L,   m.delta("a", 1L, false))
-        assertEquals("get x", true, dataSame(m.get("a"), simpleEntry("a", "1")))
+        assertEquals("get x", true, dataSame(m.get(List("a")), simpleEntry("a", "1")))
         assertEquals("inc 1", 2L,   m.delta("a", 1L, false))
         assertEquals("inc 1", 3L,   m.delta("a", 1L, false))
         assertEquals("inc 1", 4L,   m.delta("a", 1L, false))
-        assertEquals("get y", true, dataSame(m.get("a"), simpleEntry("a", "4")))
+        assertEquals("get y", true, dataSame(m.get(List("a")), simpleEntry("a", "4")))
         assertEquals("dec 1", 3L,   m.delta("a", -1L, false))
-        assertEquals("get z", true, dataSame(m.get("a"), simpleEntry("a", "3")))
+        assertEquals("get z", true, dataSame(m.get(List("a")), simpleEntry("a", "3")))
         assertEquals("dec 1", 2L,   m.delta("a", -1L, false))
         assertEquals("dec 1", 1L,   m.delta("a", -1L, false))
         assertEquals("dec 1", 0L,   m.delta("a", -1L, false))
-        assertEquals("get w", true, dataSame(m.get("a"), simpleEntry("a", "0")))
+        assertEquals("get w", true, dataSame(m.get(List("a")), simpleEntry("a", "0")))
         
         // Test underflow.
         //
         assertEquals("dec 1", 0L,   m.delta("a", -1L, false))
-        assertEquals("get m", true, dataSame(m.get("a"), simpleEntry("a", "0")))
+        assertEquals("get m", true, dataSame(m.get(List("a")), simpleEntry("a", "0")))
         assertEquals("dec 1", 0L,   m.delta("a", -1L, false))
-        assertEquals("get n", true, dataSame(m.get("a"), simpleEntry("a", "0")))
+        assertEquals("get n", true, dataSame(m.get(List("a")), simpleEntry("a", "0")))
         
       case "should support checkAndSet" =>
         val c0 = MEntry("c", 0L, 0L, 0, new Array[Byte](0), 0L)
         val c1 = MEntry("c", 1L, 0L, 0, new Array[Byte](0), 1L)
         val c2 = MEntry("c", 2L, 0L, 0, new Array[Byte](0), 2L)
   
-        assertEquals("get 00", None,     m.get("c"))
+        assertEquals("get 00", true,     m.get(List("c")).toList.isEmpty)
         assertEquals("set c0", true,     m.set(c0, false))
-        assertEquals("get c0", true,     entrySame(m.get("c"), c0))
+        assertEquals("get c0", true,     entrySame(m.get(List("c")), c0))
         assertEquals("cas ca", "EXISTS", m.checkAndSet(c2, 2L, false))
-        assertEquals("get ca", true,     entrySame(m.get("c"), c0))
+        assertEquals("get ca", true,     entrySame(m.get(List("c")), c0))
         assertEquals("cas c1", "STORED", m.checkAndSet(c1, 0L, false))
-        assertEquals("get c1", true,     entrySame(m.get("c"), c1))
+        assertEquals("get c1", true,     entrySame(m.get(List("c")), c1))
         
       case "should be empty after flushAll" =>
         assertEquals(true, m.set(simpleEntry("a1", "0"), false))
@@ -153,17 +153,17 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         m.flushAll(0L)
         Thread.sleep(2) // flushAll is asynchronous.
         assertEquals(0, m.keys.toList.length)
-        assertEquals(None, m.get("a1"))
-        assertEquals(None, m.get("a2"))
-        assertEquals(None, m.get("a3"))
+        assertEquals(true, m.get(List("a1")).toList.isEmpty)
+        assertEquals(true, m.get(List("a2")).toList.isEmpty)
+        assertEquals(true, m.get(List("a3")).toList.isEmpty)
       
       case "should support getMulti" =>
         val c0 = MEntry("c0", 0L, 0L, 0, new Array[Byte](0), 0L)
         val c1 = MEntry("c1", 1L, 0L, 0, new Array[Byte](0), 1L)
   
-        assertEquals("get 00", None, m.get("c0"))
-        assertEquals("get 00", None, m.get("c1"))
-        assertEquals("get 00", None, m.get("c2"))
+        assertEquals("get 00", true, m.get(List("c0")).toList.isEmpty)
+        assertEquals("get 00", true, m.get(List("c1")).toList.isEmpty)
+        assertEquals("get 00", true, m.get(List("c2")).toList.isEmpty)
         
         assertEquals("getMulti 00", true, m.getMulti(List("c0", "c1", "c2")).toList.isEmpty)
         
@@ -184,41 +184,41 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         val c1 = MEntry("c0", 0L, 0L, 5, "world".getBytes, 0L)
         val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
         
-        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("get 00", true,  m.get(List("c0")).toList.isEmpty)
         assertEquals("apd 00", false, m.xpend(c0, true, false))
-        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("get 00", true,  m.get(List("c0")).toList.isEmpty)
         assertEquals("set c0", true,  m.set(c0, false))
-        assertEquals("get c0", true,  entrySame(m.get("c0"), c0))       
+        assertEquals("get c0", true,  entrySame(m.get(List("c0")), c0))       
         assertEquals("apd c1", true,  m.xpend(c1, true, false))
-        assertEquals("get c1", true,  dataEquals(m.get("c0"), "helloworld".getBytes))
+        assertEquals("get c1", true,  dataEquals(m.get(List("c0")), "helloworld".getBytes))
         assertEquals("apd c2", true,  m.xpend(c2, true, false))
-        assertEquals("get c2", true,  dataEquals(m.get("c0"), "helloworldthere".getBytes))
+        assertEquals("get c2", true,  dataEquals(m.get(List("c0")), "helloworldthere".getBytes))
 
       case "should prepend data correctly" =>
         val c0 = MEntry("c0", 0L, 0L, 5, "hello".getBytes, 0L)
         val c1 = MEntry("c0", 0L, 0L, 5, "world".getBytes, 0L)
         val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
         
-        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("get 00", true,  m.get(List("c0")).toList.isEmpty)
         assertEquals("apd 00", false, m.xpend(c0, true, false))
-        assertEquals("get 00", None,  m.get("c0"))
+        assertEquals("get 00", true,  m.get(List("c0")).toList.isEmpty)
         assertEquals("set c0", true,  m.set(c0, false))
-        assertEquals("get c0", true,  entrySame(m.get("c0"), c0))       
+        assertEquals("get c0", true,  entrySame(m.get(List("c0")), c0))       
         assertEquals("ppd c1", true,  m.xpend(c1, false, false))
-        assertEquals("get c1", true,  dataEquals(m.get("c0"), "worldhello".getBytes))
+        assertEquals("get c1", true,  dataEquals(m.get(List("c0")), "worldhello".getBytes))
         assertEquals("ppd c2", true,  m.xpend(c2, false, false))
-        assertEquals("get c2", true,  dataEquals(m.get("c0"), "thereworldhello".getBytes))
+        assertEquals("get c2", true,  dataEquals(m.get(List("c0")), "thereworldhello".getBytes))
 
       case "should expire entries" =>
         val c0 = MEntry("c0", 0L, Util.nowInSeconds + 1L, 5, "hello".getBytes, 0L) // Expires in 1 sec.
 
-        assertEquals("get 00", None, m.get("c0"))
+        assertEquals("get 00", true, m.get(List("c0")).toList.isEmpty)
         assertEquals("set c0", true, m.set(c0, false))
-        assertEquals("get c0", true, dataSame(m.get("c0"), c0))       
+        assertEquals("get c0", true, dataSame(m.get(List("c0")), c0))       
         
         Thread.sleep(2100)
         
-        assertEquals("get xx", None, m.get("c0"))
+        assertEquals("get xx", true, m.get(List("c0")).toList.isEmpty)
         
       case "simple benchmark" =>
         val n = 4000
@@ -233,7 +233,7 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         println(calc(n, "get",
                      benchMarkAvgMillis(10, 
                        for (i <- 0 until n)
-                         m.get(genKey(i)))))
+                         m.get(List(genKey(i))))))
   
       case "simple multithreaded benchmark" => 
         val nOperations = 4000
@@ -274,18 +274,24 @@ trait MTestUtil {
   def simpleEntry(key: String, v: String) =
     MEntry(key, 0L, 0L, v.getBytes.size, v.getBytes, 0L)
       
-  def dataSame(aOpt: Option[MEntry], b: MEntry) =
-    aOpt.map(a => (a.dataSize == b.dataSize) &&
+  def dataSame(iter: Iterator[MEntry], b: MEntry) =
+    iter.toList.
+         headOption.
+         map(a => (a.dataSize == b.dataSize) &&
                   (a.data == b.data || a.data.deepEquals(b.data))).
          getOrElse(false)
 
-  def dataEquals(aOpt: Option[MEntry], b: Array[Byte]) =
-    aOpt.map(a => (a.dataSize == b.size) &&
+  def dataEquals(iter: Iterator[MEntry], b: Array[Byte]) =
+    iter.toList.
+         headOption.
+         map(a => (a.dataSize == b.size) &&
                   (a.data == b || a.data.deepEquals(b))).
          getOrElse(false)
 
-  def entrySame(aOpt: Option[MEntry], b: MEntry) =
-    aOpt.map(a => (a.key == b.key) &&
+  def entrySame(iter: Iterator[MEntry], b: MEntry) =
+    iter.toList.
+         headOption.
+         map(a => (a.key == b.key) &&
                   (a.flags == b.flags) &&
                   (a.expTime == b.expTime) &&
                   (a.dataSize == b.dataSize) &&

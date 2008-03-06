@@ -87,14 +87,14 @@ class MDecoder extends MessageDecoder {
   def lineOnlySpecs = List( 
       Spec("get <key>*",
            (svr, cmd, sess) => { 
-             svr.getMulti(cmd.args.slice(1, cmd.args.length)).
+             svr.get(cmd.args.slice(1, cmd.args.length)).
                  foreach(el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
              reply("END")
            }),
 
       Spec("gets <key>*",
            (svr, cmd, sess) => {
-             svr.getMulti(cmd.args.slice(1, cmd.args.length)).
+             svr.get(cmd.args.slice(1, cmd.args.length)).
                  foreach(el => sess.write(List(MResponseLineEntry(asValueLineCAS(el), el))))
              reply("END")
            }),
