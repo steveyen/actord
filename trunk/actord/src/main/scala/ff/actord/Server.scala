@@ -23,6 +23,9 @@ import ff.actord.Util._
 
 object MServer {
   def version = "actord-0.1.0"
+
+  type MGetPf = PartialFunction[String, String => Option[MEntry]]
+  type MSetPf = PartialFunction[(String, MEntry, Boolean), (MEntry, Boolean) => Boolean]
 }
 
 /**
@@ -75,6 +78,21 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def subServerIdForKey(key: String) = key.hashCode % subServerNum   
   
   // --------------------------------------------------
+  
+  var getPf: MServer.MGetPf = createGetPf
+  var setPf: MServer.MSetPf = createSetPf
+  
+  def createGetPf: MServer.MGetPf = { 
+    case _ => { k => subServerForKey(k).get(k) }
+  }
+	
+  def createSetPf: MServer.MSetPf = { 
+    case ("set", _, _)     => { (el, async) => subServerForKey(el.key).set(el, async) }
+    case ("add", _, _)     => { (el, async) => subServerForKey(el.key).add(el, async) }
+    case ("replace", _, _) => { (el, async) => subServerForKey(el.key).replace(el, async) }
+  }
+
+  // --------------------------------------------------
 
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
     // First group the keys for each subServer, for better 
@@ -95,17 +113,10 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
       foldLeft(empty)((result, i) => result.append(subServers(i).getMulti(groupedKeys(i))))
   }
 
-  def get(key: String): Option[MEntry] =
-    subServerForKey(key).get(key)
-	
-  def set(el: MEntry, async: Boolean) = 
-    subServerForKey(el.key).set(el, async)
-
-  def add(el: MEntry, async: Boolean) = 
-    subServerForKey(el.key).add(el, async)
-
-  def replace(el: MEntry, async: Boolean) = 
-    subServerForKey(el.key).replace(el, async)
+  def get(key: String): Option[MEntry]    = getPf(key)(key)
+  def set(el: MEntry, async: Boolean)     = setPf("set",     el, async)(el, async)
+  def add(el: MEntry, async: Boolean)     = setPf("add",     el, async)(el, async)
+  def replace(el: MEntry, async: Boolean) = setPf("replace", el, async)(el, async)
 
   def delete(key: String, time: Long, async: Boolean) = 
     subServerForKey(key).delete(key, time, async)
