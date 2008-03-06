@@ -171,7 +171,16 @@ class MDecoder extends MessageDecoder {
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply))))
+              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply))),
+
+      // Extensions to basic protocol.
+      //
+      Spec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
+           (svr, cmd, sess) => {
+              svr.act(cmd.entry, cmd.noReply).
+                  foreach(el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
+              reply("END")
+           }))
       
   val lineOnlyCommands = 
       Map[String, Spec](lineOnlySpecs.

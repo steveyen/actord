@@ -27,6 +27,7 @@ object MServer {
   type MGetPf    = PartialFunction[String, String => Option[MEntry]]
   type MSetPf    = PartialFunction[(String, MEntry, Boolean), (MEntry, Boolean) => Boolean]
   type MDeletePf = PartialFunction[(String, Long, Boolean), (String, Long, Boolean) => Boolean]
+  type MActPf    = PartialFunction[(MEntry, Boolean), (MEntry, Boolean) => Iterator[MEntry]]
 }
 
 /**
@@ -83,6 +84,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   var getPf: MServer.MGetPf       = defaultGetPf
   var setPf: MServer.MSetPf       = defaultSetPf
   var deletePf: MServer.MDeletePf = defaultDeletePf
+  var actPf: MServer.MActPf       = defaultActPf
   
   def defaultGetPf: MServer.MGetPf = { 
     case _ => { k => subServerForKey(k).get(k) }
@@ -98,6 +100,10 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
     case _ => { (k, time, async) => subServerForKey(k).delete(k, time, async) }
   }
 	
+  def defaultActPf: MServer.MActPf = { 
+    case _ => { (el, async) => Iterator.empty }
+  }
+  
   // --------------------------------------------------
 
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
@@ -159,6 +165,8 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
     val empty: Iterator[MEntry] = Iterator.empty 
     subServers.foldLeft(empty)((result, s) => result.append(s.range(keyFrom, keyTo)))
   }
+
+  def act(el: MEntry, async: Boolean) = actPf(el, async)(el, async)
 }
 
 // --------------------------------------------
