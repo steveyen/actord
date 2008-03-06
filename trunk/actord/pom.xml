@@ -6,7 +6,7 @@
 
  <groupId>actord</groupId>
  <artifactId>actord</artifactId>
- <packaging>war</packaging>
+ <packaging>jar</packaging>
  <name>actord</name>
  <version>0.1.0</version>
 
