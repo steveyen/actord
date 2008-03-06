@@ -24,8 +24,9 @@ import ff.actord.Util._
 object MServer {
   def version = "actord-0.1.0"
 
-  type MGetPf = PartialFunction[String, String => Option[MEntry]]
-  type MSetPf = PartialFunction[(String, MEntry, Boolean), (MEntry, Boolean) => Boolean]
+  type MGetPf    = PartialFunction[String, String => Option[MEntry]]
+  type MSetPf    = PartialFunction[(String, MEntry, Boolean), (MEntry, Boolean) => Boolean]
+  type MDeletePf = PartialFunction[(String, Long, Boolean), (String, Long, Boolean) => Boolean]
 }
 
 /**
@@ -79,8 +80,9 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   
   // --------------------------------------------------
   
-  var getPf: MServer.MGetPf = defaultGetPf
-  var setPf: MServer.MSetPf = defaultSetPf
+  var getPf: MServer.MGetPf       = defaultGetPf
+  var setPf: MServer.MSetPf       = defaultSetPf
+  var deletePf: MServer.MDeletePf = defaultDeletePf
   
   def defaultGetPf: MServer.MGetPf = { 
     case _ => { k => subServerForKey(k).get(k) }
@@ -92,6 +94,10 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
     case ("replace", _, _) => { (el, async) => subServerForKey(el.key).replace(el, async) }
   }
 
+  def defaultDeletePf: MServer.MDeletePf = { 
+    case _ => { (k, time, async) => subServerForKey(k).delete(k, time, async) }
+  }
+	
   // --------------------------------------------------
 
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
@@ -119,7 +125,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def replace(el: MEntry, async: Boolean) = setPf("replace", el, async)(el, async)
 
   def delete(key: String, time: Long, async: Boolean) = 
-    subServerForKey(key).delete(key, time, async)
+    deletePf(key, time, async)(key, time, async)
     
 	def delta(key: String, mod: Long, async: Boolean): Long =
     subServerForKey(key).delta(key, mod, async)
