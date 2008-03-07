@@ -144,10 +144,16 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 
   def delete(key: String, time: Long, async: Boolean) = 
     deletePf(key, time, async)(key, time, async)
-    
+
+  /**
+   * A transport protocol can convert incoming incr/decr messages to delta calls.
+   */
 	def delta(key: String, mod: Long, async: Boolean): Long =
     subServerForKey(key).delta(key, mod, async)
     
+  /**
+   * A transport protocol can convert incoming append/prepend messages to xpend calls.
+   */
   def xpend(el: MEntry, append: Boolean, async: Boolean) =
     subServerForKey(el.key).xpend(el, append, async)
   
