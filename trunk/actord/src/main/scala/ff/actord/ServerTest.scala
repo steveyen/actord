@@ -151,7 +151,7 @@ class MServerTestCase(name: String) extends TestCase(name) with MTestUtil {
         assertEquals(true, m.set(simpleEntry("a3", "0"), false))
         assertEquals(3, m.keys.toList.length)
         m.flushAll(0L)
-        Thread.sleep(2) // flushAll is asynchronous.
+        Thread.sleep(200) // flushAll is asynchronous.
         assertEquals(0, m.keys.toList.length)
         assertEquals(true, m.get(List("a1")).toList.isEmpty)
         assertEquals(true, m.get(List("a2")).toList.isEmpty)
