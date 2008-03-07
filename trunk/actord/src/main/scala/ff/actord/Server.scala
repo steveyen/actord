@@ -83,8 +83,8 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 
   // Subclases can prepend to these partial functions during initialization
   // to flexibly hook into message processing.  Alternatively, subclasses 
-  // may also just override the main get/set/delete/... methods using
-  // classic OO techniques.
+  // may also just using classic method overrides of the main 
+  // get/set/delete/... methods, too.
   //  
   var getPf:    MServer.MGetPf    = defaultGetPf
   var setPf:    MServer.MSetPf    = defaultSetPf
