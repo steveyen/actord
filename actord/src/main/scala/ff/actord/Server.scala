@@ -80,7 +80,12 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def subServerIdForKey(key: String) = key.hashCode % subServerNum   
   
   // --------------------------------------------------
-  
+
+  // Subclases can prepend to these partial functions during initialization
+  // to flexibly hook into message processing.  Alternatively, subclasses 
+  // may also just override the main get/set/delete/... methods using
+  // classic OO techniques.
+  //  
   var getPf:    MServer.MGetPf    = defaultGetPf
   var setPf:    MServer.MSetPf    = defaultSetPf
   var deletePf: MServer.MDeletePf = defaultDeletePf
