@@ -73,6 +73,8 @@ object Main
   }
 }
 
+// ------------------------------------------------------
+
 class MainProg {
   /**
    * Start a server, parsing command-line arguments.
@@ -81,7 +83,7 @@ class MainProg {
     val flagValueList = parseFlags(args)
 
     for (FlagValue(spec, values) <- flagValueList) {
-      if (spec == errSpec) {
+      if (spec == FLAG_ERR) {
         println("error: " + spec.specs.mkString(" | ") + " : " + values.mkString(" ").trim)
         System.exit(1)
       }
@@ -193,8 +195,8 @@ class MainProg {
 
   /**
    * Parse the flags on a command-line.  The returned list
-   * might have an entry of FlagValue(errSpec, ...) to signal 
-   * a parsing error.
+   * might have an entry of FlagValue(FLAG_ERR, ...) to signal 
+   * a parsing error for a particular parameter.
    */
   def parseFlags(args: Array[String]): List[FlagValue] = {
     val xs = (" " + args.mkString(" ")). // " -a 1 -b -c 2"
@@ -202,7 +204,7 @@ class MainProg {
     if (xs.headOption.
            map(_.trim.length > 0).
            getOrElse(false))
-      List(FlagValue(errSpec, xs.toList))
+      List(FlagValue(FLAG_ERR, xs.toList))
     else
       xs.drop(1).                        // ["a 1", "b", "c 2"]
          toList.
@@ -212,8 +214,8 @@ class MainProg {
                      map(spec => if (spec.check(argParts))
                                    FlagValue(spec, argParts.tail)
                                  else
-                                   FlagValue(errSpec, argParts)).
-                     getOrElse(FlagValue(errSpec, argParts))
+                                   FlagValue(FLAG_ERR, argParts)).
+                     getOrElse(FlagValue(FLAG_ERR, argParts))
          })
   }
   
@@ -237,7 +239,7 @@ class MainProg {
   }
 
   /**
-   * A sentinel value or singleton that signals a parseFlags error.
+   * A sentinel singleton that signals parseFlags errors.
    */  
-  val errSpec = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")
+  val FLAG_ERR = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")
 }
