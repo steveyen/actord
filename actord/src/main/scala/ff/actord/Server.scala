@@ -223,7 +223,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       case s @ Some(el) => {
         if (el.isExpired) {
           if (queueExpired)
-            mod ! ModDelete(el, true) // TODO: Many readers of expired entries means redundant ModDelete messages.
+            mod ! ModDelete(el, 0L, true) // TODO: Many readers of expired entries means redundant ModDelete messages.
           None 
         } else 
           s
@@ -254,20 +254,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   def delete(key: String, time: Long, async: Boolean) = 
 		getUnexpired(key).map(
 		  el => {
-		    if (time != 0L) {
-		      // TODO: Concurrent modification issue here, so move into mod actor?
-		      //       The case when time != 0L is very special, however,
-		      //       mostly during flushAll.
-		      //
-          if (el.expTime == 0L || 
-              el.expTime > (nowInSeconds + time)) 
-              set(el.updateExpTime(nowInSeconds + time), async)
-        } else {
-          if (async)
-            mod ! ModDelete(el, async)
-          else
-            mod !? ModDelete(el, async)
-        }
+        if (async)
+          mod ! ModDelete(el, time, async)
+        else
+          mod !? ModDelete(el, time, async)
         true
       }
     ).getOrElse(false)
@@ -311,10 +301,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 	
 	def flushAll(expTime: Long) {
 	  for ((key, el) <- data)
-      if (expTime == 0L) 
-        mod ! ModDelete(el, true)
-      else
-        delete(key, expTime, true)
+	    mod ! ModDelete(el, expTime, true)
 	}
 	
 	def stats: MServerStats = 
@@ -337,7 +324,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
    *
    * TODO: Should the mod actor be on its own separate real, receive-based thread?
    */
-  private val mod = actor {
+  val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
     val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
     
@@ -434,20 +421,28 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           evictCheck
         }
 
-        case ModDelete(el, noReply) => {
+        case ModDelete(el, expTime, noReply) => {
           val dataMod = data
-          
+
           dataMod.get(el.key) match {
             case Some(current) =>
               if (current.cid == el.cid) {
-                if (el.lru != null) 
-                    el.lru.remove
-                
-                data_i_!!(dataMod - el.key)
-                usedMemory = usedMemory - el.dataSize
-                
-                if (!noReply) 
+                if (expTime != 0L) {
+                  if (el.expTime == 0L || 
+                      el.expTime > (nowInSeconds + expTime)) 
+                    setEntry(el.updateExpTime(nowInSeconds + expTime))
+                  if (!noReply)
                     reply(true)
+                } else {
+                  if (el.lru != null) 
+                      el.lru.remove
+                  
+                  data_i_!!(dataMod - el.key)
+                  usedMemory = usedMemory - el.dataSize
+                  
+                  if (!noReply) 
+                      reply(true)
+                }
               } else {
                 if (!noReply) 
                     reply(false)
@@ -518,12 +513,12 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   mod.start
   
   case class ModSet    (el: MEntry, noReply: Boolean)
-  case class ModDelete (el: MEntry, noReply: Boolean)
-  case class ModTouch  (els: Iterator[MEntry],        noReply: Boolean)
-  case class ModDelta  (key: String, delta: Long,     noReply: Boolean)
-  case class ModXPend  (el: MEntry,  append: Boolean, noReply: Boolean) // For append/prepend.
-  case class ModCAS    (el: MEntry,  cidPrev: Long,   noReply: Boolean)
-  case class ModAdd    (el: MEntry,  add: Boolean,    noReply: Boolean) // For add/replace.
+  case class ModDelete (el: MEntry, expTime: Long,   noReply: Boolean)
+  case class ModTouch  (els: Iterator[MEntry],       noReply: Boolean)
+  case class ModDelta  (key: String, delta: Long,    noReply: Boolean)
+  case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean) // For append/prepend.
+  case class ModCAS    (el: MEntry, cidPrev: Long,   noReply: Boolean)
+  case class ModAdd    (el: MEntry, add: Boolean,    noReply: Boolean) // For add/replace.
 }
 
 case class MServerStatsRequest
