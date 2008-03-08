@@ -24,13 +24,9 @@ import scala.collection._
  */
 class Treap[A <% Ordered[A], B](val root: TreapNode[A, B])
 {
-  type Node  = TreapNode[A, B]
-  type Full  = TreapFull[A, B]
-  type Empty = TreapEmpty[A, B]
-  
   def this() = this(TreapEmpty[A, B])
   
-  def mkTreap(r: Node): Treap[A, B] = new Treap(r)
+  def mkTreap(r: TreapNode[A, B]): Treap[A, B] = new Treap(r)
   
   def union(that: Treap[A, B]): Treap[A, B]     = mkTreap(root.union(that.root))
   def intersect(that: Treap[A, B]): Treap[A, B] = mkTreap(root.intersect(that.root))
