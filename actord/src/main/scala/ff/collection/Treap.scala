@@ -25,14 +25,23 @@ import scala.collection._
 class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
 {
   abstract class Node {
-    def split(s: A): (Node, Option[(A, B)], Node)
+    def split(s: A): (Node, Full, Node)
 
     /**
-     * For join to work, we require that this.keys < that.keys.
+     * For join to work, we require that "this".keys < "that".keys.
      */
     def join(that: Node): Node
 
+    /**
+     * When union'ed, the values from "that" have precedence 
+     * over "this" when there are matching keys.
+     */ 
     def union(that: Node): Node
+
+    /**
+     * When intersect'ed, the values from "that" have precedence 
+     * over "this" when there are matching keys.
+     */ 
     def intersect(that: Node): Node
     
     /**
@@ -49,7 +58,7 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
 
     def split(s: A) = {
       if (s == key) {
-        (left, Some(key, value), right)
+        (left, this, right)
       } else {
         if (s < key) {
           val (l1, m, r1) = left.split(s)
@@ -75,14 +84,14 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
       case b: Full =>
         if (priority > b.priority) {
           val (l, m, r) = b.split(key)
-          m match {
-            case None        => mkFull(key, value, left.union(l), right.union(r))
-            case Some(m, mv) => mkFull(m,   mv,    left.union(l), right.union(r))
-          }
+          if (m == null)
+            mkFull(key, value, left.union(l), right.union(r))
+          else
+            mkFull(m.key, m.value, left.union(l), right.union(r))
         } else {
           val (l, m, r) = this.split(b.key)
           
-          // Note we don't use m/mv here because b has precendence over this.
+          // Note we don't use m because b (that) has precendence over this when union'ed.
           //
           mkFull(b.key, b.value, l.union(b.left), r.union(b.right))
         }
@@ -95,18 +104,18 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
           val (l, m, r) = b.split(key)
           val nl = left.intersect(l)
           val nr = right.intersect(r)
-          m match {
-            case None        => nl.join(nr)
-            case Some(m, mv) => mkFull(m, mv, nl, nr)
-          }
+          if (m == null)
+            nl.join(nr)
+          else
+            mkFull(m.key, m.value, nl, nr)
         } else {
           val (l, m, r) = this.split(b.key)
           val nl = l.intersect(b.left)
           val nr = r.intersect(b.right)
-          m match {
-            case None => nl.join(nr)
-            case _    => mkFull(b.key, b.value, nl, nr) // The b value has precendence over this value.
-          }
+          if (m == null)
+            nl.join(nr)
+          else
+            mkFull(b.key, b.value, nl, nr) // The b value has precendence over this value.
         }
     }
 
@@ -119,15 +128,15 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
         val (l2, m, r2) = b.split(key)
         val l = left.diff(l2)
         val r = right.diff(r2)
-        m match {
-          case None => mkFull(key, value, l, r)
-          case _    => l.join(r)
-        }
+        if (m == null)
+          mkFull(key, value, l, r)
+        else
+          l.join(r)
     }
   }
   
   case class Empty extends Node { 
-    def split(s: A)                 = (this, None, this)
+    def split(s: A)                 = (this, null, this)
     def join(that: Node): Node      = that
     def union(that: Node): Node     = that
     def intersect(that: Node): Node = this
