@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ff.actord
+package ff.collection
 
 import scala.collection._
 
@@ -31,6 +31,8 @@ class Treap[A <% Ordered[A], B](val root: TreapNode[A, B])
   def union(that: Treap[A, B]): Treap[A, B]     = mkTreap(root.union(that.root))
   def intersect(that: Treap[A, B]): Treap[A, B] = mkTreap(root.intersect(that.root))
   def diff(that: Treap[A, B]): Treap[A, B]      = mkTreap(root.diff(that.root))
+  
+  override def toString = root.toString
 }
 
 abstract class TreapNode[A <% Ordered[A], B] 
@@ -158,10 +160,38 @@ case class TreapEmpty[A <% Ordered[A], B] extends TreapNode[A, B]
   def union(that: Node): Node     = that
   def intersect(that: Node): Node = this
   def diff(that: Node): Node      = this
+  
+  override def toString = "_"
 }
 
 // ---------------------------------------------------------
 
-object TreapTest extends Application {
-  val t = new Treap[Int, Int]
+object TreapTest {
+  def main(args: Array[String]) {
+    val e = TreapEmpty[Int, Int]
+    val t0 = new Treap[Int, Int]
+    println(t0)
+    
+    val t1 = new Treap[Int, Int](TreapFull(1, 100, e, e))
+    println(t1)
+
+    val t2 = new Treap[Int, Int](TreapFull(2, 200, e, e))
+    println(t2)
+    
+    val t1_1 = new Treap[Int, Int](TreapFull(1, 101, e, e))
+    println(t1_1)
+
+    println(t1.union(t2))
+    println(t1.union(t2).union(t2))
+    println(t1.union(t2).union(t2).union(t1_1))
+    println(t1.intersect(t2))
+    println(t1.diff(t2))
+    println(t2.diff(t1))
+    
+    val t3 = new Treap[Int, Int](TreapFull(3, 300, e, e))
+    println(t1.union(t2).union(t3))
+    println(t1.union(t2).union(t3).intersect(t1.union(t2)))    
+    println(t1.union(t2).union(t3).diff(t1.union(t2)))    
+    println(t1.union(t2).union(t3).diff(t2))
+  }
 }
