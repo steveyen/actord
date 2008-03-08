@@ -25,11 +25,10 @@ import scala.collection._
 class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
 {
   abstract class Node {
-    def isEmpty: Boolean
     def split(s: A): (Node, Option[(A, B)], Node)
 
     /**
-     * All the keys in this treap must be < the keys in that treap for join to work.
+     * For join to work, we require that this.keys < that.keys.
      */
     def join(that: Node): Node
 
@@ -48,11 +47,9 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
   case class Full(key: A, value: B, left: Node, right: Node) extends Node {
     def priority = key.hashCode
 
-    def isEmpty = false
-
     def split(s: A) = {
       if (s == key) {
-        (left, Some((key, value)), right)
+        (left, Some(key, value), right)
       } else {
         if (s < key) {
           val (l1, m, r1) = left.split(s)
@@ -79,8 +76,8 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
         if (priority > b.priority) {
           val (l, m, r) = b.split(key)
           m match {
-            case None          => mkFull(key, value, left.union(l), right.union(r))
-            case Some((m, mv)) => mkFull(m,   mv,    left.union(l), right.union(r))
+            case None        => mkFull(key, value, left.union(l), right.union(r))
+            case Some(m, mv) => mkFull(m,   mv,    left.union(l), right.union(r))
           }
         } else {
           val (l, m, r) = this.split(b.key)
@@ -99,8 +96,8 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
           val nl = left.intersect(l)
           val nr = right.intersect(r)
           m match {
-            case None          => nl.join(nr)
-            case Some((m, mv)) => mkFull(m, mv, nl, nr)
+            case None        => nl.join(nr)
+            case Some(m, mv) => mkFull(m, mv, nl, nr)
           }
         } else {
           val (l, m, r) = this.split(b.key)
@@ -130,7 +127,6 @@ class Treap[A <% Ordered[A], B <% AnyRef](val root: Treap[A, B]#Node)
   }
   
   case class Empty extends Node { 
-    def isEmpty                     = true
     def split(s: A)                 = (this, None, this)
     def join(that: Node): Node      = that
     def union(that: Node): Node     = that
