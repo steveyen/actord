@@ -40,6 +40,9 @@ abstract class TreapNode[A <% Ordered[A], B]
   type Node  = TreapNode[A, B]
   type Full  = TreapFull[A, B]
   type Empty = TreapEmpty[A, B]
+  
+  def isEmpty: Boolean
+  def isLeaf: Boolean
 
   def split(s: A): (Node, Full, Node)
 
@@ -74,16 +77,27 @@ case class TreapFull[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B]
   
   def priority = key.hashCode
 
+  def isEmpty: Boolean = false
+  def isLeaf: Boolean  = left.isEmpty && right.isEmpty
+
   def split(s: A) = {
     if (s == key) {
       (left, this, right)
     } else {
       if (s < key) {
-        val (l1, m, r1) = left.split(s)
-        (l1, m, mkFull(key, value, r1, right))
+        if (isLeaf)
+          (left, null, this) // Optimization when isLeaf.
+        else {
+          val (l1, m, r1) = left.split(s)
+          (l1, m, mkFull(key, value, r1, right))
+        }
       } else {
-        val (l1, m, r1) = right.split(s)
-        (mkFull(key, value, left, l1), m, r1)
+        if (isLeaf)
+          (this, null, right) // Optimization when isLeaf.
+        else {
+          val (l1, m, r1) = right.split(s)
+          (mkFull(key, value, left, l1), m, r1)
+        }
       }
     }
   }
@@ -155,6 +169,9 @@ case class TreapFull[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B]
 
 case class TreapEmpty[A <% Ordered[A], B] extends TreapNode[A, B] 
 { 
+  def isEmpty: Boolean = true
+  def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
+
   def split(s: A) = (this, null, this)
   def join(that: Node): Node      = that
   def union(that: Node): Node     = that
