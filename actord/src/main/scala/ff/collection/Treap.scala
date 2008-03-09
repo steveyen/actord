@@ -18,7 +18,7 @@ package ff.collection
 import scala.collection._
 
 /**
- * Immutable treap implementation in scala.
+ * An in-memory, immutable treap implementation in scala.
  *
  * See: http://www.cs.cmu.edu/afs/cs.cmu.edu/project/scandal/public/papers/treaps-spaa98.pdf
  */
@@ -27,7 +27,14 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   def this() = this(TreapEmptyNode[A, B])
   
   def mkTreap(r: TreapNode[A, B]): Treap[A, B] = new Treap(r)
-  
+
+  def mkNode(basis: TreapFullNode[A, B], 
+             left:  TreapNode[A, B], 
+             right: TreapNode[A, B]): TreapNode[A, B] = basis match {
+    case TreapMemNode(k, v, _, _) => 
+         TreapMemNode(k, v, left, right)
+  }
+
   def union(that: Treap[A, B]): Treap[A, B]     = mkTreap(root.union(this, that.root))
   def intersect(that: Treap[A, B]): Treap[A, B] = mkTreap(root.intersect(this, that.root))
   def diff(that: Treap[A, B]): Treap[A, B]      = mkTreap(root.diff(this, that.root))
@@ -107,8 +114,6 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def left: Node
   def right: Node
   
-  def mkNode(basis: Full, left: Node, right: Node): Node
-  
   def priority = key.hashCode
 
   def isEmpty: Boolean = false
@@ -133,14 +138,14 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
           (left, null, this) // Optimization when isLeaf.
         else {
           val (l1, m, r1) = left.split(t, s)
-          (l1, m, mkNode(this, r1, right))
+          (l1, m, t.mkNode(this, r1, right))
         }
       } else {
         if (isLeaf)
           (this, null, right) // Optimization when isLeaf.
         else {
           val (l1, m, r1) = right.split(t, s)
-          (mkNode(this, left, l1), m, r1)
+          (t.mkNode(this, left, l1), m, r1)
         }
       }
     }
@@ -150,9 +155,9 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
     case e: Empty => this
     case b: Full =>
       if (priority > b.priority)
-        mkNode(this, left, right.join(t, b))
+        t.mkNode(this, left, right.join(t, b))
       else
-        mkNode(b, this.join(t, b.left), b.right)
+        t.mkNode(b, this.join(t, b.left), b.right)
   }
 
   def union(t: T, that: Node): Node = that match {
@@ -161,15 +166,15 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
       if (priority > b.priority) {
         val (l, m, r) = b.split(t, key)
         if (m == null)
-          mkNode(this, left.union(t, l), right.union(t, r))
+          t.mkNode(this, left.union(t, l), right.union(t, r))
         else
-          mkNode(m, left.union(t, l), right.union(t, r))
+          t.mkNode(m, left.union(t, l), right.union(t, r))
       } else {
         val (l, m, r) = this.split(t, b.key)
         
         // Note we don't use m because b (that) has precendence over this when union'ed.
         //
-        mkNode(b, l.union(t, b.left), r.union(t, b.right))
+        t.mkNode(b, l.union(t, b.left), r.union(t, b.right))
       }
   }
 
@@ -183,7 +188,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
         if (m == null)
           nl.join(t, nr)
         else
-          mkNode(m, nl, nr)
+          t.mkNode(m, nl, nr)
       } else {
         val (l, m, r) = this.split(t, b.key)
         val nl = l.intersect(t, b.left)
@@ -191,7 +196,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
         if (m == null)
           nl.join(t, nr)
         else
-          mkNode(b, nl, nr) // The b value has precendence over this value.
+          t.mkNode(b, nl, nr) // The b value has precendence over this value.
       }
   }
 
@@ -205,7 +210,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
       val l = left.diff(t, l2)
       val r = right.diff(t, r2)
       if (m == null)
-        mkNode(this, l, r)
+        t.mkNode(this, l, r)
       else
         l.join(t, r)
   }
@@ -213,17 +218,8 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
 
 // ---------------------------------------------------------
 
-/**
- * An in-memory treap node implementation.
- */
 case class TreapMemNode[A <% Ordered[A], B <: AnyRef](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
    extends TreapFullNode[A, B] 
-{
-  def mkNode(basis: Full, left: Node, right: Node): Node = basis match {
-    case TreapMemNode(k, v, _, _) => 
-         TreapMemNode(k, v, left, right)
-  }
-}
 
 // ---------------------------------------------------------
 
