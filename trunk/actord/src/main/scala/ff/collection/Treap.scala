@@ -219,50 +219,110 @@ case class TreapMemNode[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A,
    extends TreapFullNode[A, B] 
 {
   def mkNode(basis: Full, left: Node, right: Node): Node = basis match {
-    case TreapMemNode(k, v, _, _) => TreapMemNode(k, v, left, right)
+    case TreapMemNode(k, v, _, _) => 
+         TreapMemNode(k, v, left, right)
   }
 }
 
 // ---------------------------------------------------------
 
 /**
- * A treap node that potentially stored to nonvolatile/persistent storage,
- * and, thus, evictable from memory.
+ * A treap node that's potentially stored to nonvolatile/persistent 
+ * storage.  So, it's evictable from memory.
  */
 case class TreapStorableNode[A <% Ordered[A], B](
-  key: A, 
-  keyWrapLeft: A,
-  keyWrapRight: A,
-  value: B, 
+  key: A,
+  keyInnerMin: A,
+  keyInnerMax: A,
+  swizzle: TreapStorageNodeSwizzle[A, B],
   left: TreapNode[A, B], 
   right: TreapNode[A, B]) 
   extends TreapFullNode[A, B] 
 {
   def mkNode(basis: Full, left: Node, right: Node): Node = basis match {
-    case TreapStorableNode(k, kwl, kwr, v, _, _) => 
-         TreapStorableNode(k, kwl, kwr, v, left, right)
+    case TreapStorableNode(k, kiMin, kiMax, s, _, _) =>
+         TreapStorableNode(k, kiMin, kiMax, s, left, right)
+  }
+  
+  def hasSimpleKey: Boolean = 
+    key == keyInnerMin && 
+    key == keyInnerMax
+  
+  def value: B = inner.value
+  
+  def inner: TreapStorableNode[A, B] = synchronized {
+    // Swizzle/load from storage, if not already.
+    //
+    swizzle.synchronized {
+      if (swizzle.node == null) {
+      }
+      swizzle.node
+    }
   }
 
+  override def lookup(s: A): Node = 
+    if (s < keyInnerMin)
+      left.lookup(s)
+    else if (s > keyInnerMax)
+      right.lookup(s)
+    else 
+      inner.lookup(s)
+
   override def split(s: A) = {
-    if (s == key) {
-      (left, this, right)
-    } else {
-      if (s < key) {
-        if (isLeaf)
-          (left, null, this) // Optimization when isLeaf.
-        else {
-          val (l1, m, r1) = left.split(s)
-          (l1, m, mkNode(this, r1, right))
-        }
-      } else {
-        if (isLeaf)
-          (this, null, right) // Optimization when isLeaf.
-        else {
-          val (l1, m, r1) = right.split(s)
-          (mkNode(this, left, l1), m, r1)
-        }
+    if (s < keyInnerMin) {
+      if (isLeaf)
+        (left, null, this) // Optimization when isLeaf.
+      else {
+        val (l1, m, r1) = left.split(s)
+        (l1, m, mkNode(this, r1, right))
       }
+    } else if (s > keyInnerMax) {
+      if (isLeaf)
+        (this, null, right) // Optimization when isLeaf.
+      else {
+        val (l1, m, r1) = right.split(s)
+        (mkNode(this, left, l1), m, r1)
+      }
+    } else {
+      // Split point "s" is without [keyInnerMin, keyInnerMax] range.
+      //
+      val (l1, m, r1) = inner.split(s)
+      (left.join(l1), m, r1.join(right))
     }
+  }
+}
+
+class TreapStorageNodeSwizzle[A <% Ordered[A], B] {
+  type Storable = TreapStorableNode[A, B]
+
+  private var loc_i: Long      = -1L 
+  private var node_i: Storable = null
+  
+  def loc: Long = synchronized { loc_i }
+  
+  def loc_!!(x: Long) = synchronized { 
+    if (loc_i >= 0L && x >= 0L)
+      throw new RuntimeException("cannot override an existing swizzle loc")
+
+    loc_i = x; 
+    this 
+  }
+
+  /**
+   * The storable node here must have a simple key (hasSimpleKey == true).
+   */
+  def node: Storable = synchronized { node_i }
+  
+  def node_!!(x: Storable) = synchronized { 
+    if (x != null) {
+      if (x.hasSimpleKey == false)
+        throw new RuntimeException("swizzle node must have simple key")
+      if (node_i != null)
+        throw new RuntimeException("cannot overwrite an existing swizzle node")
+    }        
+      
+    node_i = x; 
+    this 
   }
 }
 
