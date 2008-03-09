@@ -33,16 +33,16 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
                    oldLeft.value == left)
                    oldLeft
                else {
-                   val x = new StorageSwizzle[TreapStorableNode[A, B]]()
-                   x.value_!!(left.asInstanceOf[TreapStorableNode[A, B]])
+                   val x = new StorageSwizzle[TreapNode[A, B]]()
+                   x.value_!!(left.asInstanceOf[TreapNode[A, B]])
                    x
                }
       val sr = if (oldRight.value != null &&
                    oldRight.value == right)
                    oldRight
                else {
-                   val x = new StorageSwizzle[TreapStorableNode[A, B]]()
-                   x.value_!!(right.asInstanceOf[TreapStorableNode[A, B]])
+                   val x = new StorageSwizzle[TreapNode[A, B]]()
+                   x.value_!!(right.asInstanceOf[TreapNode[A, B]])
                    x
                }
 
@@ -51,7 +51,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       TreapStorableNode(this, k, sv, ss, sl, sr)
   }
 
-  def swizzleLoadNode(s: StorageSwizzle[TreapStorableNode[A, B]]) = {
+  def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]) = {
     s.synchronized {
       if (s.value != null)
           s.value
@@ -91,8 +91,8 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
   key: A,
   swizzleValue: StorageSwizzle[B],
   swizzleSelf:  StorageSwizzle[TreapStorableNode[A, B]],
-  swizzleLeft:  StorageSwizzle[TreapStorableNode[A, B]],
-  swizzleRight: StorageSwizzle[TreapStorableNode[A, B]])
+  swizzleLeft:  StorageSwizzle[TreapNode[A, B]],
+  swizzleRight: StorageSwizzle[TreapNode[A, B]])
   extends TreapFullNode[A, B] 
 {
   def left  = t.swizzleLoadNode(swizzleLeft)
