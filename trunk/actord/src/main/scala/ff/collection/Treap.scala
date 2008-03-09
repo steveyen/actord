@@ -18,7 +18,7 @@ package ff.collection
 import scala.collection._
 
 /**
- * Treap implementation in scala.
+ * Immutable treap implementation in scala.
  *
  * See: http://www.cs.cmu.edu/afs/cs.cmu.edu/project/scandal/public/papers/treaps-spaa98.pdf
  */
