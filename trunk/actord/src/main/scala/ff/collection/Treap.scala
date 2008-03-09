@@ -77,6 +77,8 @@ abstract class TreapNode[A <% Ordered[A], B]
   def diff(that: Node): Node
 }
 
+// ---------------------------------------------------------
+
 abstract class TreapFullNode[A <% Ordered[A], B] extends TreapNode[A, B] 
 {
   def key: A  
