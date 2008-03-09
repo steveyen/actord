@@ -40,7 +40,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       val sn2 = new TreapStorageSwizzle[TreapStorableNode[A, B]]()
       val sv2 = new TreapStorageSwizzle[B]()
 
-      sv2.valueLoc_!!(sv.valueLoc)
+      sv2.loc_!!(sv.loc)
       sv2.value_!!(sv.value)
 
       TreapStorableNode(k, kiMin, kiMax, sn2, sv2, left, right)
@@ -51,9 +51,9 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       if (s.value != null)
           s.value
       else {
-        if (s.valueLoc < 0L)
-          throw new RuntimeException("could not swizzle load without a valueLoc")
-//        s.value_!!(unserialize(io.readArray(s.valueLoc)))
+        if (s.loc < 0L)
+          throw new RuntimeException("could not swizzle load without a loc")
+//        s.value_!!(unserialize(io.readArray(s.loc)))
 null
       }
     }
@@ -67,9 +67,9 @@ null
       if (s.value != null)
           s.value
       else {
-        if (s.valueLoc < 0L)
-          throw new RuntimeException("could not swizzle load without a valueLoc")
-        s.value_!!(unserialize(io.readArray(s.valueLoc)))
+        if (s.loc < 0L)
+          throw new RuntimeException("could not swizzle load without a loc")
+        s.value_!!(unserialize(io.readArray(s.loc)))
       }
     }
   }
@@ -136,15 +136,15 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
 // ---------------------------------------------------------
 
 class TreapStorageSwizzle[S <: AnyRef] {
-  private var valueLoc_i: Long = -1L 
-  private var value_i: S       = _
+  private var loc_i: Long = -1L 
+  private var value_i: S  = _
 
-  def valueLoc: Long = synchronized { valueLoc_i }
-  def valueLoc_!!(x: Long) = synchronized { 
-    if (valueLoc_i >= 0L && x >= 0L)
-      throw new RuntimeException("cannot override an existing swizzle valueLoc")
-    valueLoc_i = x
-    valueLoc_i 
+  def loc: Long = synchronized { loc_i }
+  def loc_!!(x: Long) = synchronized { 
+    if (loc_i >= 0L && x >= 0L)
+      throw new RuntimeException("cannot override an existing swizzle loc")
+    loc_i = x
+    loc_i 
   }
 
   def value: S = synchronized { value_i }
