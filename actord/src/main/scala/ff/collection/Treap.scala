@@ -35,6 +35,8 @@ class Treap[A <% Ordered[A], B](val root: TreapNode[A, B])
   override def toString = root.toString
 }
 
+// ---------------------------------------------------------
+
 abstract class TreapNode[A <% Ordered[A], B] 
 {
   type Node  = TreapNode[A, B]
@@ -44,6 +46,12 @@ abstract class TreapNode[A <% Ordered[A], B]
   def isEmpty: Boolean
   def isLeaf: Boolean
 
+  /**
+   * Splits a treap into two treaps based on a split key "s".
+   * The result tuple-3 means (left, X, right), where X is either...
+   * null - meaning the key "s" was not in the original treap.
+   * non-null - returning the Full node that had key "s".
+   */
   def split(s: A): (Node, Full, Node)
 
   /**
@@ -169,6 +177,8 @@ abstract class TreapFullNode[A <% Ordered[A], B] extends TreapNode[A, B]
   }
 }
 
+// ---------------------------------------------------------
+
 case class TreapSimpleNode[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
    extends TreapFullNode[A, B] 
 {
@@ -176,6 +186,8 @@ case class TreapSimpleNode[A <% Ordered[A], B](key: A, value: B, left: TreapNode
     case TreapSimpleNode(k, v, _, _) => TreapSimpleNode(k, v, left, right)
   }
 }
+
+// ---------------------------------------------------------
 
 case class TreapEmptyNode[A <% Ordered[A], B] extends TreapNode[A, B] 
 { 
