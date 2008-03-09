@@ -105,7 +105,6 @@ class TreapStorageNodeSwizzle[A <% Ordered[A], B <: AnyRef] {
   private var value_i: B       = _
   
   def loc: Long = synchronized { loc_i }
-  
   def loc_!!(x: Long) = synchronized { 
     if (loc_i >= 0L && x >= 0L)
       throw new RuntimeException("cannot override an existing swizzle loc")
@@ -118,7 +117,6 @@ class TreapStorageNodeSwizzle[A <% Ordered[A], B <: AnyRef] {
    * The storable node here must have a simple key (hasSimpleKey == true).
    */
   def node: Storable = synchronized { node_i }
-  
   def node_!!(x: Storable) = synchronized { 
     if (x != null) {
       if (x.hasSimpleKey == false)
@@ -132,7 +130,6 @@ class TreapStorageNodeSwizzle[A <% Ordered[A], B <: AnyRef] {
   }
 
   def value: B = synchronized { value_i }
-  
   def value_!!(x: B) = synchronized { 
     value_i = x; 
     this 
