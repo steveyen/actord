@@ -81,6 +81,22 @@ abstract class TreapNode[A <% Ordered[A], B]
 
 // ---------------------------------------------------------
 
+case class TreapEmptyNode[A <% Ordered[A], B] extends TreapNode[A, B] 
+{ 
+  def isEmpty: Boolean = true
+  def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
+
+  def split(s: A) = (this, null, this)
+  def join(that: Node): Node      = that
+  def union(that: Node): Node     = that
+  def intersect(that: Node): Node = this
+  def diff(that: Node): Node      = this
+  
+  override def toString = "_"
+}
+
+// ---------------------------------------------------------
+
 abstract class TreapFullNode[A <% Ordered[A], B] extends TreapNode[A, B] 
 {
   def key: A  
@@ -183,28 +199,15 @@ abstract class TreapFullNode[A <% Ordered[A], B] extends TreapNode[A, B]
 
 // ---------------------------------------------------------
 
-case class TreapSimpleNode[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
+/**
+ * An in-memory treap node implementation.
+ */
+case class TreapMemNode[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
    extends TreapFullNode[A, B] 
 {
   def mkNode(basis: Full, left: Node, right: Node): Node = basis match {
-    case TreapSimpleNode(k, v, _, _) => TreapSimpleNode(k, v, left, right)
+    case TreapMemNode(k, v, _, _) => TreapMemNode(k, v, left, right)
   }
-}
-
-// ---------------------------------------------------------
-
-case class TreapEmptyNode[A <% Ordered[A], B] extends TreapNode[A, B] 
-{ 
-  def isEmpty: Boolean = true
-  def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
-
-  def split(s: A) = (this, null, this)
-  def join(that: Node): Node      = that
-  def union(that: Node): Node     = that
-  def intersect(that: Node): Node = this
-  def diff(that: Node): Node      = this
-  
-  override def toString = "_"
 }
 
 // ---------------------------------------------------------
@@ -215,13 +218,13 @@ object TreapTest {
     val t0 = new Treap[Int, Int]
     println(t0)
     
-    val t1 = new Treap[Int, Int](TreapSimpleNode(1, 100, e, e))
+    val t1 = new Treap[Int, Int](TreapMemNode(1, 100, e, e))
     println(t1)
 
-    val t2 = new Treap[Int, Int](TreapSimpleNode(2, 200, e, e))
+    val t2 = new Treap[Int, Int](TreapMemNode(2, 200, e, e))
     println(t2)
     
-    val t1_1 = new Treap[Int, Int](TreapSimpleNode(1, 101, e, e))
+    val t1_1 = new Treap[Int, Int](TreapMemNode(1, 101, e, e))
     println(t1_1)
 
     println(t1.union(t2))
@@ -231,7 +234,7 @@ object TreapTest {
     println(t1.diff(t2))
     println(t2.diff(t1))
     
-    val t3 = new Treap[Int, Int](TreapSimpleNode(3, 300, e, e))
+    val t3 = new Treap[Int, Int](TreapMemNode(3, 300, e, e))
     println(t1.union(t2).union(t3))
     println(t1.union(t2).union(t3).intersect(t1.union(t2)))    
     println(t1.union(t2).union(t3).diff(t1.union(t2)))    
