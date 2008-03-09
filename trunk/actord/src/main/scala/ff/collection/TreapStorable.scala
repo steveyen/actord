@@ -39,17 +39,16 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
   }
   
   def mkNodeSwizzle(next: TreapNode[A, B], prev: StorageSwizzle[TreapNode[A, B]]) = 
-    if (prev.value != null &&
-        prev.value == next)
-        prev
+    if (prev.value == next)
+        prev // Don't create a new swizzle holder, just use old/previous one.
     else {
-      if (next.isEmpty)
-        emptyNodeSwizzle
-      else {
-        val x = new StorageSwizzle[TreapNode[A, B]]()
-        x.value_!!(next)
-        x
-      }
+        if (next.isEmpty)
+          emptyNodeSwizzle
+        else {
+          val x = new StorageSwizzle[TreapNode[A, B]]()
+          x.value_!!(next)
+          x
+        }
     }
 
   val emptyNodeSwizzle = {
