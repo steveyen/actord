@@ -45,6 +45,8 @@ abstract class TreapNode[A <% Ordered[A], B]
   
   def isEmpty: Boolean
   def isLeaf: Boolean
+  
+  def lookup(s: A): Node
 
   /**
    * Splits a treap into two treaps based on a split key "s".
@@ -86,7 +88,8 @@ case class TreapEmptyNode[A <% Ordered[A], B] extends TreapNode[A, B]
   def isEmpty: Boolean = true
   def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
 
-  def split(s: A) = (this, null, this)
+  def lookup(s: A): Node          = this
+  def split(s: A)                 = (this, null, this)
   def join(that: Node): Node      = that
   def union(that: Node): Node     = that
   def intersect(that: Node): Node = this
@@ -109,6 +112,16 @@ abstract class TreapFullNode[A <% Ordered[A], B] extends TreapNode[A, B]
 
   def isEmpty: Boolean = false
   def isLeaf: Boolean  = left.isEmpty && right.isEmpty
+
+  def lookup(s: A): Node = 
+    if (s == key)
+      this
+    else {
+      if (s < key)
+        left.lookup(s)
+      else
+        right.lookup(s)
+    }    
 
   def split(s: A) = {
     if (s == key) {
@@ -207,6 +220,49 @@ case class TreapMemNode[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A,
 {
   def mkNode(basis: Full, left: Node, right: Node): Node = basis match {
     case TreapMemNode(k, v, _, _) => TreapMemNode(k, v, left, right)
+  }
+}
+
+// ---------------------------------------------------------
+
+/**
+ * A treap node that potentially stored to nonvolatile/persistent storage,
+ * and, thus, evictable from memory.
+ */
+case class TreapStorableNode[A <% Ordered[A], B](
+  key: A, 
+  keyWrapLeft: A,
+  keyWrapRight: A,
+  value: B, 
+  left: TreapNode[A, B], 
+  right: TreapNode[A, B]) 
+  extends TreapFullNode[A, B] 
+{
+  def mkNode(basis: Full, left: Node, right: Node): Node = basis match {
+    case TreapStorableNode(k, kwl, kwr, v, _, _) => 
+         TreapStorableNode(k, kwl, kwr, v, left, right)
+  }
+
+  override def split(s: A) = {
+    if (s == key) {
+      (left, this, right)
+    } else {
+      if (s < key) {
+        if (isLeaf)
+          (left, null, this) // Optimization when isLeaf.
+        else {
+          val (l1, m, r1) = left.split(s)
+          (l1, m, mkNode(this, r1, right))
+        }
+      } else {
+        if (isLeaf)
+          (this, null, right) // Optimization when isLeaf.
+        else {
+          val (l1, m, r1) = right.split(s)
+          (mkNode(this, left, l1), m, r1)
+        }
+      }
+    }
   }
 }
 
