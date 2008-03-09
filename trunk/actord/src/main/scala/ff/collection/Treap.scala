@@ -51,6 +51,8 @@ abstract class TreapNode[A <% Ordered[A], B]
    * The result tuple-3 means (left, X, right), where X is either...
    * null - meaning the key "s" was not in the original treap.
    * non-null - returning the Full node that had key "s".
+   * The tuple-3's left treap has keys all < s,
+   * and the tuple-3's right treap has keyas all > s.
    */
   def split(s: A): (Node, Full, Node)
 
