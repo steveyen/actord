@@ -31,6 +31,14 @@ class TreapStorable[A <% Ordered[A], B <: AnyRef](override val root: TreapNode[A
     case TreapStorableNode(k, kiMin, kiMax, s, _, _) =>
          TreapStorableNode(k, kiMin, kiMax, s, left, right)
   }
+
+  def swizzleValue(s: TreapStorageNodeSwizzle[A, B]) = {
+    s.value
+  }
+
+  def swizzleNode(s: TreapStorageNodeSwizzle[A, B]) = {
+    s.node
+  }
 }
 
 // ---------------------------------------------------------
@@ -52,18 +60,11 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
     key == keyInnerMin && 
     key == keyInnerMax
   
-  def value(t: T): B                       = swizzleLoad(t).value
-  def inner(t: T): TreapStorableNode[A, B] = swizzleLoad(t).node
+  def value(t: T) = 
+    t.asInstanceOf[TreapStorable[A, B]].swizzleValue(swizzle)
 
-  def swizzleLoad(t: T) = synchronized {
-    // Swizzle/load from storage, if not already.
-    //
-    swizzle.synchronized {
-      if (swizzle.node == null) {
-      }
-    }
-    swizzle
-  }
+  def inner(t: T) = 
+    t.asInstanceOf[TreapStorable[A, B]].swizzleNode(swizzle)
 
   override def lookup(t: T, s: A): Node = 
     if (s < keyInnerMin)
@@ -100,11 +101,9 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
 // ---------------------------------------------------------
 
 class TreapStorageNodeSwizzle[A <% Ordered[A], B <: AnyRef] {
-  type Storable = TreapStorableNode[A, B]
-
-  private var loc_i: Long      = -1L 
-  private var node_i: Storable = null
-  private var value_i: B       = _
+  private var loc_i: Long                     = -1L 
+  private var node_i: TreapStorableNode[A, B] = null
+  private var value_i: B                      = _
   
   def loc: Long = synchronized { loc_i }
   def loc_!!(x: Long) = synchronized { 
@@ -118,8 +117,8 @@ class TreapStorageNodeSwizzle[A <% Ordered[A], B <: AnyRef] {
   /**
    * The storable node here must have a simple key (hasSimpleKey == true).
    */
-  def node: Storable = synchronized { node_i }
-  def node_!!(x: Storable) = synchronized { 
+  def node: TreapStorableNode[A, B] = synchronized { node_i }
+  def node_!!(x: TreapStorableNode[A, B]) = synchronized { 
     if (x != null) {
       if (x.hasSimpleKey == false)
         throw new RuntimeException("swizzle node must have simple key")
