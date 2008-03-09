@@ -30,29 +30,36 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
                       right: TreapNode[A, B]): TreapNode[A, B] = basis match {
     case TreapStorableNode(t, k, sv, oldSelf, oldLeft, oldRight) =>
       if (t.io != this.io)
-        throw new RuntimeException("treaps io mismatch")
+        throw new RuntimeException("treap io mismatch")
 
-      val sl = if (oldLeft.value != null &&
-                   oldLeft.value == left)
-                   oldLeft
-               else {
-                   val x = new StorageSwizzle[TreapNode[A, B]]()
-                   x.value_!!(left.asInstanceOf[TreapNode[A, B]])
-                   x
-               }
-      val sr = if (oldRight.value != null &&
-                   oldRight.value == right)
-                   oldRight
-               else {
-                   val x = new StorageSwizzle[TreapNode[A, B]]()
-                   x.value_!!(right.asInstanceOf[TreapNode[A, B]])
-                   x
-               }
-
-      val ss = new StorageSwizzle[TreapStorableNode[A, B]]()
-
-      TreapStorableNode(this, k, sv, ss, sl, sr)
+      TreapStorableNode(this, k, sv, 
+        new StorageSwizzle[TreapStorableNode[A, B]],
+        mkNodeSwizzle(left,  oldLeft), 
+        mkNodeSwizzle(right, oldRight))
   }
+  
+  def mkNodeSwizzle(next: TreapNode[A, B], prev: StorageSwizzle[TreapNode[A, B]]) = 
+    if (prev.value != null &&
+        prev.value == next)
+        prev
+    else {
+      if (next.isEmpty)
+        emptyNodeSwizzle
+      else {
+        val x = new StorageSwizzle[TreapNode[A, B]]()
+        x.value_!!(next)
+        x
+      }
+    }
+
+  val emptyNodeSwizzle = {
+    val x = new StorageSwizzle[TreapNode[A, B]]()
+    x.loc_!!(0L)
+    x.value_!!(emptyNode)
+    x
+  }
+  
+  val emptyNode = TreapEmptyNode[A, B]
 
   def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]) = {
     s.synchronized {
