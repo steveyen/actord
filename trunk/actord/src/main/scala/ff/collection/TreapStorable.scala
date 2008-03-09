@@ -23,9 +23,14 @@ import scala.collection._
 class TreapStorable[A <% Ordered[A], B <: AnyRef](override val root: TreapNode[A, B])
   extends Treap[A, B](root)
 {
-  def this() = this(TreapEmptyNode[A, B])
-  
   override def mkTreap(r: TreapNode[A, B]): Treap[A, B] = new TreapStorable(r)
+  
+  override def mkNode(basis: TreapFullNode[A, B], 
+                      left:  TreapNode[A, B], 
+                      right: TreapNode[A, B]): TreapNode[A, B] = basis match {
+    case TreapStorableNode(k, kiMin, kiMax, s, _, _) =>
+         TreapStorableNode(k, kiMin, kiMax, s, left, right)
+  }
 }
 
 // ---------------------------------------------------------
@@ -43,11 +48,6 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
   right: TreapNode[A, B]) 
   extends TreapFullNode[A, B] 
 {
-  def mkNode(basis: Full, left: Node, right: Node): Node = basis match {
-    case TreapStorableNode(k, kiMin, kiMax, s, _, _) =>
-         TreapStorableNode(k, kiMin, kiMax, s, left, right)
-  }
-  
   def hasSimpleKey: Boolean = 
     key == keyInnerMin && 
     key == keyInnerMax
@@ -79,14 +79,14 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
         (left, null, this) // Optimization when isLeaf.
       else {
         val (l1, m, r1) = left.split(t, s)
-        (l1, m, mkNode(this, r1, right))
+        (l1, m, t.mkNode(this, r1, right))
       }
     } else if (s > keyInnerMax) {
       if (isLeaf)
         (this, null, right) // Optimization when isLeaf.
       else {
         val (l1, m, r1) = right.split(t, s)
-        (mkNode(this, left, l1), m, r1)
+        (t.mkNode(this, left, l1), m, r1)
       }
     } else {
       // Split point "s" is without [keyInnerMin, keyInnerMax] range.
@@ -96,6 +96,8 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
     }
   }
 }
+
+// ---------------------------------------------------------
 
 class TreapStorageNodeSwizzle[A <% Ordered[A], B <: AnyRef] {
   type Storable = TreapStorableNode[A, B]
