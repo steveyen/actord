@@ -24,7 +24,7 @@ import scala.collection._
  */
 class Treap[A <% Ordered[A], B](val root: TreapNode[A, B])
 {
-  def this() = this(TreapEmpty[A, B])
+  def this() = this(TreapEmptyNode[A, B])
   
   def mkTreap(r: TreapNode[A, B]): Treap[A, B] = new Treap(r)
   
@@ -38,8 +38,8 @@ class Treap[A <% Ordered[A], B](val root: TreapNode[A, B])
 abstract class TreapNode[A <% Ordered[A], B] 
 {
   type Node  = TreapNode[A, B]
-  type Full  = TreapFull[A, B]
-  type Empty = TreapEmpty[A, B]
+  type Full  = TreapFullNode[A, B]
+  type Empty = TreapEmptyNode[A, B]
   
   def isEmpty: Boolean
   def isLeaf: Boolean
@@ -69,11 +69,11 @@ abstract class TreapNode[A <% Ordered[A], B]
   def diff(that: Node): Node
 }
 
-case class TreapFull[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
+case class TreapFullNode[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
    extends TreapNode[A, B] 
 {
   def mkFull(key: A, value: B, left: Node, right: Node): Node = 
-        TreapFull[A, B](key, value, left, right)
+        TreapFullNode[A, B](key, value, left, right)
   
   def priority = key.hashCode
 
@@ -167,7 +167,7 @@ case class TreapFull[A <% Ordered[A], B](key: A, value: B, left: TreapNode[A, B]
   }
 }
 
-case class TreapEmpty[A <% Ordered[A], B] extends TreapNode[A, B] 
+case class TreapEmptyNode[A <% Ordered[A], B] extends TreapNode[A, B] 
 { 
   def isEmpty: Boolean = true
   def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
@@ -185,17 +185,17 @@ case class TreapEmpty[A <% Ordered[A], B] extends TreapNode[A, B]
 
 object TreapTest {
   def main(args: Array[String]) {
-    val e = TreapEmpty[Int, Int]
+    val e = TreapEmptyNode[Int, Int]
     val t0 = new Treap[Int, Int]
     println(t0)
     
-    val t1 = new Treap[Int, Int](TreapFull(1, 100, e, e))
+    val t1 = new Treap[Int, Int](TreapFullNode(1, 100, e, e))
     println(t1)
 
-    val t2 = new Treap[Int, Int](TreapFull(2, 200, e, e))
+    val t2 = new Treap[Int, Int](TreapFullNode(2, 200, e, e))
     println(t2)
     
-    val t1_1 = new Treap[Int, Int](TreapFull(1, 101, e, e))
+    val t1_1 = new Treap[Int, Int](TreapFullNode(1, 101, e, e))
     println(t1_1)
 
     println(t1.union(t2))
@@ -205,7 +205,7 @@ object TreapTest {
     println(t1.diff(t2))
     println(t2.diff(t1))
     
-    val t3 = new Treap[Int, Int](TreapFull(3, 300, e, e))
+    val t3 = new Treap[Int, Int](TreapFullNode(3, 300, e, e))
     println(t1.union(t2).union(t3))
     println(t1.union(t2).union(t3).intersect(t1.union(t2)))    
     println(t1.union(t2).union(t3).diff(t1.union(t2)))    
