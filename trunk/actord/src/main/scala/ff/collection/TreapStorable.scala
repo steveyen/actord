@@ -17,14 +17,6 @@ package ff.collection
 
 import scala.collection._
 
-trait Storage {
-  def readArray(loc: Long): Array[Byte]
-  def appendArray(arr: Array[Byte]): Long
-  
-  def lastLocOf(arr: Array[Byte]): Long
-
-}
-
 /**
  * Extends the immutable treap implementation with persistence.
  */
@@ -37,8 +29,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
                       left:  TreapNode[A, B], 
                       right: TreapNode[A, B]): TreapNode[A, B] = basis match {
     case TreapStorableNode(k, kiMin, kiMax, sn, sv, _, _) =>
-      val sn2 = new TreapStorageSwizzle[TreapStorableNode[A, B]]()
-      val sv2 = new TreapStorageSwizzle[B]()
+      val sn2 = new StorageSwizzle[TreapStorableNode[A, B]]()
+      val sv2 = new StorageSwizzle[B]()
 
       sv2.loc_!!(sv.loc)
       sv2.value_!!(sv.value)
@@ -46,7 +38,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       TreapStorableNode(k, kiMin, kiMax, sn2, sv2, left, right)
   }
 
-  def swizzleNode(s: TreapStorageSwizzle[TreapStorableNode[A, B]]) = {
+  def swizzleNode(s: StorageSwizzle[TreapStorableNode[A, B]]) = {
     s.synchronized {
       if (s.value != null)
           s.value
@@ -62,7 +54,7 @@ null
   def serialize(x: B): Array[Byte]
   def unserialize(arr: Array[Byte]): B
 
-  def swizzleValue(s: TreapStorageSwizzle[B]) = {
+  def swizzleValue(s: StorageSwizzle[B]) = {
     s.synchronized {
       if (s.value != null)
           s.value
@@ -85,8 +77,8 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
   key: A,
   keyInnerMin: A,
   keyInnerMax: A,
-  swizzleNode: TreapStorageSwizzle[TreapStorableNode[A, B]],
-  swizzleValue: TreapStorageSwizzle[B],
+  swizzleNode: StorageSwizzle[TreapStorableNode[A, B]],
+  swizzleValue: StorageSwizzle[B],
   left: TreapNode[A, B], 
   right: TreapNode[A, B]) 
   extends TreapFullNode[A, B] 
@@ -130,29 +122,6 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
       val (l1, m, r1) = inner(t).split(t, s)
       (left.join(t, l1), m, r1.join(t, right))
     }
-  }
-}
-
-// ---------------------------------------------------------
-
-class TreapStorageSwizzle[S <: AnyRef] {
-  private var loc_i: Long = -1L 
-  private var value_i: S  = _
-
-  def loc: Long = synchronized { loc_i }
-  def loc_!!(x: Long) = synchronized { 
-    if (loc_i >= 0L && x >= 0L)
-      throw new RuntimeException("cannot override an existing swizzle loc")
-    loc_i = x
-    loc_i 
-  }
-
-  def value: S = synchronized { value_i }
-  def value_!!(x: S) = synchronized { 
-    if (x != null && value_i != null)
-      throw new RuntimeException("cannot overwrite an existing swizzle value")
-    value_i = x
-    value_i
   }
 }
 
