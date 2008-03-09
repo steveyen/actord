@@ -28,7 +28,10 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
   override def mkNode(basis: TreapFullNode[A, B], 
                       left:  TreapNode[A, B], 
                       right: TreapNode[A, B]): TreapNode[A, B] = basis match {
-    case TreapStorableNode(_, k, sv, oldSelf, oldLeft, oldRight) =>
+    case TreapStorableNode(t, k, sv, oldSelf, oldLeft, oldRight) =>
+      if (t.io != this.io)
+        throw new RuntimeException("treaps mismatch")
+
       val sl = if (oldLeft.value != null &&
                    oldLeft.value == left)
                    oldLeft
