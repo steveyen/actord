@@ -19,10 +19,12 @@ import scala.collection._
 
 import java.io._
 
+/** 
+ * Interface for a journaling, append-only nonvolatile storage.
+ */
 trait Storage {
   def readAt[T](loc: StorageLoc, func: StorageReader => T): T
   def append(func: (StorageLoc, StorageAppender) => Unit): StorageLoc
-  def flush: Unit
 }
 
 trait StorageReader {
@@ -37,7 +39,15 @@ trait StorageAppender {
   def appendUTF(s: String): StorageLoc
 }
 
-case class StorageLoc(id: Int, position: Long)
+/**
+ * Immutable opaque pointer to location in storage.
+ * The id is an opaque identifier to a storage shard, possibly 
+ * representing a file.  The position is also opaque, possibly
+ * representing a byte offset in a file.  
+ */
+case class StorageLoc(id: Short, position: Long)
+
+object NullStorageLoc extends StorageLoc(-1, -1L)
 
 // ---------------------------------------------------------
 
@@ -80,7 +90,7 @@ class SingleFileStorage(f: File) extends Storage {
       arr
     }
         
-    def readLoc: StorageLoc = StorageLoc(raf.readInt, raf.readLong)
+    def readLoc: StorageLoc = StorageLoc(raf.readShort, raf.readLong)
     def readUTF: String     = raf.readUTF
   }
   
@@ -93,7 +103,7 @@ class SingleFileStorage(f: File) extends Storage {
     }
     
     def appendLoc(loc: StorageLoc): Unit = {
-      fosData.writeInt(loc.id)
+      fosData.writeShort(loc.id)
       fosData.writeLong(loc.position)
     }
     
@@ -124,9 +134,4 @@ class SingleFileStorage(f: File) extends Storage {
       func(loc, appender)
       loc
     }
-    
-  def flush = synchronized {
-    fosData.flush
-    fosChannel.force(true)
-  }
 }
