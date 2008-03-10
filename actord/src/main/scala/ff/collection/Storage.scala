@@ -25,7 +25,7 @@ trait Storage {
 // ---------------------------------------------------------
 
 class StorageSwizzle[S <: AnyRef] {
-  private var loc_i: Long = -1L 
+  private var loc_i: Long = -1L
   private var value_i: S  = _
 
   def loc: Long = synchronized { loc_i }
