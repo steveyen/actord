@@ -69,7 +69,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
   }
   
   val emptyNode    = TreapEmptyNode[A, B]
-  val emptyNodeLoc = StorageLoc(-1, -1L)
+  def emptyNodeLoc = NullStorageLoc
 
   def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = {
     s.synchronized {
