@@ -17,20 +17,27 @@ package ff.collection
 
 import scala.collection._
 
+import java.io._
+
 trait Storage {
-  def readArray(loc: Long): Array[Byte]
-  def appendArray(arr: Array[Byte]): Long
+  def readArray(loc: StorageLoc): Array[Byte]
+  def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc
+  def flush: Unit
 }
 
 // ---------------------------------------------------------
 
-class StorageSwizzle[S <: AnyRef] {
-  private var loc_i: Long = -1L
-  private var value_i: S  = _
+case class StorageLoc(id: Int, position: Long)
 
-  def loc: Long = synchronized { loc_i }
-  def loc_!!(x: Long) = synchronized { 
-    if (loc_i >= 0L && x >= 0L)
+// ---------------------------------------------------------
+
+class StorageSwizzle[S <: AnyRef] {
+  private var loc_i: StorageLoc = null
+  private var value_i: S        = _
+
+  def loc: StorageLoc = synchronized { loc_i }
+  def loc_!!(x: StorageLoc) = synchronized { 
+    if (x != null && loc_i != null)
       throw new RuntimeException("cannot override an existing swizzle loc")
     loc_i = x
     loc_i 
@@ -45,3 +52,32 @@ class StorageSwizzle[S <: AnyRef] {
   }
 }
 
+// ---------------------------------------------------------
+
+class SingleFileStorage(f: File) extends Storage {
+  val fos            = new FileOutputStream(f, true)
+  val fosData        = new DataOutputStream(new BufferedOutputStream(fos))
+  val fosChannel     = fos.getChannel
+  val fosInitialSize = fosChannel.size
+  
+  def readArray(loc: StorageLoc): Array[Byte] = {
+    if (loc == null ||
+        loc.id != 0)
+      throw new RuntimeException("bad loc during SFS readArray: " + loc)
+    if (loc.position >= fosChannel.size)
+      throw new RuntimeException("bad position during SFS readArray: " + loc)
+    null
+  }
+  
+  def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc = {
+    val pos = fosChannel.size
+    fosData.writeInt(len)
+    fosData.write(arr, offset, len)
+    StorageLoc(0, pos)
+  }
+  
+  def flush = {
+    fosData.flush
+    fosChannel.force(true)
+  }
+}

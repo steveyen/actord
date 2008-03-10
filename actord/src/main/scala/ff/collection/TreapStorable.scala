@@ -55,22 +55,27 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
   val emptyNodeSwizzle = {
     val x = new StorageSwizzle[TreapNode[A, B]]
-    x.loc_!!(0L)
+    x.loc_!!(emptyLoc)
     x.value_!!(emptyNode)
     x
   }
   
   val emptyNode = TreapEmptyNode[A, B]
+  val emptyLoc  = StorageLoc(-1, -1L)
 
-  def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]) = {
+  def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = {
     s.synchronized {
       if (s.value != null)
           s.value
       else {
-        if (s.loc < 0L)
+        if (s.loc == null)
           throw new RuntimeException("could not swizzle load without a loc")
+        if (s.loc == emptyLoc)
+          s.value_!!(emptyNode)
+        else {
 //        s.value_!!(unserialize(io.readArray(s.loc)))
 null
+        }
       }
     }
   }
@@ -78,14 +83,17 @@ null
   def serialize(x: B): Array[Byte]
   def unserialize(arr: Array[Byte]): B
 
-  def swizzleLoadValue(s: StorageSwizzle[B]) = {
+  def swizzleLoadValue(s: StorageSwizzle[B]): B = {
     s.synchronized {
       if (s.value != null)
           s.value
       else {
-        if (s.loc < 0L)
+        if (s.loc == null)
           throw new RuntimeException("could not swizzle load without a loc")
-        s.value_!!(unserialize(io.readArray(s.loc)))
+        if (s.loc == emptyLoc)
+          s.value_!!(null.asInstanceOf[B])
+        else
+          s.value_!!(unserialize(io.readArray(s.loc)))
       }
     }
   }
