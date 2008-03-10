@@ -22,6 +22,8 @@ import java.io._
 trait Storage {
   def readArray(loc: StorageLoc): Array[Byte]
   def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc
+  def appendLoc(loc: StorageLoc): Unit
+  def appendUTF(s: String): StorageLoc
   def flush: Unit
 }
 
@@ -89,6 +91,20 @@ class SingleFileStorage(f: File) extends Storage {
     StorageLoc(0, pos)
   }
   
+  def appendLoc(loc: StorageLoc): Unit = synchronized {
+    fosData.writeInt(loc.id)
+    fosData.writeLong(loc.position)
+  }
+  
+  def appendUTF(s: String): StorageLoc = {
+    var pos = -1L
+    synchronized {
+      pos = fosChannel.size
+      fosData.writeUTF(s)
+    }
+    StorageLoc(0, pos)
+  }
+
   def flush = synchronized {
     fosData.flush
     fosChannel.force(true)
