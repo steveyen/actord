@@ -19,12 +19,20 @@ import scala.collection._
 
 /**
  * Extends the immutable treap implementation with persistence.
+ * Concrete subclasses need to implement serialize/unserialize
+ * of keys and values.
  */
 abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
   override val root: TreapNode[A, B],
   val io: Storage)
   extends Treap[A, B](root)
 {
+  def serializeKey(x: A): Array[Byte]
+  def unserializeKey(arr: Array[Byte]): A
+
+  def serializeValue(x: B): Array[Byte]
+  def unserializeValue(arr: Array[Byte]): B
+
   override def mkNode(basis: TreapFullNode[A, B], 
                       left:  TreapNode[A, B], 
                       right: TreapNode[A, B]): TreapNode[A, B] = basis match {
@@ -73,8 +81,33 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
         if (s.loc == emptyNodeLoc)
           s.value_!!(emptyNode)
         else {
-//        s.value_!!(unserialize(io.readArray(s.loc)))
-null
+          var keyArr: Array[Byte]  = null
+          var locValue: StorageLoc = null
+          var locLeft: StorageLoc  = null
+          var locRight: StorageLoc = null
+
+          io.readAt(s.loc, reader => {
+            keyArr   = reader.readArray
+            locValue = reader.readLoc
+            locLeft  = reader.readLoc
+            locRight = reader.readLoc
+          })
+
+          val key          = unserializeKey(keyArr)
+          val swizzleValue = new StorageSwizzle[B]
+          val swizzleLeft  = new StorageSwizzle[TreapNode[A, B]]
+          val swizzleRight = new StorageSwizzle[TreapNode[A, B]]
+
+          swizzleValue.loc_!!(locValue)
+          swizzleLeft.loc_!!(locLeft)
+          swizzleRight.loc_!!(locRight)
+          
+          s.value_!!(TreapStorableNode[A, B](this, 
+                                             key, 
+                                             swizzleValue,
+                                             s,
+                                             swizzleLeft,
+                                             swizzleRight))
         }
       }
     }
@@ -88,34 +121,43 @@ null
         case e: TreapEmptyNode[A, B] =>
           s.loc_!!(emptyNodeLoc)
         case x: TreapStorableNode[A, B] =>
-          s.loc_!!(x.append(io))
+          val keyArr   = serializeKey(x.key)
+          val locValue = swizzleSaveValue(x.swizzleValue)
+          val locLeft  = swizzleSaveNode(x.swizzleLeft)
+          val locRight = swizzleSaveNode(x.swizzleRight)
+          
+          s.loc_!!(io.append((loc, appender) => {
+            appender.appendArray(keyArr, 0, keyArr.length)
+            appender.appendLoc(locValue)
+            appender.appendLoc(locLeft)
+            appender.appendLoc(locRight)
+          }))
       }
     }
   }
 
-  def serialize(x: B): Array[Byte]
-  def unserialize(arr: Array[Byte]): B
-
-  def swizzleLoadValue(s: StorageSwizzle[B]): B = {
+  def swizzleLoadValue(s: StorageSwizzle[B]): B = 
     s.synchronized {
       if (s.value != null)
           s.value
       else {
         if (s.loc == null)
           throw new RuntimeException("could not swizzle load without a loc")
-        s.value_!!(unserialize(io.readArray(s.loc)))
+          
+        s.value_!!(unserializeValue(io.readAt(s.loc, _.readArray)))
       }
     }
-  }
 
-  def swizzleSaveValue(s: StorageSwizzle[B]): StorageLoc = s.synchronized {
-    if (s.loc != null)
-        s.loc
-    else {
-        val arr = serialize(s.value)
-        s.loc_!!(io.appendArray(arr, 0, arr.length))
+  def swizzleSaveValue(s: StorageSwizzle[B]): StorageLoc = 
+    s.synchronized {
+      if (s.loc != null)
+          s.loc
+      else {
+          val arr = serializeValue(s.value)
+          s.loc_!!(io.append((loc, appender) =>
+                                   appender.appendArray(arr, 0, arr.length)))
+      }
     }
-  }
 }
 
 // ---------------------------------------------------------
@@ -136,19 +178,5 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
   def left  = t.swizzleLoadNode(swizzleLeft)
   def right = t.swizzleLoadNode(swizzleRight)
   def value = t.swizzleLoadValue(swizzleValue)
-  
-  def append(s: Storage): StorageLoc = {
-    val locValue = t.swizzleSaveValue(swizzleValue)
-    val locLeft  = t.swizzleSaveNode(swizzleLeft)
-    val locRight = t.swizzleSaveNode(swizzleRight)
-    
-    s.synchronized {
-      val loc = s.appendUTF(key.toString)
-      s.appendLoc(locValue)
-      s.appendLoc(locLeft)
-      s.appendLoc(locRight)
-      loc
-    }
-  }
 }
 

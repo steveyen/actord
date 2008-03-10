@@ -20,14 +20,22 @@ import scala.collection._
 import java.io._
 
 trait Storage {
-  def readArray(loc: StorageLoc): Array[Byte]
-  def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc
-  def appendLoc(loc: StorageLoc): Unit
-  def appendUTF(s: String): StorageLoc
+  def readAt[T](loc: StorageLoc, func: StorageReader => T): T
+  def append(func: (StorageLoc, StorageAppender) => Unit): StorageLoc
   def flush: Unit
 }
 
-// ---------------------------------------------------------
+trait StorageReader {
+  def readArray: Array[Byte]
+  def readLoc: StorageLoc
+  def readUTF: String
+}
+
+trait StorageAppender {
+  def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc
+  def appendLoc(loc: StorageLoc): Unit
+  def appendUTF(s: String): StorageLoc
+}
 
 case class StorageLoc(id: Int, position: Long)
 
@@ -64,7 +72,39 @@ class SingleFileStorage(f: File) extends Storage {
   
   val raf = new RandomAccessFile(f, "r")
   
-  def readArray(loc: StorageLoc): Array[Byte] = {
+  val reader = new StorageReader {
+    def readArray: Array[Byte] = {
+      val len = raf.readInt
+      val arr = new Array[Byte](len)
+      raf.readFully(arr)
+      arr
+    }
+        
+    def readLoc: StorageLoc = StorageLoc(raf.readInt, raf.readLong)
+    def readUTF: String     = raf.readUTF
+  }
+  
+  val appender = new StorageAppender {
+    def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc = {
+      val loc = StorageLoc(0, fosChannel.size)
+      fosData.writeInt(len)
+      fosData.write(arr, offset, len)
+      loc
+    }
+    
+    def appendLoc(loc: StorageLoc): Unit = {
+      fosData.writeInt(loc.id)
+      fosData.writeLong(loc.position)
+    }
+    
+    def appendUTF(s: String): StorageLoc = {
+      val loc = StorageLoc(0, fosChannel.size)
+      fosData.writeUTF(s)
+      loc
+    }
+  }
+
+  def readAt[T](loc: StorageLoc, func: StorageReader => T): T = {
     if (loc == null)
       throw new RuntimeException("bad loc during SFS readArray: " + loc)
     if (loc.id != 0)
@@ -74,37 +114,17 @@ class SingleFileStorage(f: File) extends Storage {
 
     synchronized {
       raf.seek(loc.position)
-      val len = raf.readInt
-      val arr = new Array[Byte](len)
-      raf.readFully(arr)
-      arr
+      func(reader)
     }
-  }
-  
-  def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc = {
-    var pos = -1L
-    synchronized {
-      pos = fosChannel.size
-      fosData.writeInt(len)
-      fosData.write(arr, offset, len)
-    }
-    StorageLoc(0, pos)
-  }
-  
-  def appendLoc(loc: StorageLoc): Unit = synchronized {
-    fosData.writeInt(loc.id)
-    fosData.writeLong(loc.position)
-  }
-  
-  def appendUTF(s: String): StorageLoc = {
-    var pos = -1L
-    synchronized {
-      pos = fosChannel.size
-      fosData.writeUTF(s)
-    }
-    StorageLoc(0, pos)
   }
 
+  def append(func: (StorageLoc, StorageAppender) => Unit): StorageLoc = 
+    synchronized {
+      val loc = StorageLoc(0, fosChannel.size)
+      func(loc, appender)
+      loc
+    }
+    
   def flush = synchronized {
     fosData.flush
     fosChannel.force(true)
