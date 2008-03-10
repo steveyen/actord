@@ -32,20 +32,24 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       if (t.io != this.io)
         throw new RuntimeException("treap io mismatch")
 
-      TreapStorableNode(this, k, sv, 
-        new StorageSwizzle[TreapStorableNode[A, B]],
-        mkNodeSwizzle(left,  oldLeft), 
-        mkNodeSwizzle(right, oldRight))
+      val nodeSwizzle = new StorageSwizzle[TreapStorableNode[A, B]]
+      val node        = TreapStorableNode(this, k, sv, 
+                          nodeSwizzle,
+                          mkNodeSwizzle(left,  oldLeft), 
+                          mkNodeSwizzle(right, oldRight))
+      nodeSwizzle.value_!!(node)
+      node
   }
   
   def mkNodeSwizzle(next: TreapNode[A, B], prev: StorageSwizzle[TreapNode[A, B]]) = 
-    if (prev.value == next)
+    if (prev != null &&
+        prev.value == next)
         prev // Don't create a new swizzle holder, just use old/previous one.
     else {
         if (next.isEmpty)
           emptyNodeSwizzle
         else {
-          val x = new StorageSwizzle[TreapNode[A, B]]()
+          val x = new StorageSwizzle[TreapNode[A, B]]
           x.value_!!(next)
           x
         }
