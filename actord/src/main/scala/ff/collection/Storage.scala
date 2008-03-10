@@ -37,6 +37,7 @@ trait StorageAppender {
   def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc
   def appendLoc(loc: StorageLoc): Unit
   def appendUTF(s: String): StorageLoc
+  def flush: Unit
 }
 
 /**
@@ -82,6 +83,9 @@ class StorageSwizzle[S <: AnyRef] {
 
 // ---------------------------------------------------------
 
+/**
+ * A simple storage implementation that appends to a single file.
+ */
 class SingleFileStorage(f: File) extends Storage {
   val fos            = new FileOutputStream(f, true)
   val fosData        = new DataOutputStream(new BufferedOutputStream(fos))
@@ -119,6 +123,11 @@ class SingleFileStorage(f: File) extends Storage {
       val loc = StorageLoc(0, fosChannel.size)
       fosData.writeUTF(s)
       loc
+    }
+    
+    def flush = {
+      fosData.flush
+      fosChannel.force(true) // TODO: Do we really need separate flush and force?
     }
   }
 
