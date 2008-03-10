@@ -60,23 +60,36 @@ class SingleFileStorage(f: File) extends Storage {
   val fosChannel     = fos.getChannel
   val fosInitialSize = fosChannel.size
   
+  val raf = new RandomAccessFile(f, "r")
+  
   def readArray(loc: StorageLoc): Array[Byte] = {
-    if (loc == null ||
-        loc.id != 0)
+    if (loc == null)
       throw new RuntimeException("bad loc during SFS readArray: " + loc)
-    if (loc.position >= fosChannel.size)
-      throw new RuntimeException("bad position during SFS readArray: " + loc)
-    null
+    if (loc.id != 0)
+      throw new RuntimeException("bad loc id during SFS readArray: " + loc)
+    if (loc.position >= raf.length)
+      throw new RuntimeException("bad loc position during SFS readArray: " + loc)
+
+    synchronized {
+      raf.seek(loc.position)
+      val len = raf.readInt
+      val arr = new Array[Byte](len)
+      raf.readFully(arr)
+      arr
+    }
   }
   
   def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc = {
-    val pos = fosChannel.size
-    fosData.writeInt(len)
-    fosData.write(arr, offset, len)
+    var pos = -1L
+    synchronized {
+      pos = fosChannel.size
+      fosData.writeInt(len)
+      fosData.write(arr, offset, len)
+    }
     StorageLoc(0, pos)
   }
   
-  def flush = {
+  def flush = synchronized {
     fosData.flush
     fosChannel.force(true)
   }
