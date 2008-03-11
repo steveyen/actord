@@ -22,23 +22,34 @@ import java.io._
 /** 
  * Interface for a journaling, append-only nonvolatile storage.
  */
-trait Storage {
-  def readAt[T](loc: StorageLoc, func: StorageReader => T): T
-  def append(func: (StorageLoc, StorageAppender) => Unit): StorageLoc
+trait StorageReader {
+  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T
+  def close: Unit
 }
 
-trait StorageReader {
+trait StorageAppender {
+  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc
+  def close: Unit
+}
+
+trait Storage extends StorageReader with StorageAppender
+
+// ---------------------------------------------------------
+
+trait StorageLocReader {
   def readArray: Array[Byte]
   def readLoc: StorageLoc
   def readUTF: String
 }
 
-trait StorageAppender {
-  def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc
+trait StorageLocAppender {
+  def appendArray(arr: Array[Byte], offset: Int, len: Int): Unit
   def appendLoc(loc: StorageLoc): Unit
-  def appendUTF(s: String): StorageLoc
+  def appendUTF(s: String): Unit
   def flush: Unit
 }
+
+// ---------------------------------------------------------
 
 /**
  * Immutable opaque pointer to location in storage.
@@ -85,15 +96,12 @@ class StorageSwizzle[S <: AnyRef] {
 /**
  * A simple storage implementation that appends to a single file.
  */
-class SingleFileStorage(f: File) extends Storage {
-  val fos            = new FileOutputStream(f, true)
-  val fosData        = new DataOutputStream(new BufferedOutputStream(fos))
-  val fosChannel     = fos.getChannel
-  val fosInitialSize = fosChannel.size
+class SingleFileStorageReader(f: File) extends StorageReader {
+  private val raf = new RandomAccessFile(f, "r")
   
-  val raf = new RandomAccessFile(f, "r")
+  def close = synchronized { raf.close }
   
-  val reader = new StorageReader {
+  private val reader = new StorageLocReader {
     def readArray: Array[Byte] = {
       val len = raf.readInt
       val arr = new Array[Byte](len)
@@ -105,32 +113,7 @@ class SingleFileStorage(f: File) extends Storage {
     def readUTF: String     = raf.readUTF
   }
   
-  val appender = new StorageAppender {
-    def appendArray(arr: Array[Byte], offset: Int, len: Int): StorageLoc = {
-      val loc = StorageLoc(0, fosChannel.size)
-      fosData.writeInt(len)
-      fosData.write(arr, offset, len)
-      loc
-    }
-    
-    def appendLoc(loc: StorageLoc): Unit = {
-      fosData.writeShort(loc.id)
-      fosData.writeLong(loc.position)
-    }
-    
-    def appendUTF(s: String): StorageLoc = {
-      val loc = StorageLoc(0, fosChannel.size)
-      fosData.writeUTF(s)
-      loc
-    }
-    
-    def flush = {
-      fosData.flush
-      fosChannel.force(true) // TODO: Do we really need separate flush and force?
-    }
-  }
-
-  def readAt[T](loc: StorageLoc, func: StorageReader => T): T = {
+  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = {
     if (loc == null)
       throw new RuntimeException("bad loc during SFS readArray: " + loc)
     if (loc.id != 0)
@@ -143,8 +126,45 @@ class SingleFileStorage(f: File) extends Storage {
       func(reader)
     }
   }
+}
 
-  def append(func: (StorageLoc, StorageAppender) => Unit): StorageLoc = 
+// ---------------------------------------------------------
+
+/**
+ * A simple storage implementation that appends to a single file.
+ */
+class SingleFileStorage(f: File) extends SingleFileStorageReader(f) with Storage {
+  private val fos        = new FileOutputStream(f, true)
+  private val fosData    = new DataOutputStream(new BufferedOutputStream(fos))
+  private val fosChannel = fos.getChannel
+  
+  override def close = synchronized {
+    appender.flush
+    fosData.close
+    super.close
+  }
+
+  private val appender = new StorageLocAppender {
+    def appendArray(arr: Array[Byte], offset: Int, len: Int): Unit = {
+      fosData.writeInt(len)
+      fosData.write(arr, offset, len)
+    }
+    
+    def appendLoc(loc: StorageLoc): Unit = {
+      fosData.writeShort(loc.id)
+      fosData.writeLong(loc.position)
+    }
+    
+    def appendUTF(s: String): Unit = 
+      fosData.writeUTF(s)
+    
+    def flush = {
+      fosData.flush
+      fosChannel.force(true) // TODO: Do we really need both flush and force?
+    }
+  }
+
+  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = 
     synchronized {
       val loc = StorageLoc(0, fosChannel.size)
       func(loc, appender)

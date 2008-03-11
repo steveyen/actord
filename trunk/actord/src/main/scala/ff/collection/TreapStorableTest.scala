@@ -32,8 +32,21 @@ class TreapStorableTest extends TestConsoleMain {
 }
 
 class TreapStorableTestCase(name: String) extends TestCase(name) {
+  val empty = TreapEmptyNode[String, String]
+  
+  class TS(override val root: TreapNode[String, String],
+           override val io: Storage)
+    extends TreapStorable[String, String](root, io) {
+    def serializeKey(x: String): Array[Byte]     = x.getBytes
+    def unserializeKey(arr: Array[Byte]): String = new String(arr)
+  
+    def serializeValue(x: String): Array[Byte]     = x.getBytes
+    def unserializeValue(arr: Array[Byte]): String = new String(arr)
+  }
+  
   override def runTest = {
     println("test: " + name)
+
     name match {
       case "should be empty after creation" =>
     }
