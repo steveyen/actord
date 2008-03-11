@@ -32,6 +32,26 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
   def serializeValue(x: B): Array[Byte]
   def unserializeValue(arr: Array[Byte]): B
+  
+  // --------------------------------------------
+
+  override def mkLeaf(key: A, value: B) = {
+    val nodeSwizzle = new StorageSwizzle[TreapNode[A, B]]
+    val valSwizzle  = new StorageSwizzle[B]
+
+    valSwizzle.value_!!(value)
+    
+    val node = TreapStorableNode(this, 
+                                 key, 
+                                 valSwizzle, 
+                                 nodeSwizzle, 
+                                 emptyNodeSwizzle,
+                                 emptyNodeSwizzle)
+                                 
+    nodeSwizzle.value_!!(node)
+    
+    node
+  }   
 
   override def mkNode(basis: TreapFullNode[A, B], 
                       left:  TreapNode[A, B], 
@@ -61,6 +81,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
         x.swizzleSelf
     }
 
+  // --------------------------------------------
+  
   val emptyNodeSwizzle = {
     val x = new StorageSwizzle[TreapNode[A, B]]
     x.loc_!!(emptyNodeLoc)
@@ -71,6 +93,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
   val emptyNode    = TreapEmptyNode[A, B]
   def emptyNodeLoc = NullStorageLoc
 
+  // --------------------------------------------
+  
   def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = {
     s.synchronized {
       if (s.value != null)
@@ -136,6 +160,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
     }
   }
 
+  // --------------------------------------------
+  
   def swizzleLoadValue(s: StorageSwizzle[B]): B = 
     s.synchronized {
       if (s.value != null)

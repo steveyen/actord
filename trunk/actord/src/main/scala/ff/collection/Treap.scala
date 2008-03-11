@@ -27,6 +27,11 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   def this() = this(TreapEmptyNode[A, B])
   
   def mkTreap(r: TreapNode[A, B]): Treap[A, B] = new Treap(r)
+  
+  def mkLeaf(k: A, v: B): TreapNode[A, B] =
+    TreapMemNode(k, v, 
+                 TreapEmptyNode[A, B], 
+                 TreapEmptyNode[A, B])  
 
   def mkNode(basis: TreapFullNode[A, B], 
              left:  TreapNode[A, B], 
@@ -35,9 +40,13 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
          TreapMemNode(k, v, left, right)
   }
 
-  def union(that: Treap[A, B]): Treap[A, B]     = mkTreap(root.union(this, that.root))
-  def intersect(that: Treap[A, B]): Treap[A, B] = mkTreap(root.intersect(this, that.root))
-  def diff(that: Treap[A, B]): Treap[A, B]      = mkTreap(root.diff(this, that.root))
+  def union(that: Treap[A, B]): Treap[A, B]     = union(that.root)
+  def intersect(that: Treap[A, B]): Treap[A, B] = intersect(that.root)
+  def diff(that: Treap[A, B]): Treap[A, B]      = diff(that.root)
+  
+  def union(that: TreapNode[A, B]): Treap[A, B]     = mkTreap(root.union(this, that))
+  def intersect(that: TreapNode[A, B]): Treap[A, B] = mkTreap(root.intersect(this, that))
+  def diff(that: TreapNode[A, B]): Treap[A, B]      = mkTreap(root.diff(this, that))
   
   override def toString = root.toString
 }

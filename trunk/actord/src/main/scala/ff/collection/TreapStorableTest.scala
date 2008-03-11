@@ -52,10 +52,79 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
     val f = File.createTempFile("test_treapstorable", ".tmp")
     val s = new SingleFileStorage(f)
     val t = new TS(empty, s)
-
+    
     try {
       name match {
         case "should be empty after creation" =>
+/*
+          val t0 = new Treap[Int, String]
+          assertEquals(e, t0.root)
+          
+          val t1 = new Treap[Int, String](TreapMemNode(1, "100", e, e))
+          assertEquals(TreapMemNode(1, "100", e, e), t1.root)
+      
+          val t2 = new Treap[Int, String](TreapMemNode(2, "200", e, e))
+          assertEquals(TreapMemNode(2, "200", e, e), t2.root)
+          
+          val t1_1 = new Treap[Int, String](TreapMemNode(1, "101", e, e))
+          assertEquals(TreapMemNode(1, "101", e, e), t1_1.root)
+          
+          var t = t1.union(t2)
+          assertEquals(TreapMemNode(2, "200", 
+                         TreapMemNode(1, "100", e, e), 
+                         e), 
+                       t.root)
+          
+          t = t1.union(t2).union(t2)
+          assertEquals(TreapMemNode(2, "200", 
+                         TreapMemNode(1, "100", e, e), 
+                         e), 
+                       t.root)
+          
+          t = t1.union(t2).union(t2).union(t1_1)
+          assertEquals(TreapMemNode(2, "200", 
+                         TreapMemNode(1, "101", e, e), 
+                         e), 
+                       t.root)
+          
+          t = t1.intersect(t2)
+          assertEquals(e, 
+                       t.root)
+          
+          t = t1.diff(t2)
+          assertEquals(TreapMemNode(1, "100", e, e), 
+                       t.root)
+  
+          t = t2.diff(t1)
+          assertEquals(TreapMemNode(2, "200", e, e), 
+                       t.root)
+          
+          val t3 = new Treap[Int, String](TreapMemNode(3, "300", e, e))
+  
+          t = t1.union(t2).union(t3)
+          assertEquals(TreapMemNode(3, "300", 
+                         TreapMemNode(2, "200", 
+                           TreapMemNode(1, "100", e, e), 
+                           e), 
+                         e),
+                       t.root)
+  
+          t = t1.union(t2).union(t3).intersect(t1.union(t2))
+          assertEquals(TreapMemNode(2, "200", 
+                         TreapMemNode(1, "100", e, e), 
+                         e), 
+                       t.root)
+          
+          t = t1.union(t2).union(t3).diff(t1.union(t2))
+          assertEquals(TreapMemNode(3, "300", e, e), 
+                       t.root)
+          
+          t = t1.union(t2).union(t3).diff(t2)
+          assertEquals(TreapMemNode(3, "300", 
+                         TreapMemNode(1, "100", e, e), 
+                         e), 
+                       t.root)
+*/
       }
     } finally {
       s.close        
