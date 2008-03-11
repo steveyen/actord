@@ -21,6 +21,8 @@ import java.io._
 
 /** 
  * Interface for a journaling, append-only nonvolatile storage.
+ * The interface abstracts away underlying details of actual files,
+ * whether single or multiple, whether auto-rotated, compacted, encrypted, etc.
  */
 trait StorageReader {
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T
@@ -94,7 +96,7 @@ class StorageSwizzle[S <: AnyRef] {
 // ---------------------------------------------------------
 
 /**
- * A simple storage implementation that appends to a single file.
+ * A simple storage implementation that accesses a single file.
  */
 class SingleFileStorageReader(f: File) extends StorageReader {
   private val raf = new RandomAccessFile(f, "r")
@@ -114,17 +116,21 @@ class SingleFileStorageReader(f: File) extends StorageReader {
   }
   
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = {
-    if (loc == null)
-      throw new RuntimeException("bad loc during SFS readArray: " + loc)
-    if (loc.id != 0)
-      throw new RuntimeException("bad loc id during SFS readArray: " + loc)
-    if (loc.position >= raf.length)
-      throw new RuntimeException("bad loc position during SFS readArray: " + loc)
+    checkLoc(loc)
 
     synchronized {
       raf.seek(loc.position)
       func(reader)
     }
+  }
+  
+  def checkLoc(loc: StorageLoc) = {
+    if (loc == null)
+      throw new RuntimeException("bad loc during SFS readAt: " + loc)
+    if (loc.id != 0)
+      throw new RuntimeException("bad loc id during SFS readAt: " + loc)
+    if (loc.position >= raf.length)
+      throw new RuntimeException("bad loc position during SFS readAt: " + loc)
   }
 }
 
