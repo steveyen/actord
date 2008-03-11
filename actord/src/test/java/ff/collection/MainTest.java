@@ -7,6 +7,7 @@ public class MainTest extends TestCase {
     // Run actual tests via scala SUnit.
     //
     new StorageTest().main(new String[0]); 
+    new TreapTest().main(new String[0]); 
     new TreapStorableTest().main(new String[0]); 
   }
 }

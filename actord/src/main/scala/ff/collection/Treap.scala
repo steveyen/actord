@@ -221,34 +221,3 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
 case class TreapMemNode[A <% Ordered[A], B <: AnyRef](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
    extends TreapFullNode[A, B] 
 
-// ---------------------------------------------------------
-
-object TreapTest {
-  def main(args: Array[String]) {
-    val e = TreapEmptyNode[Int, String]
-    val t0 = new Treap[Int, String]
-    println(t0)
-    
-    val t1 = new Treap[Int, String](TreapMemNode(1, "100", e, e))
-    println(t1)
-
-    val t2 = new Treap[Int, String](TreapMemNode(2, "200", e, e))
-    println(t2)
-    
-    val t1_1 = new Treap[Int, String](TreapMemNode(1, "101", e, e))
-    println(t1_1)
-
-    println(t1.union(t2))
-    println(t1.union(t2).union(t2))
-    println(t1.union(t2).union(t2).union(t1_1))
-    println(t1.intersect(t2))
-    println(t1.diff(t2))
-    println(t2.diff(t1))
-    
-    val t3 = new Treap[Int, String](TreapMemNode(3, "300", e, e))
-    println(t1.union(t2).union(t3))
-    println(t1.union(t2).union(t3).intersect(t1.union(t2)))    
-    println(t1.union(t2).union(t3).diff(t1.union(t2)))    
-    println(t1.union(t2).union(t3).diff(t2))
-  }
-}
