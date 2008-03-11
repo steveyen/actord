@@ -64,6 +64,8 @@ class TreapTestCase(name: String) extends TestCase(name) {
                      t.root)
         
         t = t1.union(t2).union(t2).union(t1_1)
+        assertEquals(1, t.root.first)
+        assertEquals(2, t.root.last)
         assertEquals(TreapMemNode(2, "200", 
                        TreapMemNode(1, "101", e, e), 
                        e), 
@@ -84,24 +86,36 @@ class TreapTestCase(name: String) extends TestCase(name) {
         val t3 = new Treap[Int, String](TreapMemNode(3, "300", e, e))
 
         t = t1.union(t2).union(t3)
+        assertEquals(3L, t.root.count)
+        assertEquals(1, t.root.first)
+        assertEquals(3, t.root.last)
         assertEquals(TreapMemNode(3, "300", 
                        TreapMemNode(2, "200", 
                          TreapMemNode(1, "100", e, e), 
                          e), 
                        e),
                      t.root)
-
+        
         t = t1.union(t2).union(t3).intersect(t1.union(t2))
+        assertEquals(2L, t.root.count)
+        assertEquals(1, t.root.first)
+        assertEquals(2, t.root.last)
         assertEquals(TreapMemNode(2, "200", 
                        TreapMemNode(1, "100", e, e), 
                        e), 
                      t.root)
         
         t = t1.union(t2).union(t3).diff(t1.union(t2))
+        assertEquals(1L, t.root.count)
+        assertEquals(3, t.root.first)
+        assertEquals(3, t.root.last)
         assertEquals(TreapMemNode(3, "300", e, e), 
                      t.root)
         
         t = t1.union(t2).union(t3).diff(t2)
+        assertEquals(2L, t.root.count)
+        assertEquals(1, t.root.first)
+        assertEquals(3, t.root.last)
         assertEquals(TreapMemNode(3, "300", 
                        TreapMemNode(1, "100", e, e), 
                        e), 
