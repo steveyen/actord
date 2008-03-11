@@ -30,6 +30,7 @@ class TreapStorableTest extends TestConsoleMain {
     ( "should be empty after creation" ::
       "should swizzle one node" ::
       "should swizzle a few nodes" ::
+      "should swizzle only deltas" ::
       Nil
     ).map(name => new TreapStorableTestCase(name)) :_*
   )
@@ -188,6 +189,50 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
                          left.
                          asInstanceOf[TreapStorableNode[String, String]].
                          value)
+
+        case "should swizzle only deltas" =>
+          t = t.union(t.mkLeaf("1", "111")).
+                union(t.mkLeaf("2", "222")).
+                union(t.mkLeaf("3", "333")).
+                asInstanceOf[TS]
+
+          t.swizzleSaveNode(t.rootStorable.swizzleSelf)
+          assertHasLoc(t.rootStorable)
+          assertHasLoc(t.rootStorable.
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+          assertHasLoc(t.rootStorable.
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+
+          assertEquals(true,
+                       t.rootStorable.swizzleValue.loc.position == 0L)
+                       
+          val fLength = f.length
+          assertEquals(true,
+                       fLength > 0L)
+
+          val t2 = t.union(t.mkLeaf("3", "345")).
+                     asInstanceOf[TS]
+          
+          t.swizzleSaveNode(t2.rootStorable.swizzleSelf)
+          assertHasLoc(t2.rootStorable)
+          assertHasLoc(t2.rootStorable.
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+          assertHasLoc(t2.rootStorable.
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+
+          val f2Length = f.length
+          assertEquals(true,
+                       f2Length > fLength)
+          assertEquals(true,
+                       f2Length < fLength * 2L) // Resaving shouldn't double the size.
       }
     } finally {
       s.close        
