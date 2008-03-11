@@ -68,6 +68,17 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
       assertEquals(null, n.swizzleSelf.loc)
       assertEquals(n,    n.swizzleSelf.value)
     }
+    
+    def assertHasLoc(n: TreapStorableNode[String, String]) = {
+      assertEquals(true,
+                   n.swizzleSelf.loc != null)
+      assertEquals(true,
+                   n.swizzleSelf.loc.position > 0L)
+      assertEquals(n,
+                   n.swizzleSelf.value)
+      assertEquals(true,
+                   n.swizzleValue.loc != null)
+    }
 
     try {
       name match {
@@ -119,19 +130,23 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
                             left.
                             asInstanceOf[TreapStorableNode[String, String]], 
                           "1", "111")
-/*
+
           t.swizzleSaveNode(t.rootStorable.swizzleSelf)
-          assertEquals(true,
-                       t.rootStorable.swizzleSelf.loc != null)
-          assertEquals(true,
-                       t.rootStorable.swizzleSelf.loc.position > 0L)
-          assertEquals(t.rootStorable,
-                       t.rootStorable.swizzleSelf.value)
-          assertEquals(true,
-                       t.rootStorable.swizzleValue.loc != null)
+          assertHasLoc(t.rootStorable)
+          assertHasLoc(t.rootStorable.
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+          assertHasLoc(t.rootStorable.
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+
           assertEquals(true,
                        t.rootStorable.swizzleValue.loc.position == 0L)
-          assertEquals("root",
+          assertEquals("333",
+                       t.rootStorable.value)
+          assertEquals("333",
                        t.rootStorable.swizzleValue.value)
 
           val swz = new StorageSwizzle[TreapNode[String, String]]
@@ -143,76 +158,36 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
           assertEquals(n, swz.value)
           assertEquals(n.key, t.rootStorable.key)
           assertEquals(n.value, t.rootStorable.value)
-*/
-/*
-          val t0 = new Treap[Int, String]
-          assertEquals(e, t0.root)
-          
-          val t1 = new Treap[Int, String](TreapMemNode(1, "100", e, e))
-          assertEquals(TreapMemNode(1, "100", e, e), t1.root)
-      
-          val t2 = new Treap[Int, String](TreapMemNode(2, "200", e, e))
-          assertEquals(TreapMemNode(2, "200", e, e), t2.root)
-          
-          val t1_1 = new Treap[Int, String](TreapMemNode(1, "101", e, e))
-          assertEquals(TreapMemNode(1, "101", e, e), t1_1.root)
-          
-          var t = t1.union(t2)
-          assertEquals(TreapMemNode(2, "200", 
-                         TreapMemNode(1, "100", e, e), 
-                         e), 
-                       t.root)
-          
-          t = t1.union(t2).union(t2)
-          assertEquals(TreapMemNode(2, "200", 
-                         TreapMemNode(1, "100", e, e), 
-                         e), 
-                       t.root)
-          
-          t = t1.union(t2).union(t2).union(t1_1)
-          assertEquals(TreapMemNode(2, "200", 
-                         TreapMemNode(1, "101", e, e), 
-                         e), 
-                       t.root)
-          
-          t = t1.intersect(t2)
-          assertEquals(e, 
-                       t.root)
-          
-          t = t1.diff(t2)
-          assertEquals(TreapMemNode(1, "100", e, e), 
-                       t.root)
-  
-          t = t2.diff(t1)
-          assertEquals(TreapMemNode(2, "200", e, e), 
-                       t.root)
-          
-          val t3 = new Treap[Int, String](TreapMemNode(3, "300", e, e))
-  
-          t = t1.union(t2).union(t3)
-          assertEquals(TreapMemNode(3, "300", 
-                         TreapMemNode(2, "200", 
-                           TreapMemNode(1, "100", e, e), 
-                           e), 
-                         e),
-                       t.root)
-  
-          t = t1.union(t2).union(t3).intersect(t1.union(t2))
-          assertEquals(TreapMemNode(2, "200", 
-                         TreapMemNode(1, "100", e, e), 
-                         e), 
-                       t.root)
-          
-          t = t1.union(t2).union(t3).diff(t1.union(t2))
-          assertEquals(TreapMemNode(3, "300", e, e), 
-                       t.root)
-          
-          t = t1.union(t2).union(t3).diff(t2)
-          assertEquals(TreapMemNode(3, "300", 
-                         TreapMemNode(1, "100", e, e), 
-                         e), 
-                       t.root)
-*/
+
+          assertHasLoc(n)
+          assertHasLoc(n.left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+          assertHasLoc(n.left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]])
+
+          assertEquals("2",
+                       n.left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         key)
+          assertEquals("1",
+                       n.left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         key)
+
+          assertEquals("222",
+                       n.left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         value)
+          assertEquals("111",
+                       n.left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         left.
+                         asInstanceOf[TreapStorableNode[String, String]].
+                         value)
       }
     } finally {
       s.close        
