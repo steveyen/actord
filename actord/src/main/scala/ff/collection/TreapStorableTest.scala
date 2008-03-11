@@ -28,6 +28,7 @@ import java.io._
 class TreapStorableTest extends TestConsoleMain {
   def suite = new TestSuite(
     ( "should be empty after creation" ::
+      "should swizzle one node" ::
       Nil
     ).map(name => new TreapStorableTestCase(name)) :_*
   )
@@ -39,11 +40,16 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
   class TS(override val root: TreapNode[String, String],
            override val io: Storage)
     extends TreapStorable[String, String](root, io) {
+    override def mkTreap(r: TreapNode[String, String]): Treap[String, String] = 
+      new TS(r, io)    
+    
     def serializeKey(x: String): Array[Byte]     = x.getBytes
     def unserializeKey(arr: Array[Byte]): String = new String(arr)
   
     def serializeValue(x: String): Array[Byte]     = x.getBytes
     def unserializeValue(arr: Array[Byte]): String = new String(arr)
+    
+    def rootStorable = root.asInstanceOf[TreapStorableNode[String, String]]
   }
   
   override def runTest = {
@@ -51,11 +57,50 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
 
     val f = File.createTempFile("test_treapstorable", ".tmp")
     val s = new SingleFileStorage(f)
-    val t = new TS(empty, s)
+    var t = new TS(empty, s)
     
     try {
       name match {
         case "should be empty after creation" =>
+          assertEquals(empty, t.root)
+
+        case "should swizzle one node" =>
+          t = t.union(t.mkLeaf("top", "root")).asInstanceOf[TS]
+          assertEquals("top", 
+                       t.rootStorable.key)
+          assertEquals("root",
+                       t.rootStorable.swizzleValue.value)
+          assertEquals(null,
+                       t.rootStorable.swizzleValue.loc)
+          assertEquals(null,
+                       t.rootStorable.swizzleSelf.loc)
+          assertEquals(t.rootStorable,
+                       t.rootStorable.swizzleSelf.value)
+
+          t.swizzleSaveNode(t.rootStorable.swizzleSelf)
+          assertEquals(true,
+                       t.rootStorable.swizzleSelf.loc != null)
+          assertEquals(true,
+                       t.rootStorable.swizzleSelf.loc.position > 0L)
+          assertEquals(t.rootStorable,
+                       t.rootStorable.swizzleSelf.value)
+          assertEquals(true,
+                       t.rootStorable.swizzleValue.loc != null)
+          assertEquals(true,
+                       t.rootStorable.swizzleValue.loc.position == 0L)
+          assertEquals("root",
+                       t.rootStorable.swizzleValue.value)
+
+          val swz = new StorageSwizzle[TreapNode[String, String]]
+          swz.loc_!!(t.rootStorable.swizzleSelf.loc)
+          assertEquals(null, swz.value)
+
+          val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
+          assertEquals(true, n != null)
+          assertEquals(n, swz.value)
+          assertEquals(n.key, t.rootStorable.key)
+          assertEquals(n.value, t.rootStorable.value)
+
 /*
           val t0 = new Treap[Int, String]
           assertEquals(e, t0.root)
