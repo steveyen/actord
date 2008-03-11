@@ -124,8 +124,18 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
   
   override def runTest = {
     println("test: " + name)
-    name match {
-      case "should be empty after creation" =>
+
+    val f = File.createTempFile("test_treapstorable", ".tmp")
+    val s = new SingleFileStorage(f)
+    val t = new TS(empty, s)
+
+    try {
+      name match {
+        case "should be empty after creation" =>
+      }
+    } finally {
+      s.close        
+      f.delete
     }
   }
 }
