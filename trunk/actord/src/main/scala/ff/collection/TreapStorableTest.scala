@@ -20,6 +20,8 @@ import scala.collection._
 import scala.testing.SUnit
 import scala.testing.SUnit._
 
+import java.io._
+
 /**
  * Tests persistent treap storage.
  */
@@ -27,8 +29,32 @@ class TreapStorableTest extends TestConsoleMain {
   def suite = new TestSuite(
     ( "should be empty after creation" ::
       Nil
-    ).map(name => new TreapStorableTestCase(name)):_*
+    ).map(name => new SingleFileStorageTestCase(name)) :::  
+    ( "should be empty after creation" ::
+      Nil
+    ).map(name => new TreapStorableTestCase(name)) :_*
   )
+}
+
+class SingleFileStorageTestCase(name: String) extends TestCase(name) {
+  override def runTest = {
+    println("test: " + name)
+    name match {
+      case "should be empty after creation" =>
+        val f = File.createTempFile("test_sfs", ".tmp")
+        val s = new SingleFileStorage(f)
+        val loc = s.append((loc, appender) => appender.appendUTF("hello"))
+        assertEquals(loc, StorageLoc(0, 0L))
+        s.close
+        
+        val s2 = new SingleFileStorage(f)
+        val b2 = s.readAt(loc, _.readUTF)
+        assertEquals("hello", b2)
+        s2.close
+
+        f.delete
+    }
+  }
 }
 
 class TreapStorableTestCase(name: String) extends TestCase(name) {
@@ -46,7 +72,6 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
   
   override def runTest = {
     println("test: " + name)
-
     name match {
       case "should be empty after creation" =>
     }
