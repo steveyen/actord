@@ -27,6 +27,8 @@ import java.io._
 trait StorageReader {
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T
   def close: Unit
+  
+  // TODO: One day revisit adding NIO/file-channel or transmitTo methods.
 }
 
 trait StorageAppender {
