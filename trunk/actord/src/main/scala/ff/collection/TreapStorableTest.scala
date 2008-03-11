@@ -85,6 +85,7 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
       name match {
         case "should be empty after creation" =>
           assertEquals(empty, t.root)
+          assertEquals(0L, t.root.count)
 
         case "should swizzle one node" =>
           t = t.union(t.mkLeaf("top", "root")).asInstanceOf[TS]
@@ -109,6 +110,9 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
           assertEquals(null, swz.value)
 
           val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
+          assertEquals(1L, t.count)
+          assertEquals("top", t.root.first)
+          assertEquals("top", t.root.last)
           assertEquals(true, n != null)
           assertEquals(n, swz.value)
           assertEquals(n.key, t.rootStorable.key)
@@ -155,10 +159,14 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
           assertEquals(null, swz.value)
 
           val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
+          assertEquals(3L, t.count)
+          assertEquals("1", t.root.first)
+          assertEquals("3", t.root.last)
           assertEquals(true, n != null)
           assertEquals(n, swz.value)
           assertEquals(n.key, t.rootStorable.key)
           assertEquals(n.value, t.rootStorable.value)
+          assertEquals(3L, n.count)
 
           assertHasLoc(n)
           assertHasLoc(n.left.
@@ -239,6 +247,9 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
           assertEquals(null, swz.value)
           
           val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
+          assertEquals(3L, n.count)
+          assertEquals("1", t.root.first)
+          assertEquals("3", t.root.last)
           assertEquals(empty, n.lookup(t, "0"))
           var x = n.lookup(t, "3").asInstanceOf[TreapStorableNode[String, String]]
           assertEquals("345", x.value)

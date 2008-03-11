@@ -23,6 +23,7 @@ import scala.collection._
  * See: http://www.cs.cmu.edu/afs/cs.cmu.edu/project/scandal/public/papers/treaps-spaa98.pdf
  */
 class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
+  extends TreapNodeFactory[A, B]
 {
   def this() = this(TreapEmptyNode[A, B])
   
@@ -48,20 +49,36 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   def intersect(that: TreapNode[A, B]): Treap[A, B] = mkTreap(root.intersect(this, that))
   def diff(that: TreapNode[A, B]): Treap[A, B]      = mkTreap(root.diff(this, that))
   
+  def count = root.count
+  
   override def toString = root.toString
+}
+
+// ---------------------------------------------------------
+
+abstract class TreapNodeFactory[A <% Ordered[A], B <: AnyRef]  {
+  def mkLeaf(k: A, v: B): TreapNode[A, B]
+
+  def mkNode(basis: TreapFullNode[A, B], 
+             left:  TreapNode[A, B], 
+             right: TreapNode[A, B]): TreapNode[A, B]
 }
 
 // ---------------------------------------------------------
 
 abstract class TreapNode[A <% Ordered[A], B <: AnyRef] 
 {
-  type T     = Treap[A, B]
+  type T     = TreapNodeFactory[A, B]
   type Node  = TreapNode[A, B]
   type Full  = TreapFullNode[A, B]
   type Empty = TreapEmptyNode[A, B]
   
   def isEmpty: Boolean
   def isLeaf: Boolean
+  
+  def count: Long
+  def first: A
+  def last: A
   
   def lookup(t: T, s: A): Node
 
@@ -105,6 +122,10 @@ case class TreapEmptyNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, B]
   def isEmpty: Boolean = true
   def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
 
+  def count = 0L
+  def first = throw new NoSuchElementException("empty treap")
+  def last  = throw new NoSuchElementException("empty treap")
+  
   def lookup(t: T, s: A): Node          = this
   def split(t: T, s: A)                 = (this, null, this)
   def join(t: T, that: Node): Node      = that
@@ -127,6 +148,10 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
 
   def isEmpty: Boolean = false
   def isLeaf: Boolean  = left.isEmpty && right.isEmpty
+  
+  def count = 1L + left.count + right.count
+  def first = if (left.isEmpty)  key else left.first
+  def last  = if (right.isEmpty) key else right.last
 
   def lookup(t: T, s: A): Node = 
     if (s == key)
