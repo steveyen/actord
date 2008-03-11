@@ -174,6 +174,7 @@ class SingleFileStorage(f: File) extends SingleFileStorageReader(f) with Storage
     synchronized {
       val loc = StorageLoc(0, fosChannel.size)
       func(loc, appender)
+      appender.flush
       loc
     }
 }
