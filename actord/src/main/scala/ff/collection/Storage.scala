@@ -175,6 +175,9 @@ class SingleFileStorage(f: File) extends SingleFileStorageReader(f) with Storage
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = 
     synchronized {
       val loc = StorageLoc(0, fosChannel.size)
+
+      // We assume the callback func is not holding onto the appender parameter.
+      //
       func(loc, appender)
       
       // Note: the flush keeps the fosChannel.size metadata correct.
