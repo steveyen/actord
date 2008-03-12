@@ -237,10 +237,21 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
                          asInstanceOf[TreapStorableNode[String, String]])
 
           val f2Length = f.length
+          val intSize = 4 // in bytes
+          val shortSize = 2
+          val longSize = 8
+          val locSize = shortSize + longSize
           assertEquals(true,
                        f2Length > fLength)
           assertEquals(true,
                        f2Length < fLength * 2L) // Resaving shouldn't double the size.
+          assertEquals(fLength +
+                       intSize + "3".length +    // key
+                       intSize + "345".length +  // value
+                       locSize +                 // valueLoc
+                       locSize +                 // leftLoc
+                       locSize,                  // rightLoc
+                       f2Length)
 
           val swz = new StorageSwizzle[TreapNode[String, String]]
           swz.loc_!!(t2.rootStorable.swizzleSelf.loc)
