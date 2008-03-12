@@ -111,8 +111,8 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
 
           val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
           assertEquals(1L, t.count)
-          assertEquals("top", t.root.first)
-          assertEquals("top", t.root.last)
+          assertEquals("top", t.root.firstKey)
+          assertEquals("top", t.root.lastKey)
           assertEquals(true, n != null)
           assertEquals(n, swz.value)
           assertEquals(n.key, t.rootStorable.key)
@@ -160,8 +160,8 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
 
           val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
           assertEquals(3L, t.count)
-          assertEquals("1", t.root.first)
-          assertEquals("3", t.root.last)
+          assertEquals("1", t.root.firstKey)
+          assertEquals("3", t.root.lastKey)
           assertEquals(true, n != null)
           assertEquals(n, swz.value)
           assertEquals(n.key, t.rootStorable.key)
@@ -259,8 +259,8 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
           
           val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
           assertEquals(3L, n.count)
-          assertEquals("1", t.root.first)
-          assertEquals("3", t.root.last)
+          assertEquals("1", t.root.firstKey)
+          assertEquals("3", t.root.lastKey)
           assertEquals(empty, n.lookup(t, "0"))
           var x = n.lookup(t, "3").asInstanceOf[TreapStorableNode[String, String]]
           assertEquals("345", x.value)
