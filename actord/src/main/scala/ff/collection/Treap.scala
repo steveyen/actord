@@ -75,6 +75,9 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
     }
 
   override def - (key: A): immutable.SortedMap[A, B] = 
+    delete(key)
+
+  def delete(key: A): immutable.SortedMap[A, B] = 
     mkTreap(root.del(this, key))
   
   override def firstKey: A = root.firstKey

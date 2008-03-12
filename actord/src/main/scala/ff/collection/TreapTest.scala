@@ -28,6 +28,7 @@ import java.io._
 class TreapTest extends TestConsoleMain {
   def suite = new TestSuite(
     ( "should handle simple treap operations" ::
+      "should handle range operations" ::
       Nil
     ).map(name => new TreapTestCase(name)) :_*
   )
@@ -120,6 +121,26 @@ class TreapTestCase(name: String) extends TestCase(name) {
                        TreapMemNode(1, "100", e, e), 
                        e), 
                      t.root)
+
+        t = t1.union(t2).union(t3).-(2).asInstanceOf[t1.type]
+        assertEquals(2L, t.root.count)
+        assertEquals(1, t.root.firstKey)
+        assertEquals(3, t.root.lastKey)
+        assertEquals(TreapMemNode(3, "300", 
+                       TreapMemNode(1, "100", e, e), 
+                       e), 
+                     t.root)
+
+        t = t1.update(2, "200").update(3, "300").-(2).asInstanceOf[t1.type]
+        assertEquals(2L, t.root.count)
+        assertEquals(1, t.root.firstKey)
+        assertEquals(3, t.root.lastKey)
+        assertEquals(TreapMemNode(3, "300", 
+                       TreapMemNode(1, "100", e, e), 
+                       e), 
+                     t.root)
+
+      case "should handle range operations" =>
     }
   }
 }
