@@ -76,6 +76,8 @@ object Main
 // ------------------------------------------------------
 
 class MainProg {
+  var persistentData = false
+  
   /**
    * Start a server, parsing command-line arguments.
    */
@@ -133,13 +135,26 @@ class MainProg {
   // Here are simple constructors that can be easily overridden by subclasses.
   //
   def createHandler(server: MServer): IoHandler = new MHandler(server)
-  def createServer(numProcessors: Int, limitMem: Long) = new MServer(numProcessors, limitMem)
   def createAcceptor(numProcessors: Int): IoAcceptor   = new NioSocketAcceptor(numProcessors)
   def createMessageDecoder: MessageDecoder = new MDecoder
   def createMessageEncoder: MessageEncoder = new MEncoder
   def createCodecFactory: DemuxingProtocolCodecFactory     = new DemuxingProtocolCodecFactory
   def createCodecFilter(f: ProtocolCodecFactory): IoFilter = new ProtocolCodecFilter(f)
   
+  def createServer(numProcessors: Int, limitMem: Long) = 
+    new MServer(numProcessors, limitMem) {
+      override def createSubServer(id: Int): MSubServer = {
+        new MSubServer(id, limitMem / subServerNum) {
+          override def createSortedMap: immutable.SortedMap[String, MEntry] = {
+            if (persistentData)
+              new ff.collection.Treap[String, MEntry]
+            else
+              new immutable.TreeMap[String, MEntry]
+          }
+        }
+      }
+    }
+
   // ------------------------------------------------------
 
   /**
