@@ -20,7 +20,6 @@ import scala.actors._
 import scala.actors.Actor._
 
 import ff.actord.Util._
-import ff.collection._
 
 object MServer {
   def version = "actord-0.1.0"
@@ -194,7 +193,8 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   /**
    * Override to pass in other implementations, such as storage.SMap for persistence.
    */
-  def createSortedMap: immutable.SortedMap[String, MEntry] = new Treap[String, MEntry]
+  def createSortedMap: immutable.SortedMap[String, MEntry] =
+                   new immutable.TreeMap[String, MEntry]
 
   /**
    * TODO: Maybe just use volatile, or AtomicReference around data_i.
