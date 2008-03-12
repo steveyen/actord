@@ -68,12 +68,14 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   override def rangeImpl(from: Option[A], until: Option[A]): immutable.SortedMap[A, B] = 
     mkTreap(root.range(this, from, until))
     
-  override def update[B1 >: B](key: A, value: B1): immutable.SortedMap[A, B1] = {
-    null
-  }
-  override def - (key: A): immutable.SortedMap[A, B] = {
-    null
-  }
+  override def update[B1 >: B](key: A, value: B1): immutable.SortedMap[A, B1] =
+    value match {
+      case v: B => union(mkLeaf(key, v))
+      case _ => throw new RuntimeException("TODO: update on type B1 unimplemented")
+    }
+
+  override def - (key: A): immutable.SortedMap[A, B] = 
+    mkTreap(root.del(this, key))
   
   override def firstKey: A = root.firstKey
   override def lastKey: A  = root.lastKey
@@ -146,6 +148,8 @@ abstract class TreapNode[A <% Ordered[A], B <: AnyRef]
   def elements(t: T): immutable.ImmutableIterator[Pair[A, B]]
   
   def range(t: T, from: Option[A], until: Option[A]): TreapNode[A, B]
+
+  def del(t: T, k: A): TreapNode[A, B]
 }
 
 // ---------------------------------------------------------
@@ -170,6 +174,8 @@ case class TreapEmptyNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, B]
                       immutable.ImmutableIterator.empty
 
   def range(t: T, from: Option[A], until: Option[A]): TreapNode[A, B] = this
+  
+  def del(t: T, k: A): TreapNode[A, B] = this
 
   override def toString = "_"
 }
@@ -306,6 +312,11 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
       t.mkNode(m1, TreapEmptyNode[A, B],
                    TreapEmptyNode[A, B]).
         join(t, t.mkNode(this, r1, l2))
+  }
+
+  def del(t: T, k: A): TreapNode[A, B] = {
+    val (l, m, r) = split(t, k)
+    l.join(t, r)
   }
 }
 
