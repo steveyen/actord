@@ -198,8 +198,8 @@ case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
   swizzleRight: StorageSwizzle[TreapNode[A, B]])
   extends TreapFullNode[A, B] 
 {
-  lazy val left  = t.swizzleLoadNode(swizzleLeft)
-  lazy val right = t.swizzleLoadNode(swizzleRight)
-  lazy val value = t.swizzleLoadValue(swizzleValue)
+  def left  = t.swizzleLoadNode(swizzleLeft)
+  def right = t.swizzleLoadNode(swizzleRight)
+  def value = t.swizzleLoadValue(swizzleValue)
 }
 
