@@ -153,6 +153,62 @@ class TreapTestCase(name: String) extends TestCase(name) {
                      xs)
 
       case "should handle range operations" =>
+        val e = TreapEmptyNode[Int, String]
+        val t0 = new Treap[Int, String]
+
+        assertEquals(Nil, t0.elements.toList)
+        assertEquals(Nil, t0.from(0).elements.toList)        
+        assertEquals(Nil, t0.from(100).elements.toList)
+        assertEquals(Nil, t0.until(100).elements.toList)        
+        assertEquals(Nil, t0.range(0, 100).elements.toList)                
+
+        val t1 = t0.upd(1, "100")      
+        val x1 = List((1, "100"))
+
+        assertEquals(x1,  t1.elements.toList)
+        assertEquals(x1,  t1.from(0).elements.toList)        
+        assertEquals(Nil, t1.from(100).elements.toList)
+        assertEquals(x1,  t1.until(100).elements.toList)        
+        assertEquals(x1,  t1.range(0, 100).elements.toList)                
+
+        val t2  = t1.upd(5, "500")      
+        val x5  = List((5, "500"))
+        val x15 = x1 ::: x5
+
+        assertEquals(x15, t2.elements.toList)
+
+        assertEquals(x15, t2.from(0).elements.toList)        
+        assertEquals(x15, t2.from(1).elements.toList)        
+        assertEquals(x5,  t2.from(2).elements.toList)        
+        assertEquals(x5,  t2.from(5).elements.toList)        
+        assertEquals(Nil, t2.from(100).elements.toList)
+
+        assertEquals(x15, t2.until(100).elements.toList)        
+        assertEquals(x1,  t2.until(5).elements.toList)        
+        assertEquals(x1,  t2.until(2).elements.toList)        
+        assertEquals(Nil, t2.until(1).elements.toList)        
+        assertEquals(Nil, t2.until(0).elements.toList)                
+
+        assertEquals(x15, t2.range(0, 100).elements.toList)
+        assertEquals(x15, t2.range(1, 100).elements.toList)
+        assertEquals(x5,  t2.range(2, 100).elements.toList)
+        assertEquals(x5,  t2.range(5, 100).elements.toList)
+        assertEquals(Nil, t2.range(6, 100).elements.toList)
+
+        assertEquals(x1,  t2.range(0, 5).elements.toList)
+        assertEquals(x1,  t2.range(1, 5).elements.toList)
+        assertEquals(Nil, t2.range(2, 5).elements.toList)
+        assertEquals(Nil, t2.range(5, 5).elements.toList)
+        // undefined: assertEquals(Nil, t2.range(6, 5).elements.toList)
+
+        assertEquals(x1,  t2.range(0, 2).elements.toList)
+        assertEquals(x1,  t2.range(1, 2).elements.toList)
+        assertEquals(Nil, t2.range(2, 2).elements.toList)
+        // undefined: assertEquals(Nil, t2.range(5, 2).elements.toList)
+        // undefined: assertEquals(Nil, t2.range(6, 2).elements.toList)
+
+        assertEquals(Nil, t2.range(0, 1).elements.toList)
+        assertEquals(Nil, t2.range(1, 1).elements.toList)
     }
   }
 }
