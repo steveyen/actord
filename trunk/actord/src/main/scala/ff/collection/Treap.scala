@@ -24,6 +24,7 @@ import scala.collection._
  */
 class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   extends TreapNodeFactory[A, B]
+     with immutable.SortedMap[A, B]
 {
   def this() = this(TreapEmptyNode[A, B])
   
@@ -49,8 +50,36 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   def intersect(that: TreapNode[A, B]): Treap[A, B] = mkTreap(root.intersect(this, that))
   def diff(that: TreapNode[A, B]): Treap[A, B]      = mkTreap(root.diff(this, that))
   
-  def count = root.count
+  lazy val count = root.count // TODO: Revisit treap size/count.
+
+  def size: Int = count.toInt
+
+  override def empty[C]: immutable.SortedMap[A, C] = 
+    throw new RuntimeException("TODO: empty method is unimplemented")
   
+  override def get(key: A): Option[B] = 
+    root.lookup(this, key) match {
+      case n: TreapFullNode[A, B] => Some(n.value)
+      case _ => None
+    }
+    
+  def elements: Iterator[Pair[A, B]] = root.elements(this).elements
+
+  override def rangeImpl(from: Option[A], until: Option[A]): immutable.SortedMap[A, B] = 
+    mkTreap(root.range(this, from, until))
+    
+  override def update[B1 >: B](key: A, value: B1): immutable.SortedMap[A, B1] = {
+    null
+  }
+  override def - (key: A): immutable.SortedMap[A, B] = {
+    null
+  }
+  
+  override def firstKey: A = root.firstKey
+  override def lastKey: A  = root.lastKey
+  
+  override def compare(k0: A, k1: A): Int = k0.compare(k1)
+    
   override def toString = root.toString
 }
 
@@ -77,8 +106,8 @@ abstract class TreapNode[A <% Ordered[A], B <: AnyRef]
   def isLeaf: Boolean
   
   def count: Long
-  def first: A
-  def last: A
+  def firstKey: A
+  def lastKey: A
   
   def lookup(t: T, s: A): Node
 
@@ -113,6 +142,10 @@ abstract class TreapNode[A <% Ordered[A], B <: AnyRef]
    * Works like set-difference, as in "this" minus "that", or this - that.
    */
   def diff(t: T, that: Node): Node
+
+  def elements(t: T): immutable.ImmutableIterator[Pair[A, B]]
+  
+  def range(t: T, from: Option[A], until: Option[A]): TreapNode[A, B]
 }
 
 // ---------------------------------------------------------
@@ -123,8 +156,8 @@ case class TreapEmptyNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, B]
   def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
 
   def count = 0L
-  def first = throw new NoSuchElementException("empty treap")
-  def last  = throw new NoSuchElementException("empty treap")
+  def firstKey = throw new NoSuchElementException("empty treap")
+  def lastKey  = throw new NoSuchElementException("empty treap")
   
   def lookup(t: T, s: A): Node          = this
   def split(t: T, s: A)                 = (this, null, this)
@@ -133,6 +166,11 @@ case class TreapEmptyNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, B]
   def intersect(t: T, that: Node): Node = this
   def diff(t: T, that: Node): Node      = this
   
+  def elements(t: T): immutable.ImmutableIterator[Pair[A, Nothing]] = 
+                      immutable.ImmutableIterator.empty
+
+  def range(t: T, from: Option[A], until: Option[A]): TreapNode[A, B] = this
+
   override def toString = "_"
 }
 
@@ -143,6 +181,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def key: A  
   def left: Node
   def right: Node
+  def value: B
   
   def priority = key.hashCode
 
@@ -150,8 +189,8 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def isLeaf: Boolean  = left.isEmpty && right.isEmpty
   
   def count = 1L + left.count + right.count
-  def first = if (left.isEmpty)  key else left.first
-  def last  = if (right.isEmpty) key else right.last
+  def firstKey = if (left.isEmpty)  key else left.firstKey
+  def lastKey  = if (right.isEmpty) key else right.lastKey
 
   def lookup(t: T, s: A): Node = 
     if (s == key)
@@ -247,6 +286,26 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
         t.mkNode(this, l, r)
       else
         l.join(t, r)
+  }
+
+  def elements(t: T): immutable.ImmutableIterator[Pair[A, B]] = 
+    left.elements(t).append(Pair(key, value), () => right.elements(t))
+
+  def range(t: T, from: Option[A], until: Option[A]): TreapNode[A, B] = {
+    if (from  == None && until == None)    return this
+    if (from  != None && key < from.get)   return right.range(t, from, until)
+    if (until != None && key >= until.get) return left.range(t, from, until)
+    
+    val (l1, m1, r1) = from.map(s => left.split(t, s)).
+                            getOrElse(null, null, left)
+    val (l2, m2, r2) = until.map(s => right.split(t, s)).
+                             getOrElse(right, null, null)
+    if (m1 == null)
+      t.mkNode(this, r1, l2)
+    else
+      t.mkNode(m1, TreapEmptyNode[A, B],
+                   TreapEmptyNode[A, B]).
+        join(t, t.mkNode(this, r1, l2))
   }
 }
 
