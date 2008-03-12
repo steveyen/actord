@@ -44,12 +44,20 @@ trait StorageLocReader {
   def readArray: Array[Byte]
   def readLoc: StorageLoc
   def readUTF: String
+  def readByte: Byte
+  def readShort: Short  
+  def readInt: Int
+  def readLong: Long
 }
 
 trait StorageLocAppender {
   def appendArray(arr: Array[Byte], offset: Int, len: Int): Unit
   def appendLoc(loc: StorageLoc): Unit
   def appendUTF(s: String): Unit
+  def appendByte(s: Byte): Unit
+  def appendShort(s: Short): Unit
+  def appendInt(s: Int): Unit
+  def appendLong(s: Long): Unit
   def flush: Unit
 }
 
@@ -115,6 +123,10 @@ class SingleFileStorageReader(f: File) extends StorageReader {
         
     def readLoc: StorageLoc = StorageLoc(raf.readShort, raf.readLong)
     def readUTF: String     = raf.readUTF
+    def readByte: Byte      = raf.readByte
+    def readShort: Short    = raf.readShort
+    def readInt: Int        = raf.readInt
+    def readLong: Long      = raf.readLong
   }
   
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = {
@@ -163,8 +175,11 @@ class SingleFileStorage(f: File) extends SingleFileStorageReader(f) with Storage
       fosData.writeLong(loc.position)
     }
     
-    def appendUTF(s: String): Unit = 
-      fosData.writeUTF(s)
+    def appendUTF(s: String): Unit  = fosData.writeUTF(s)
+    def appendByte(s: Byte): Unit   = fosData.writeByte(s)
+    def appendShort(s: Short): Unit = fosData.writeShort(s)
+    def appendInt(s: Int): Unit     = fosData.writeInt(s)
+    def appendLong(s: Long): Unit   = fosData.writeLong(s)
     
     def flush = {
       fosData.flush

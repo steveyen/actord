@@ -30,8 +30,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
   def serializeKey(x: A): Array[Byte]
   def unserializeKey(arr: Array[Byte]): A
 
-  def serializeValue(x: B): Array[Byte]
-  def unserializeValue(arr: Array[Byte]): B
+  def serializeValue(x: B, loc: StorageLoc, appender: StorageLocAppender): Unit
+  def unserializeValue(loc: StorageLoc, reader: StorageLocReader): B
   
   // --------------------------------------------
 
@@ -170,7 +170,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
         if (s.loc == null)
           throw new RuntimeException("could not swizzle load without a loc")
           
-        s.value_!!(unserializeValue(io.readAt(s.loc, _.readArray)))
+        s.value_!!(io.readAt(s.loc, reader => unserializeValue(s.loc, reader)))
       }
     }
 
@@ -178,11 +178,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
     s.synchronized {
       if (s.loc != null)
           s.loc
-      else {
-          val arr = serializeValue(s.value)
-          s.loc_!!(io.append((loc, appender) =>
-                                   appender.appendArray(arr, 0, arr.length)))
-      }
+      else 
+          s.loc_!!(io.append((loc, appender) => serializeValue(s.value, loc, appender)))
     }
 }
 

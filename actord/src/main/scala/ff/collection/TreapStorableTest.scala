@@ -48,8 +48,13 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
     def serializeKey(x: String): Array[Byte]     = x.getBytes
     def unserializeKey(arr: Array[Byte]): String = new String(arr)
   
-    def serializeValue(x: String): Array[Byte]     = x.getBytes
-    def unserializeValue(arr: Array[Byte]): String = new String(arr)
+    def serializeValue(x: String, loc: StorageLoc, appender: StorageLocAppender): Unit = {
+      val arr = x.getBytes
+      appender.appendArray(arr, 0, arr.length)
+    }
+      
+    def unserializeValue(loc: StorageLoc, reader: StorageLocReader): String = 
+      new String(reader.readArray)
     
     def rootStorable = root.asInstanceOf[TreapStorableNode[String, String]]
   }

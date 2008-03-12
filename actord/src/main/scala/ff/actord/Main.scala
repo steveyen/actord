@@ -27,6 +27,7 @@ import org.apache.mina.filter.codec.demux._
 import org.apache.mina.transport.socket.nio._
 
 import ff.actord.Util._
+import ff.collection._
 
 object Main
 {
@@ -154,6 +155,38 @@ class MainProg {
         }
       }
     }
+    
+  // ------------------------------------------------------
+
+  class MEntryTreap(override val root: TreapNode[String, MEntry],
+                    override val io: Storage)
+    extends TreapStorable[String, MEntry](root, io) {
+    override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
+      new MEntryTreap(r, io)    
+    
+    def serializeKey(x: String): Array[Byte]     = x.getBytes
+    def unserializeKey(arr: Array[Byte]): String = new String(arr)
+  
+    def serializeValue(x: MEntry, loc: StorageLoc, appender: StorageLocAppender): Unit = {
+      val arr = x.key.getBytes
+      appender.appendArray(arr, 0, arr.length)
+      appender.appendLong(x.flags)
+      appender.appendLong(x.expTime)
+      appender.appendArray(x.data, 0, x.data.length)
+      appender.appendLong(x.cid)
+    }
+      
+    def unserializeValue(loc: StorageLoc, reader: StorageLocReader): MEntry = {
+      val key = new String(reader.readArray)
+      val flags = reader.readLong
+      val expTime = reader.readLong
+      val data = reader.readArray
+      val cid = reader.readLong
+      MEntry(key, flags, expTime, data.size, data, cid)
+    }
+
+    def rootStorable = root.asInstanceOf[TreapStorableNode[String, MEntry]]
+  }
 
   // ------------------------------------------------------
 
