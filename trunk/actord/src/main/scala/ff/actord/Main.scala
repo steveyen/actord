@@ -18,6 +18,7 @@ package ff.actord
 import scala.collection._
 
 import java.net._
+import java.io._
 
 import org.slf4j._
 
@@ -77,7 +78,7 @@ object Main
 // ------------------------------------------------------
 
 class MainProg {
-  var persistentData = false
+  var storePath: String = null
   
   /**
    * Start a server, parsing command-line arguments.
@@ -108,6 +109,8 @@ class MainProg {
     val port      = getFlagValue(m, "port",     "11211").toInt
     val limitMem  = getFlagValue(m, "limitMem", "64"   ).toLong * 1024L * 1024L
     val availCpus = Runtime.getRuntime.availableProcessors
+    
+    storePath = getFlagValue(m, "storePath", null)
     
     startAcceptor(createServer(availCpus, limitMem), availCpus, port)
 
@@ -147,14 +150,20 @@ class MainProg {
       override def createSubServer(id: Int): MSubServer = {
         new MSubServer(id, limitMem / subServerNum) {
           override def createSortedMap: immutable.SortedMap[String, MEntry] = {
-            if (persistentData)
+            if (storePath != null) {
               new ff.collection.Treap[String, MEntry]
-            else
+              val f = new File(storePath + "/actord_store_" + id + ".data")
+              val s = new SingleFileStorage(f)
+              var t = new MEntryTreap(emptyNode, s)
+              t
+            } else
               new immutable.TreeMap[String, MEntry]
           }
         }
       }
     }
+    
+  val emptyNode = TreapEmptyNode[String, MEntry]
     
   // ------------------------------------------------------
 
@@ -204,6 +213,9 @@ class MainProg {
     FlagSpec("port", 
              "-p <num>" :: Nil,
              "Listen on port <num>, the default is port 11211."),
+    FlagSpec("storePath", 
+             "-s <dir_path>" :: Nil,
+             "Persist data to directory <dir_path>; the default is ./data directory."),
     FlagSpec("help", 
              "-h" :: "-?" :: "--help" :: Nil,
              "Show the version of the server and a summary of options."),
