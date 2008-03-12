@@ -139,6 +139,18 @@ class TreapTestCase(name: String) extends TestCase(name) {
                        TreapMemNode(1, "100", e, e), 
                        e), 
                      t.root)
+                     
+        var xs = t1.update(2, "200").update(3, "300").elements.toList
+        assertEquals(3, xs.length)
+        assertEquals(List((1, "100"), (2, "200"), (3, "300")),
+                     xs)
+        
+        var ttt = t1.update(2, "200").update(3, "300")             
+        xs = ttt.elements.toList
+        ttt = ttt - 2
+        assertEquals(3, xs.length)
+        assertEquals(List((1, "100"), (2, "200"), (3, "300")),
+                     xs)
 
       case "should handle range operations" =>
     }

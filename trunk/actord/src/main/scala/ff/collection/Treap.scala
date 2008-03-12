@@ -70,14 +70,17 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
     
   override def update[B1 >: B](key: A, value: B1): immutable.SortedMap[A, B1] =
     value match {
-      case v: B => union(mkLeaf(key, v))
+      case v: B => upd(key, v)
       case _ => throw new RuntimeException("TODO: update on type B1 unimplemented")
     }
+  
+  def upd(key: A, value: B): Treap[A, B] =  
+    union(mkLeaf(key, value))
 
   override def - (key: A): immutable.SortedMap[A, B] = 
-    delete(key)
+    del(key)
 
-  def delete(key: A): immutable.SortedMap[A, B] = 
+  def del(key: A): Treap[A, B] = 
     mkTreap(root.del(this, key))
   
   override def firstKey: A = root.firstKey
