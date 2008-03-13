@@ -44,7 +44,7 @@ object Main
     //
     (new MainProg() {
       override def createServer(numProcessors: Int, limitMem: Long): MServer = {
-        val server = new MServer(numProcessors, limitMem)
+        val server = super.createServer(numProcessors, limitMem)
         server.getPf = myCustomGetPf orElse server.defaultGetPf
         server.setPf = myCustomSetPf orElse server.defaultSetPf
         server
@@ -151,10 +151,9 @@ class MainProg {
         new MSubServer(id, limitMem / subServerNum) {
           override def createSortedMap: immutable.SortedMap[String, MEntry] = {
             if (storePath != null) {
-              new ff.collection.Treap[String, MEntry]
               val f = new File(storePath + "/actord_store_" + id + ".data")
               val s = new SingleFileStorage(f)
-              var t = new MEntryTreap(emptyNode, s)
+              var t = new MEntryTreapStorable(emptyNode, s)
               t
             } else
               new immutable.TreeMap[String, MEntry]
@@ -165,38 +164,6 @@ class MainProg {
     
   val emptyNode = TreapEmptyNode[String, MEntry]
     
-  // ------------------------------------------------------
-
-  class MEntryTreap(override val root: TreapNode[String, MEntry],
-                    override val io: Storage)
-    extends TreapStorable[String, MEntry](root, io) {
-    override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
-      new MEntryTreap(r, io)    
-    
-    def serializeKey(x: String): Array[Byte]     = x.getBytes
-    def unserializeKey(arr: Array[Byte]): String = new String(arr)
-  
-    def serializeValue(x: MEntry, loc: StorageLoc, appender: StorageLocAppender): Unit = {
-      val arr = x.key.getBytes
-      appender.appendArray(arr, 0, arr.length)
-      appender.appendLong(x.flags)
-      appender.appendLong(x.expTime)
-      appender.appendArray(x.data, 0, x.data.length)
-      appender.appendLong(x.cid)
-    }
-      
-    def unserializeValue(loc: StorageLoc, reader: StorageLocReader): MEntry = {
-      val key = new String(reader.readArray)
-      val flags = reader.readLong
-      val expTime = reader.readLong
-      val data = reader.readArray
-      val cid = reader.readLong
-      MEntry(key, flags, expTime, data.size, data, cid)
-    }
-
-    def rootStorable = root.asInstanceOf[TreapStorableNode[String, MEntry]]
-  }
-
   // ------------------------------------------------------
 
   /**
