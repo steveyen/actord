@@ -49,7 +49,7 @@ class MServerStorage(dir: File, numSubServers: Int) {
 // ----------------------------------------------------
 
 class MSubServerStorage(subDir: File) {
-  val f = new File(subDir + "/00000001.data")
+  val f = new File(subDir + "/00000000.data")
   
   def storage: Storage = s
   
@@ -58,12 +58,12 @@ class MSubServerStorage(subDir: File) {
   val HEADER_SUFFIX = (0 until (HEADER_LENGTH - HEADER_LINE.length)).map(x => "\n").mkString
   val HEADER        = HEADER_LINE + HEADER_SUFFIX
 
-  val ROOT_DEFAULT = "9gUd9a2b3Kh5sYf8x001".getBytes
+  val ROOT_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes
   val ROOT_LENGTH  = ROOT_DEFAULT.length
   val ROOT_MARKER: Array[Byte] = {
     if (f.exists &&
         f.length >= (HEADER_LENGTH + ROOT_LENGTH)) {
-      // Read ROOT_MARKER from existing file.
+      // Read ROOT_MARKER from header area of existing file.
       //
       if (!f.isFile)
         throw new MStorageException("not a file: " + f.getPath)
@@ -99,7 +99,42 @@ class MSubServerStorage(subDir: File) {
     }
   }
   
-  val initialRootLoc = 0
+  val initialRootPosition: Long = {
+    // Scan backwards for the last ROOT_MARKER.
+    //
+    val raf = new RandomAccessFile(f, "rws")
+    try {
+      val mArr = new Array[Byte](ROOT_LENGTH)
+      var mPos = -1L
+      var cPos = raf.length - ROOT_LENGTH.toLong
+      while (mPos < 0L &&
+             cPos >= HEADER_LENGTH.toLong) {
+        raf.seek(cPos)
+        raf.read(mArr)
+        if (mArr.deepEquals(ROOT_MARKER))
+          mPos = cPos
+        else
+          cPos = cPos - 1L // TODO: Do a faster backwards scan.
+      }
+      if (mPos < HEADER_LENGTH)
+        throw new MStorageException("could not find ROOT_MARKER in file: " + f.getPath)
+        
+      // Truncate the file, because everything after the last ROOT_MARKER
+      // is a data write/append that got only partially written,
+      // perhaps to do a crash or process termination.
+      //
+      raf.setLength(mPos + ROOT_LENGTH)
+
+      // A negative initialRootPosition means it's a clean, just-initialized file.
+      //
+      if (mPos == HEADER_LENGTH)
+        -1L
+      else
+        mPos
+    } finally {
+      raf.close
+    }
+  }
     
   val s = new SingleFileStorage(f)
 }
