@@ -31,8 +31,10 @@ class MServerStorage(dir: File, numSubServers: Int) {
     throw new MStorageException("invalid directory: " + dir.getPath)
   if (numSubServers <= 0)
     throw new MStorageException("invalid numSubServers: " + numSubServers)
-  
-  private val subStorages = new Array[MSubServerStorage](numSubServers)
+
+  // TODO: Need file rebalancing tools if numSubServers (or number of CPU's) changes.
+  //  
+  val subStorages = new Array[MSubServerStorage](numSubServers)
   for (i <- 0 until numSubServers) {
     val subDir = new File(dir.getPath + "/sub_" + i)
     
@@ -42,16 +44,12 @@ class MServerStorage(dir: File, numSubServers: Int) {
 
     subStorages(i) = new MSubServerStorage(subDir)
   }
-  
-  def subStorage(id: Int): Storage = subStorages(id).storage
 }
 
 // ----------------------------------------------------
 
 class MSubServerStorage(subDir: File) {
   val f = new File(subDir + "/00000000.data")
-  
-  def storage: Storage = s
   
   val HEADER_LENGTH = 300
   val HEADER_LINE   = "# actord data file, format: binary-0.0.1\n\n"
@@ -99,7 +97,7 @@ class MSubServerStorage(subDir: File) {
     }
   }
   
-  val initialRootPosition: Long = {
+  val initialRootLoc: StorageLoc = {
     // Scan backwards for the last ROOT_MARKER.
     //
     val raf = new RandomAccessFile(f, "rws")
@@ -128,15 +126,17 @@ class MSubServerStorage(subDir: File) {
       // A negative initialRootPosition means it's a clean, just-initialized file.
       //
       if (mPos == HEADER_LENGTH)
-        -1L
+        StorageLoc(0, -1L)
       else
-        mPos
+        StorageLoc(0, mPos)
     } finally {
       raf.close
     }
   }
     
   val s = new SingleFileStorage(f)
+  
+  def storage: Storage = s
 }
 
 // ------------------------------------------------
@@ -167,7 +167,7 @@ class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
     val cid = reader.readLong
     MEntry(key, flags, expTime, data.size, data, cid)
   }
-
+  
   def rootStorable = root.asInstanceOf[TreapStorableNode[String, MEntry]]
 }
 

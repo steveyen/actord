@@ -145,22 +145,41 @@ class MainProg {
   def createCodecFactory: DemuxingProtocolCodecFactory     = new DemuxingProtocolCodecFactory
   def createCodecFilter(f: ProtocolCodecFactory): IoFilter = new ProtocolCodecFilter(f)
   
-  def createServer(numProcessors: Int, limitMem: Long) = 
+  def createServer(numProcessors: Int, limitMem: Long) = {
+    val s: MServerStorage = 
+      if (storePath != null)
+        new MServerStorage(new File(storePath), numProcessors)
+      else
+        null
+
     new MServer(numProcessors, limitMem) {
       override def createSubServer(id: Int): MSubServer = {
         new MSubServer(id, limitMem / subServerNum) {
           override def createSortedMap: immutable.SortedMap[String, MEntry] = {
             if (storePath != null) {
-              val f = new File(storePath + "/actord_store_" + id + ".data")
-              val s = new SingleFileStorage(f)
-              var t = new MEntryTreapStorable(emptyNode, s)
-              t
+              val ss      = s.subStorages(id)
+              val sx      = ss.storage
+              val locSize = sx.storageLocSize
+              val t = new MEntryTreapStorable(emptyNode, sx)
+              val p = ss.initialRootLoc
+              if (p.position > 0L + locSize) {
+                val tLoc = sx.readAt(StorageLoc(p.id, p.position - locSize),
+                                     reader => reader.readLoc)
+                                     
+                val sw = new StorageSwizzle[TreapNode[String, MEntry]]
+                
+                sw.loc_!!(tLoc)
+                
+                new MEntryTreapStorable(t.swizzleLoadNode(sw), sx)
+              } else
+                t
             } else
               new immutable.TreeMap[String, MEntry]
           }
         }
       }
     }
+  }
     
   val emptyNode = TreapEmptyNode[String, MEntry]
     
