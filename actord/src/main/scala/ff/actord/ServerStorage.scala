@@ -49,7 +49,7 @@ class MServerStorage(dir: File, numSubServers: Int) {
 // ----------------------------------------------------
 
 class MSubServerStorage(subDir: File) {
-  val f = new File(subDir + "/00000000.data")
+  val f = new File(subDir + "/db_00000000.data")
   
   val HEADER_LENGTH = 300
   val HEADER_LINE   = "# actord data file, format: binary-0.0.1\n\n"
