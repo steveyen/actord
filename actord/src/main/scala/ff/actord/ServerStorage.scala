@@ -92,8 +92,8 @@ class MSubServerStorage(subDir: File) {
       val o = new DataOutputStream(new FileOutputStream(f))
       try {
         o.write(HEADER.getBytes)
-        o.writeInt(ROOT_LENGTH)
-        o.write(ROOT_DEFAULT)
+        o.writeInt(ROOT_LENGTH) // Note: same as appender.appendArray format, of array length.
+        o.write(ROOT_DEFAULT)   // Note: same as appender.appendArray format, of array body.
         o.flush
       } finally {
         o.close
@@ -132,14 +132,14 @@ class MSubServerStorage(subDir: File) {
       // is a data write/append that got only partially written,
       // perhaps due to a crash or process termination.
       //
-      raf.setLength(mPos + ROOT_LENGTH)
+      raf.setLength(mPos + ROOT_MARKER.length.toLong)
 
-      // A negative initialRootPosition means it's a clean, just-initialized file.
+      // Negative loc values means it's a clean, just-initialized file.
       //
       if (mPos == minimumPos)
-        StorageLoc(0, -1L)
+        StorageLoc(-1, -1L)
       else
-        StorageLoc(0, mPos)
+        StorageLoc(0, mPos - sizeOfInt.toLong)
     } finally {
       raf.close
     }
@@ -167,7 +167,8 @@ class MPersistentSubServer(override val id: Int,
       //
       val locSize = io.storageLocSize
       val locRoot = ss.initialRootLoc
-      if (locRoot.position > locSize) {
+      if (locRoot.id >= 0 &&
+          locRoot.position > locSize) {
         val loc = io.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
         
         new MEntryTreapStorable(t.loadNodeAt(loc, None), io)
@@ -188,8 +189,18 @@ class MPersistentSubServer(override val id: Int,
               val beg = System.currentTimeMillis
               data match {
                 case currTreap: MEntryTreapStorable => 
-                  if (currTreap != prevTreap)
-                    println("dirty data found, need to persist!")
+                  if (currTreap != prevTreap) {
+println("dirty data found, persisting...")
+
+                    val locRoot = currTreap.appendNode(currTreap.root)
+                    
+                    currTreap.io.append((loc, appender) => {
+                      appender.appendLoc(locRoot)
+                      appender.appendArray(ss.ROOT_MARKER, 0, ss.ROOT_MARKER.length)
+                    })
+
+println("dirty data found, persisting... done")
+                  }
                   prevTreap = currTreap
               }
               val end = System.currentTimeMillis
