@@ -168,13 +168,9 @@ class MainProg {
               val locSize = sx.storageLocSize
               val locRoot = ss.initialRootLoc
               if (locRoot.position > 0L + locSize) {
-                val tLoc = sx.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
-                                     
-                val sw = new StorageSwizzle[TreapNode[String, MEntry]]
+                val loc = sx.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
                 
-                sw.loc_!!(tLoc)
-                
-                new MEntryTreapStorable(t.swizzleLoadNode(sw), sx)
+                new MEntryTreapStorable(t.loadNodeAt(loc, None), sx)
               } else
                 t
             } else
