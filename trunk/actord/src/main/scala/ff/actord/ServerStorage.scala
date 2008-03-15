@@ -177,22 +177,32 @@ class MPersistentSubServer(override val id: Int,
   
   def startPersistence(initialData: immutable.SortedMap[String, MEntry]): 
                                     immutable.SortedMap[String, MEntry] = {
+    val every = 20 * 1000 // Check for dirty data every this many millisecs.
+    
     initialData match {
-      case t: MEntryTreapStorable =>
-        val persistActor = actor {
-          var lastData = initialData
-          loop {
-            receive {
-              case x: MPersistTick =>
-                if (lastData != initialData)
-                  println("dirty data found, need to persist!")
+      case initialTreap: MEntryTreapStorable =>
+        val asyncPersister = new Thread { 
+          override def run { 
+            var prevTreap = initialTreap
+            while (true) {
+              val beg = System.currentTimeMillis
+              data match {
+                case currTreap: MEntryTreapStorable => 
+                  if (currTreap != prevTreap)
+                    println("dirty data found, need to persist!")
+                  prevTreap = currTreap
+              }
+              val end = System.currentTimeMillis
+              val amt = every - (end - beg)
+              if (amt > 0)
+                Thread.sleep(amt)
             }
-          }
+          } 
         }
-        persistActor.start
+        asyncPersister.start
     }
-   
-    initialData
+
+    initialData // Returns initialData for chainability.
   }
 }
   
