@@ -154,6 +154,8 @@ class SingleFileStorageReader(f: File) extends StorageReader {
 
 /**
  * A simple storage implementation that appends to a single file.
+ *
+ * TODO: Need a separate sync/lock for read operations than for append operations.
  */
 class SingleFileStorage(f: File) extends SingleFileStorageReader(f) with Storage {
   private val fos        = new FileOutputStream(f, true)

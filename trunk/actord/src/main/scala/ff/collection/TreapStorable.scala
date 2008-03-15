@@ -95,70 +95,81 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
   // --------------------------------------------
   
-  def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = {
+  def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = 
     s.synchronized {
       if (s.value != null)
           s.value
-      else {
-        if (s.loc == null)
-          throw new RuntimeException("could not swizzle load without a loc")
-        if (s.loc == emptyNodeLoc)
-          s.value_!!(emptyNode)
-        else {
-          var keyArr: Array[Byte]  = null
-          var locValue: StorageLoc = null
-          var locLeft: StorageLoc  = null
-          var locRight: StorageLoc = null
+      else 
+          s.value_!!(loadNodeAt(s.loc, Some(s)))
+    }
+      
+  def swizzleSaveNode(s: StorageSwizzle[TreapNode[A, B]]): StorageLoc = 
+    s.synchronized {
+      if (s.loc != null)
+          s.loc
+      else
+          s.loc_!!(appendNode(s.value))
+    }
+    
+  // --------------------------------------------
+  
+  def loadNodeAt(loc: StorageLoc,
+                 swizzleSelfOpt: Option[StorageSwizzle[TreapNode[A, B]]]): TreapNode[A, B] = {
+    if (loc == null)
+      throw new RuntimeException("could not load node without a loc")
 
-          io.readAt(s.loc, reader => {
-            keyArr   = reader.readArray
-            locValue = reader.readLoc
-            locLeft  = reader.readLoc
-            locRight = reader.readLoc
-          })
+    if (loc == emptyNodeLoc)
+      emptyNode
+    else {
+      var keyArr: Array[Byte]  = null
+      var locValue: StorageLoc = null
+      var locLeft: StorageLoc  = null
+      var locRight: StorageLoc = null
 
-          val key          = unserializeKey(keyArr)
-          val swizzleValue = new StorageSwizzle[B]
-          val swizzleLeft  = new StorageSwizzle[TreapNode[A, B]]
-          val swizzleRight = new StorageSwizzle[TreapNode[A, B]]
+      io.readAt(loc, reader => {
+        keyArr   = reader.readArray
+        locValue = reader.readLoc
+        locLeft  = reader.readLoc
+        locRight = reader.readLoc
+      })
 
-          swizzleValue.loc_!!(locValue)
-          swizzleLeft.loc_!!(locLeft)
-          swizzleRight.loc_!!(locRight)
-          
-          s.value_!!(TreapStorableNode[A, B](this, 
-                                             key, 
-                                             swizzleValue,
-                                             s,
-                                             swizzleLeft,
-                                             swizzleRight))
-        }
-      }
+      val key          = unserializeKey(keyArr)
+      val swizzleValue = new StorageSwizzle[B]
+      val swizzleSelf  = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
+      val swizzleLeft  = new StorageSwizzle[TreapNode[A, B]]
+      val swizzleRight = new StorageSwizzle[TreapNode[A, B]]
+
+      swizzleValue.loc_!!(locValue)
+      swizzleSelf.loc_!!(loc)
+      swizzleLeft.loc_!!(locLeft)
+      swizzleRight.loc_!!(locRight)
+      
+      TreapStorableNode[A, B](this, 
+                              key, 
+                              swizzleValue,
+                              swizzleSelf,
+                              swizzleLeft,
+                              swizzleRight)
     }
   }
   
-  def swizzleSaveNode(s: StorageSwizzle[TreapNode[A, B]]): StorageLoc = s.synchronized {
-    if (s.loc != null)
-        s.loc
-    else {
-      s.value match {
-        case e: TreapEmptyNode[A, B] =>
-          s.loc_!!(emptyNodeLoc)
-        case x: TreapStorableNode[A, B] =>
-          val keyArr   = serializeKey(x.key)
-          val locValue = swizzleSaveValue(x.swizzleValue)
-          val locLeft  = swizzleSaveNode(x.swizzleLeft)
-          val locRight = swizzleSaveNode(x.swizzleRight)
-          
-          s.loc_!!(io.append((loc, appender) => {
-            appender.appendArray(keyArr, 0, keyArr.length)
-            appender.appendLoc(locValue)
-            appender.appendLoc(locLeft)
-            appender.appendLoc(locRight)
-          }))
-      }
+  def appendNode(value: TreapNode[A, B]): StorageLoc =
+    value match {
+      case e: TreapEmptyNode[A, B] =>
+        emptyNodeLoc
+      case x: TreapStorableNode[A, B] =>
+        val keyArr   = serializeKey(x.key)
+        val locValue = swizzleSaveValue(x.swizzleValue)
+        val locLeft  = swizzleSaveNode(x.swizzleLeft)
+        val locRight = swizzleSaveNode(x.swizzleRight)
+        
+        io.append((loc, appender) => {
+          appender.appendArray(keyArr, 0, keyArr.length)
+          appender.appendLoc(locValue)
+          appender.appendLoc(locLeft)
+          appender.appendLoc(locRight)
+        })
     }
-  }
 
   // --------------------------------------------
   
@@ -166,12 +177,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
     s.synchronized {
       if (s.value != null)
           s.value
-      else {
-        if (s.loc == null)
-          throw new RuntimeException("could not swizzle load without a loc")
-          
-        s.value_!!(io.readAt(s.loc, reader => unserializeValue(s.loc, reader)))
-      }
+      else
+          s.value_!!(loadValueAt(s.loc))
     }
 
   def swizzleSaveValue(s: StorageSwizzle[B]): StorageLoc = 
@@ -179,8 +186,19 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       if (s.loc != null)
           s.loc
       else 
-          s.loc_!!(io.append((loc, appender) => serializeValue(s.value, loc, appender)))
+          s.loc_!!(appendValue(s.value))
     }
+
+  // --------------------------------------------
+  
+  def loadValueAt(loc: StorageLoc): B = {
+    if (loc == null)
+      throw new RuntimeException("could not load value without a loc")
+    io.readAt(loc, reader => unserializeValue(loc, reader))
+  }
+
+  def appendValue(value: B): StorageLoc = 
+    io.append((loc, appender) => serializeValue(value, loc, appender))
 }
 
 // ---------------------------------------------------------
