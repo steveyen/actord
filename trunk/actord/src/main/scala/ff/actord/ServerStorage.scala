@@ -51,6 +51,18 @@ class MServerStorage(dir: File, numSubServers: Int) {
 // ----------------------------------------------------
 
 class MSubServerStorage(subDir: File) {
+  val filePrefix    = "db_"
+  val fileSuffixLog = ".log" // A append-only log file.
+  val fileSuffixChk = ".chk" // A compacted checkpoint file.
+  
+  val initialFileNames = subDir.list.toList.
+                                filter(_.startsWith(filePrefix)).
+                                filter(_.endsWith(fileSuffix)).
+                                sort(_ > _) // Highest numbered files first.
+
+  def fileNum(fileName: String): Int =
+    fileName.substring(filePrefix.length, fileName.indexOf(".")).toInt
+
   // TODO: File rotation.
   //
   val f = new File(subDir + "/db_00000000.data")
