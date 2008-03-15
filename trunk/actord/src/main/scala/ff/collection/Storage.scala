@@ -91,7 +91,7 @@ class StorageSwizzle[S <: AnyRef] {
   def loc: StorageLoc = synchronized { loc_i }
   def loc_!!(x: StorageLoc) = synchronized { 
     if (x != null && loc_i != null)
-      throw new RuntimeException("cannot override an existing swizzle loc")
+      throw new RuntimeException("cannot overwrite an existing swizzle loc")
     loc_i = x
     loc_i 
   }
