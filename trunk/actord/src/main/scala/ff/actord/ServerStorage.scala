@@ -51,13 +51,14 @@ class MServerStorage(dir: File, numSubServers: Int) {
 class MSubServerStorage(subDir: File) {
   val f = new File(subDir + "/db_00000000.data")
   
-  val HEADER_LENGTH = 300
-  val HEADER_LINE   = "# actord data file, format: binary-0.0.1\n\n"
-  val HEADER_SUFFIX = (0 until (HEADER_LENGTH - HEADER_LINE.length)).map(x => "\n").mkString
-  val HEADER        = HEADER_LINE + HEADER_SUFFIX
+  def HEADER_LENGTH = 300
+  def HEADER_LINE   = "# actord data file, format: binary-0.0.1\n\n"
+  def HEADER_SUFFIX = (0 until (HEADER_LENGTH - HEADER_LINE.length)).map(x => "\n").mkString
+  def HEADER        = HEADER_LINE + HEADER_SUFFIX
 
-  val ROOT_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes
-  val ROOT_LENGTH  = ROOT_DEFAULT.length
+  def ROOT_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes
+  def ROOT_LENGTH  = ROOT_DEFAULT.length
+
   val ROOT_MARKER: Array[Byte] = {
     if (f.exists &&
         f.length >= (HEADER_LENGTH + ROOT_LENGTH)) {
@@ -160,11 +161,11 @@ class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
   }
     
   def unserializeValue(loc: StorageLoc, reader: StorageLocReader): MEntry = {
-    val key = new String(reader.readArray)
-    val flags = reader.readLong
+    val key     = new String(reader.readArray)
+    val flags   = reader.readLong
     val expTime = reader.readLong
-    val data = reader.readArray
-    val cid = reader.readLong
+    val data    = reader.readArray
+    val cid     = reader.readLong
     MEntry(key, flags, expTime, data.size, data, cid)
   }
   
