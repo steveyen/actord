@@ -50,18 +50,93 @@ class MServerStorage(dir: File, numSubServers: Int) {
 
 // ----------------------------------------------------
 
-class MSubServerStorage(subDir: File) {
+class MSubServerStorage(subDir: File) extends Storage {
+  // A file name looks like db_XXXXXXXX.[log|chk], 
+  // where XXXXXXXX is the id part of the file name.
+  //
+  // A log file and checkPoint file have the same file format.
+  //
   val filePrefix    = "db_"
   val fileSuffixLog = ".log" // A append-only log file.
-  val fileSuffixChk = ".chk" // A compacted checkpoint file.
-  
-  val initialFileNames = subDir.list.toList.
-                                filter(_.startsWith(filePrefix)).
-                                filter(_.endsWith(fileSuffix)).
-                                sort(_ > _) // Highest numbered files first.
+  val fileSuffixChk = ".cpt" // A compacted checkPoint file.
 
-  def fileNum(fileName: String): Int =
-    fileName.substring(filePrefix.length, fileName.indexOf(".")).toInt
+  // List of all the relevant files in the dir when we first started,
+  // lowest numbered files first.
+  //  
+  val initialFileNames = subDir.list.toList.
+                                filter(n => n.startsWith(filePrefix)).
+                                filter(n => n.endsWith(fileSuffixLog) ||
+                                            n.endsWith(fileSuffixChk)).
+                                sort(_ < _)
+
+  // Group the initialFileNames by their checkPoint files, with
+  // highest numbers (most recent) coming first.
+  // 
+  // For example....
+  //
+  //   List(db_000.log, db_001.cpt, db_002.log, db_003.log, db_004.cpt, db_005.log, db_006.log)
+  //
+  // Should be grouped like...
+  //
+  //   Pair("db_004.cpt", List("db_006.log", "db_005.log")] ::
+  //   Pair("db_001.cpt", List("db_003.log", "db_002.log")] ::
+  //   Pair(        null, List("db_000.log")] ::
+  //   Nil
+  //
+  val initialFileNameGroups: List[Pair[String, List[String]]] = 
+        initialFileNames.foldLeft[List[Pair[String, List[String]]]](Nil)(
+          (accum, nextFileName) =>
+            if (nextFileName.endsWith(fileSuffixChk))
+              Pair(nextFileName, Nil) :: accum
+            else {
+              accum match {
+                case group :: xs =>
+                  Pair(group._1, nextFileName :: group._2) :: xs
+                case Nil =>
+                  Pair(null, List(nextFileName)) :: Nil
+              }
+            }
+          ) 
+
+  def fileIdNum(fileName: String): Long =
+      fileIdPart(fileName).toLong
+    
+  def fileIdPart(fileName: String): String =
+      fileName.substring(filePrefix.length, fileName.indexOf("."))
+
+  private var storages = new immutable.TreeMap[Short, SingleFileStorage]
+
+  def close: Unit = 
+    synchronized {
+      for ((id, s) <- storages) // TODO: Race condition in close with in-flight reads/appends.
+        s.close                 // TODO: Need to wait for current ops to finish first?
+      storages = storages.empty
+    }
+
+  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = 
+    synchronized { storages(loc.id) }.readAt(loc, func)
+  
+  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc =
+    synchronized { storages(currentStorageId) }.append(func)
+  
+  var currentStorageId: Short = 0
+  
+  /**
+   * A checkPoint collapses all current logs and the previous checkPoint file (if any)
+   * into a brand new checkPoint file.  After that, those log and previous 
+   * checkPoint files can be deleted.  New log files will point to the 
+   * new checkPoint file and to new log files.
+   */
+  def checkPoint: Unit = {
+    // see if temp checkPoint file exists
+    //   that means another process is doing checkpointing -- not supposed to happen.
+    // make temp checkPoint file
+    // write checkPoint to temp
+    // rename to actual checkpoint file
+    // all writes are stopped while this is happening?
+    //   better would be if writes are just slowed down
+  } 
+  
 
   // TODO: File rotation.
   //
