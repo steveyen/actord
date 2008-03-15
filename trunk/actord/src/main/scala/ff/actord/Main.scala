@@ -146,69 +146,20 @@ class MainProg {
   def createCodecFilter(f: ProtocolCodecFactory): IoFilter = new ProtocolCodecFilter(f)
   
   def createServer(numProcessors: Int, limitMem: Long) = {
-    val s: MServerStorage = 
+    val store: MServerStorage = 
       if (storePath != null)
         new MServerStorage(new File(storePath), numProcessors)
       else
         null
 
     new MServer(numProcessors, limitMem) {
-      override def createSubServer(id: Int): MSubServer = {
-        new MSubServer(id, limitMem / subServerNum) {
-          override def createSortedMap: immutable.SortedMap[String, MEntry] = {
-            if (storePath != null) {
-              startPersistence({
-                val ss = s.subStorages(id)
-                val io = ss.storage
-                val t  = new MEntryTreapStorable(emptyNode, io)
-                
-                // If the storage has a treap root, load it.
-                //
-                // TODO: What about file versioning?
-                //
-                val locSize = io.storageLocSize
-                val locRoot = ss.initialRootLoc
-                if (locRoot.position > locSize) {
-                  val loc = io.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
-                  
-                  new MEntryTreapStorable(t.loadNodeAt(loc, None), io)
-                } else
-                  t
-              })
-            } else
-              new immutable.TreeMap[String, MEntry]
-          }
-          
-          import scala.actors._
-          import scala.actors.Actor._
-          
-          def startPersistence(initialData: immutable.SortedMap[String, MEntry]): 
-                                            immutable.SortedMap[String, MEntry] = {
-            initialData match {
-              case t: MEntryTreapStorable =>
-                val persistActor = actor {
-                  var lastData = initialData
-                  loop {
-                    receive {
-                      case x: PersistTick =>
-                        if (lastData != initialData)
-                          println("dirty data found, need to persist!")
-                    }
-                  }
-                }
-                persistActor.start
-            }
-           
-            initialData
-          }
-          
-          case class PersistTick
-        }
-      }
+      override def createSubServer(id: Int): MSubServer = 
+        if (store != null)
+          new MPersistentSubServer(id, limitMem / subServerNum, store.subStorages(id))
+        else
+          super.createSubServer(id)
     }
   }
-    
-  val emptyNode = TreapEmptyNode[String, MEntry]
     
   // ------------------------------------------------------
 

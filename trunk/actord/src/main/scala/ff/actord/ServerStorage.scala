@@ -26,6 +26,8 @@ import ff.collection._
 
 class MStorageException(m: String) extends Exception(m)
 
+// ------------------------------------------------
+
 class MServerStorage(dir: File, numSubServers: Int) {
   if (!dir.isDirectory)
     throw new MStorageException("invalid directory: " + dir.getPath)
@@ -49,6 +51,8 @@ class MServerStorage(dir: File, numSubServers: Int) {
 // ----------------------------------------------------
 
 class MSubServerStorage(subDir: File) {
+  // TODO: File rotation.
+  //
   val f = new File(subDir + "/db_00000000.data")
   
   def HEADER_LENGTH = 300
@@ -56,7 +60,7 @@ class MSubServerStorage(subDir: File) {
   def HEADER_SUFFIX = (0 until (HEADER_LENGTH - HEADER_LINE.length)).map(x => "\n").mkString
   def HEADER        = HEADER_LINE + HEADER_SUFFIX
 
-  def ROOT_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes
+  def ROOT_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes // Sort of like a checkpoint marker.
   def ROOT_LENGTH  = ROOT_DEFAULT.length
   
   val ROOT_MARKER: Array[Byte] = {
@@ -100,6 +104,8 @@ class MSubServerStorage(subDir: File) {
   
   val initialRootLoc: StorageLoc = {
     // Scan backwards for the last ROOT_MARKER.  Also, truncate file if found.
+    //
+    // TODO: Handle multi-file truncation during backwards scan.
     //
     val raf = new RandomAccessFile(f, "rws")
     try {
@@ -146,8 +152,56 @@ class MSubServerStorage(subDir: File) {
 
 // ------------------------------------------------
 
+class MPersistentSubServer(override val id: Int, 
+                           override val limitMemory: Long, 
+                           val ss: MSubServerStorage) 
+  extends MSubServer(id, limitMemory) {
+  override def createSortedMap: immutable.SortedMap[String, MEntry] =
+    startPersistence({
+      val io = ss.storage
+      val t  = new MEntryTreapStorable(TreapEmptyNode[String, MEntry], io)
+      
+      // If the storage has a treap root, load it.
+      //
+      // TODO: What about file versioning?
+      //
+      val locSize = io.storageLocSize
+      val locRoot = ss.initialRootLoc
+      if (locRoot.position > locSize) {
+        val loc = io.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
+        
+        new MEntryTreapStorable(t.loadNodeAt(loc, None), io)
+      } else
+        t
+    })
+  
+  def startPersistence(initialData: immutable.SortedMap[String, MEntry]): 
+                                    immutable.SortedMap[String, MEntry] = {
+    initialData match {
+      case t: MEntryTreapStorable =>
+        val persistActor = actor {
+          var lastData = initialData
+          loop {
+            receive {
+              case x: MPersistTick =>
+                if (lastData != initialData)
+                  println("dirty data found, need to persist!")
+            }
+          }
+        }
+        persistActor.start
+    }
+   
+    initialData
+  }
+}
+  
+case class MPersistTick
+
+// ------------------------------------------------
+
 class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
-                  override val io: Storage)
+                          override val io: Storage)
   extends TreapStorable[String, MEntry](root, io) {
   override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
     new MEntryTreapStorable(r, io)    
