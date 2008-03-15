@@ -58,10 +58,10 @@ class MSubServerStorage(subDir: File) {
 
   def ROOT_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes
   def ROOT_LENGTH  = ROOT_DEFAULT.length
-
+  
   val ROOT_MARKER: Array[Byte] = {
     if (f.exists &&
-        f.length >= (HEADER_LENGTH + ROOT_LENGTH)) {
+        f.length >= (HEADER_LENGTH + ROOT_LENGTH).toLong) {
       // Read ROOT_MARKER from header area of existing file.
       //
       if (!f.isFile)
@@ -103,11 +103,14 @@ class MSubServerStorage(subDir: File) {
     //
     val raf = new RandomAccessFile(f, "rws")
     try {
+      val sizeOfInt  = 4
+      val minimumPos = (HEADER_LENGTH + sizeOfInt).toLong
+
       val mArr = new Array[Byte](ROOT_LENGTH)
       var mPos = -1L
       var cPos = raf.length - ROOT_LENGTH.toLong
       while (mPos < 0L &&
-             cPos >= HEADER_LENGTH.toLong) {
+             cPos >= minimumPos) {
         raf.seek(cPos)
         raf.read(mArr)
         if (mArr.deepEquals(ROOT_MARKER))
@@ -115,18 +118,19 @@ class MSubServerStorage(subDir: File) {
         else
           cPos = cPos - 1L // TODO: Do a faster backwards scan.
       }
-      if (mPos < HEADER_LENGTH)
+
+      if (mPos < minimumPos)
         throw new MStorageException("could not find ROOT_MARKER in file: " + f.getPath)
         
       // Truncate the file, because everything after the last ROOT_MARKER
       // is a data write/append that got only partially written,
-      // perhaps to do a crash or process termination.
+      // perhaps due to a crash or process termination.
       //
       raf.setLength(mPos + ROOT_LENGTH)
 
       // A negative initialRootPosition means it's a clean, just-initialized file.
       //
-      if (mPos == HEADER_LENGTH)
+      if (mPos == minimumPos)
         StorageLoc(0, -1L)
       else
         StorageLoc(0, mPos)
