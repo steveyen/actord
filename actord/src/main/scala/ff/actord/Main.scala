@@ -158,19 +158,19 @@ class MainProg {
           override def createSortedMap: immutable.SortedMap[String, MEntry] = {
             if (storePath != null) {
               val ss = s.subStorages(id)
-              val sx = ss.storage
-              val t  = new MEntryTreapStorable(emptyNode, sx)
+              val io = ss.storage
+              val t  = new MEntryTreapStorable(emptyNode, io)
               
               // If the storage has a treap root, load it.
               //
               // TODO: What about file versioning?
               //
-              val locSize = sx.storageLocSize
+              val locSize = io.storageLocSize
               val locRoot = ss.initialRootLoc
               if (locRoot.position > locSize) {
-                val loc = sx.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
+                val loc = io.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
                 
-                new MEntryTreapStorable(t.loadNodeAt(loc, None), sx)
+                new MEntryTreapStorable(t.loadNodeAt(loc, None), io)
               } else
                 t
             } else
