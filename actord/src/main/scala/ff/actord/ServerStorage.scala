@@ -98,7 +98,7 @@ class MSubServerStorage(subDir: File) {
   }
   
   val initialRootLoc: StorageLoc = {
-    // Scan backwards for the last ROOT_MARKER.
+    // Scan backwards for the last ROOT_MARKER.  Also, truncate file if found.
     //
     val raf = new RandomAccessFile(f, "rws")
     try {
