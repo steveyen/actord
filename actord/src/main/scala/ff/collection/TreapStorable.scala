@@ -135,14 +135,16 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
       val key          = unserializeKey(keyArr)
       val swizzleValue = new StorageSwizzle[B]
-      val swizzleSelf  = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
       val swizzleLeft  = new StorageSwizzle[TreapNode[A, B]]
       val swizzleRight = new StorageSwizzle[TreapNode[A, B]]
 
       swizzleValue.loc_!!(locValue)
-      swizzleSelf.loc_!!(loc)
       swizzleLeft.loc_!!(locLeft)
       swizzleRight.loc_!!(locRight)
+
+      val swizzleSelf = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
+      if (swizzleSelf.loc == null)
+          swizzleSelf.loc_!!(loc)
       
       TreapStorableNode[A, B](this, 
                               key, 
