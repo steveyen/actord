@@ -157,14 +157,18 @@ class MainProg {
         new MSubServer(id, limitMem / subServerNum) {
           override def createSortedMap: immutable.SortedMap[String, MEntry] = {
             if (storePath != null) {
-              val ss      = s.subStorages(id)
-              val sx      = ss.storage
+              val ss = s.subStorages(id)
+              val sx = ss.storage
+              val t  = new MEntryTreapStorable(emptyNode, sx)
+              
+              // If the storage has a treap root, load it.
+              //
+              // TODO: What about file versioning?
+              //
               val locSize = sx.storageLocSize
-              val t = new MEntryTreapStorable(emptyNode, sx)
-              val p = ss.initialRootLoc
-              if (p.position > 0L + locSize) {
-                val tLoc = sx.readAt(StorageLoc(p.id, p.position - locSize),
-                                     reader => reader.readLoc)
+              val locRoot = ss.initialRootLoc
+              if (locRoot.position > 0L + locSize) {
+                val tLoc = sx.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
                                      
                 val sw = new StorageSwizzle[TreapNode[String, MEntry]]
                 
