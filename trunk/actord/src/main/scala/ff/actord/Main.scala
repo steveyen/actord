@@ -167,7 +167,7 @@ class MainProg {
               //
               val locSize = sx.storageLocSize
               val locRoot = ss.initialRootLoc
-              if (locRoot.position > 0L + locSize) {
+              if (locRoot.position > locSize) {
                 val loc = sx.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
                 
                 new MEntryTreapStorable(t.loadNodeAt(loc, None), sx)
