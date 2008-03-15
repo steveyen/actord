@@ -78,33 +78,44 @@ class MSubServerStorage(subDir: File) extends Storage {
   //
   // Should be grouped like...
   //
-  //   Pair("db_004.cpt", List("db_006.log", "db_005.log")] ::
-  //   Pair("db_001.cpt", List("db_003.log", "db_002.log")] ::
-  //   Pair(        null, List("db_000.log")] ::
+  //   Pair(Some("db_004.cpt"), List("db_006.log", "db_005.log")] ::
+  //   Pair(Some("db_001.cpt"), List("db_003.log", "db_002.log")] ::
+  //   Pair(None,               List("db_000.log")] ::
   //   Nil
   //
-  val initialFileNameGroups: List[Pair[String, List[String]]] = 
-        initialFileNames.foldLeft[List[Pair[String, List[String]]]](Nil)(
+  val initialFileNameGroups: List[Pair[Option[String], List[String]]] = 
+        initialFileNames.foldLeft[List[Pair[Option[String], List[String]]]](Nil)(
           (accum, nextFileName) =>
             if (nextFileName.endsWith(fileSuffixChk))
-              Pair(nextFileName, Nil) :: accum
+              Pair(Some(nextFileName), Nil) :: accum
             else {
               accum match {
                 case group :: xs =>
                   Pair(group._1, nextFileName :: group._2) :: xs
                 case Nil =>
-                  Pair(null, List(nextFileName)) :: Nil
+                  Pair(None, List(nextFileName)) :: Nil
               }
             }
           ) 
 
-  def fileIdNum(fileName: String): Long =
-      fileIdPart(fileName).toLong
+  def fileId(fileName: String): Short =
+      fileIdPart(fileName).toShort
     
   def fileIdPart(fileName: String): String =
       fileName.substring(filePrefix.length, fileName.indexOf("."))
 
-  private var storages = new immutable.TreeMap[Short, SingleFileStorage]
+  private var storages: immutable.Map[Short, SingleFileStorage] = 
+    openStorages(initialFileNameGroups.headOption.
+                                       map(group => group._2.concat(group._1.toList).toList).
+                                       getOrElse(Nil))
+
+  def openStorages(fileNames: Seq[String]): immutable.Map[Short, SingleFileStorage] =
+    new immutable.TreeMap[Short, SingleFileStorage]
+    
+/*    (
+      fileNames.map(fileName => Pair(fileId(fileName), 
+                                     new SingleFileStorage(new File(subDir + "/" + fileName)))):_*)
+*/
 
   def close: Unit = 
     synchronized {
