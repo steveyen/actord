@@ -155,7 +155,7 @@ class MainProg {
     new MServer(numProcessors, limitMem) {
       override def createSubServer(id: Int): MSubServer = 
         if (store != null)
-          new MPersistentSubServer(id, limitMem / subServerNum, store.subStorages(id))
+          new MPersistentSubServer(id, limitMem / subServerNum, 500, store.subStorages(id))
         else
           super.createSubServer(id)
     }

@@ -89,6 +89,7 @@ class MSubServerStorage(subDir: File) {
       // Create and emit header for a brand new file.
       //
       f.delete
+
       val o = new DataOutputStream(new FileOutputStream(f))
       try {
         o.write(HEADER.getBytes)
@@ -154,7 +155,8 @@ class MSubServerStorage(subDir: File) {
 
 class MPersistentSubServer(override val id: Int, 
                            override val limitMemory: Long, 
-                           val ss: MSubServerStorage) 
+                           checkInterval: Int,             // In millisecs, to check for dirty data.
+                           val ss: MSubServerStorage)
   extends MSubServer(id, limitMemory) {
   override def createSortedMap: immutable.SortedMap[String, MEntry] =
     startPersistence({
@@ -178,8 +180,6 @@ class MPersistentSubServer(override val id: Int,
   
   def startPersistence(initialData: immutable.SortedMap[String, MEntry]): 
                                     immutable.SortedMap[String, MEntry] = {
-    val every = 20 * 1000 // Check for dirty data every this many millisecs.
-    
     initialData match {
       case initialTreap: MEntryTreapStorable =>
         val asyncPersister = new Thread { 
@@ -190,21 +190,17 @@ class MPersistentSubServer(override val id: Int,
               data match {
                 case currTreap: MEntryTreapStorable => 
                   if (currTreap != prevTreap) {
-println("dirty data found, persisting...")
-
                     val locRoot = currTreap.appendNode(currTreap.root)
                     
                     currTreap.io.append((loc, appender) => {
                       appender.appendLoc(locRoot)
                       appender.appendArray(ss.ROOT_MARKER, 0, ss.ROOT_MARKER.length)
                     })
-
-println("dirty data found, persisting... done")
                   }
                   prevTreap = currTreap
               }
               val end = System.currentTimeMillis
-              val amt = every - (end - beg)
+              val amt = checkInterval - (end - beg)
               if (amt > 0)
                 Thread.sleep(amt)
             }
@@ -216,8 +212,6 @@ println("dirty data found, persisting... done")
     initialData // Returns initialData for chainability.
   }
 }
-  
-case class MPersistTick
 
 // ------------------------------------------------
 
