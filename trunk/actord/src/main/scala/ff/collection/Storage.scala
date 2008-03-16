@@ -72,6 +72,8 @@ trait StorageLocAppender {
  * The id is an opaque identifier to a storage shard, possibly 
  * representing a file.  The position is also opaque, possibly
  * representing a byte offset in a file.  
+ *
+ * Some literature calls this a LSN or log sequence number.
  */
 case class StorageLoc(id: Int, position: Long)
 
