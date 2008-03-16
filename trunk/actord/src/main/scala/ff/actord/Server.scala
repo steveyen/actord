@@ -199,9 +199,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   /**
    * TODO: Maybe just use volatile, or AtomicReference around data_i.
    */
-  private var data_i = createSortedMap
+  protected var data_i = createSortedMap
   
-  private def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
+  protected def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
     synchronized { data_i = d }  
   
   /**
