@@ -381,7 +381,7 @@ abstract class DirStorage(subDir: File) extends Storage {
         fileName => {
           val f  = new File(subDir + "/" + fileName)
           val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
-          val fs = new FileStorage(f) // Note: we create fs after ph, because ph has initialization code.
+          val fs = new FileStorage(f) // Note: we create ph before fs, because ph has initialization code.
 
           Pair(fileNameId(fileName), StorageInfo(fs, ph))
         }
