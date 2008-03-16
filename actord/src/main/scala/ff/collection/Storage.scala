@@ -73,7 +73,7 @@ trait StorageLocAppender {
  * representing a file.  The position is also opaque, possibly
  * representing a byte offset in a file.  
  */
-case class StorageLoc(id: Short, position: Long)
+case class StorageLoc(id: Int, position: Long)
 
 object NullStorageLoc extends StorageLoc(-1, -1L)
 
@@ -125,7 +125,7 @@ class FileStorageReader(f: File) extends StorageReader {
       arr
     }
         
-    def readLoc: StorageLoc = StorageLoc(raf.readShort, raf.readLong)
+    def readLoc: StorageLoc = StorageLoc(raf.readInt, raf.readLong)
     def readUTF: String     = raf.readUTF
     def readByte: Byte      = raf.readByte
     def readShort: Short    = raf.readShort
@@ -177,7 +177,7 @@ class FileStorage(f: File) extends FileStorageReader(f) with Storage {
     }
     
     def appendLoc(loc: StorageLoc): Unit = {
-      fosData.writeShort(loc.id)
+      fosData.writeInt(loc.id)
       fosData.writeLong(loc.position)
     }
     
@@ -386,32 +386,32 @@ abstract class DirStorage(subDir: File) extends Storage {
           }
         ) 
 
-  def fileId(fileName: String): Short =
-      fileIdPart(fileName).toShort
+  def fileNameId(fileName: String): Int =
+      fileNameIdPart(fileName).toInt
     
-  def fileIdPart(fileName: String): String =
+  def fileNameIdPart(fileName: String): String =
       fileName.substring(filePrefix.length, fileName.indexOf("."))
       
   case class StorageInfo(fs: FileStorage, permaHeader: FileWithPermaHeader)
 
-  private var currentStorages: immutable.SortedMap[Short, StorageInfo] = 
+  private var currentStorages: immutable.SortedMap[Int, StorageInfo] = 
     openStorages(initialFileNameGroups.headOption.
                                        map(group => group._2.concat(group._1.toList).toList).
                                        getOrElse(List(filePrefix + fileInitial + fileSuffixLog)))
 
-  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Short, StorageInfo] =
-    immutable.TreeMap[Short, StorageInfo](
+  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Int, StorageInfo] =
+    immutable.TreeMap[Int, StorageInfo](
       fileNames.map(
         fileName => {
           val f  = new File(subDir + "/" + fileName)
           val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
           val fs = new FileStorage(f)
 
-          Pair(fileId(fileName), StorageInfo(fs, ph))
+          Pair(fileNameId(fileName), StorageInfo(fs, ph))
         }
       ):_*)
 
-  def currentStorageId: Short  = synchronized { currentStorages }.lastKey
+  def currentStorageId: Int    = synchronized { currentStorages }.lastKey
   def storageInfo: StorageInfo = synchronized { currentStorages(currentStorageId) }
   def storage                  = storageInfo.fs
 

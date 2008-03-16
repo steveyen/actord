@@ -63,7 +63,7 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
     println("test: " + name)
 
     val f = File.createTempFile("test_treapstorable", ".tmp")
-    val s = new SingleFileStorage(f)
+    val s = new FileStorage(f)
     var t = new TS(empty, s)
     
     def assertInMemOnly(n: TreapStorableNode[String, String], k: String, v: String) = {
@@ -245,7 +245,7 @@ class TreapStorableTestCase(name: String) extends TestCase(name) {
           val intSize = 4 // in bytes
           val shortSize = 2
           val longSize = 8
-          val locSize = shortSize + longSize
+          val locSize = intSize + longSize
           assertEquals(true,
                        f2Length > fLength)
           assertEquals(true,
