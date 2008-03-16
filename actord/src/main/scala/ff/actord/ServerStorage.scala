@@ -110,12 +110,9 @@ class MSubServerStorage(subDir: File) extends Storage {
                                        getOrElse(Nil))
 
   def openStorages(fileNames: Seq[String]): immutable.Map[Short, SingleFileStorage] =
-    new immutable.TreeMap[Short, SingleFileStorage]
-    
-/*    (
+    immutable.TreeMap[Short, SingleFileStorage](
       fileNames.map(fileName => Pair(fileId(fileName), 
                                      new SingleFileStorage(new File(subDir + "/" + fileName)))):_*)
-*/
 
   def close: Unit = 
     synchronized {
