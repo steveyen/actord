@@ -95,9 +95,9 @@ class MPersistentSubServer(override val id: Int,
                   if (currTreap != prevTreap) {
                     val locRoot = currTreap.appendNode(currTreap.root)
                     
-                    currTreap.io.append((loc, appender) => {
+                    ss.appendWithPermaMarker((loc, appender, permaMarker) => {
                       appender.appendLoc(locRoot)
-                      appender.appendArray(ss.permaMarker, 0, ss.permaMarker.length)
+                      appender.appendArray(permaMarker, 0, permaMarker.length)
                     })
                   }
                   prevTreap = currTreap
