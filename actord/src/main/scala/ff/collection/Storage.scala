@@ -281,12 +281,6 @@ class FileWithPermaHeader(
   
   /**
    * Scan backwards in storage for the last permaMarker.  Also, truncate file if found.
-   *
-   * TODO: Handle multi-file truncation during backwards scan.
-   *       This might happend if stored data is huge, and we never
-   *       get to write a permaMarker in a one or more files because
-   *       they got rotated out.  So, we'd need to scan backards thru
-   *       all those files until we hit a real permaMarker.
    */
   val initialPermaLoc: StorageLoc = scanForPermaMarker
   
@@ -400,39 +394,18 @@ abstract class DirStorage(subDir: File) extends Storage {
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = storageInfo.fs.readAt(loc, func)
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storageInfo.fs.append(func)
   
-  val initialPermaLoc = storageInfo.permaHeader.initialPermaLoc
-  def permaMarker     = storageInfo.permaHeader.permaMarker
+  val initialPermaLoc: StorageLoc = 
+    (currentStorages.map(x => x._2.permaHeader.initialPermaLoc). // Scan backwards thru log files.
+                     filter(_ != StorageLoc(-1, -1L)).           // Find the first good permaLoc.
+                     toList ::: (StorageLoc(-1, -1L) :: Nil)).head
+  
+  def permaMarker: Array[Byte] = storageInfo.permaHeader.permaMarker
       
   def close: Unit = 
     synchronized {
       for ((id, si) <- currentStorages) // TODO: Race condition in close with in-flight reads/appends.
         si.fs.close                     // TODO: Need to wait for current ops to finish first?
       currentStorages = currentStorages.empty
-    }
-
-  /**
-   * A checkPoint collapses all current logs and the previous checkPoint file (if any)
-   * into a brand new checkPoint file.  After that, those log and previous 
-   * checkPoint files can be deleted.  New log files will point to the 
-   * new checkPoint file and to new log files.
-   */
-  def checkPoint: Unit = {
-    // see if temp checkPoint file exists
-    //   that means another process is doing checkpointing -- not supposed to happen.
-    // make temp checkPoint file
-    // write checkPoint to temp
-    // rename to actual checkpoint file
-    // all writes are stopped while this is happening?
-    //   better would be if writes are just slowed down
-  }
-  
-  /**
-   * Start a new log file.
-   */
-  def logFilePush: Unit = 
-    synchronized {
-      val nextLogFileId = Math.max(0, currentStorageId + 1)
-      nextLogFileId
     }
 }
 
