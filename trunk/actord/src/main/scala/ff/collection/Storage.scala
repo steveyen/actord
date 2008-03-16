@@ -282,11 +282,9 @@ class FileWithPermaHeader(
   }
   
   /**
-   * Scan backwards in storage for the last permaMarker.  Also, truncate file if found.
+   * Scan backwards in storage for the last permaMarker.  Optionally truncate file if found.
    */
-  val initialPermaLoc: StorageLoc = scanForPermaMarker
-  
-  def scanForPermaMarker: StorageLoc = {
+  def scanForPermaMarker(truncate: Boolean): StorageLoc = {
     val raf = new RandomAccessFile(f, "rws")
     try {
       val minimumPos = (headerLength + sizeOfInt).toLong
@@ -311,7 +309,8 @@ class FileWithPermaHeader(
       // is a data write/append that got only partially written,
       // perhaps due to a crash or process termination.
       //
-      raf.setLength(mPos + permaMarker.length.toLong)
+      if (truncate)
+        raf.setLength(mPos + permaMarker.length.toLong)
 
       // Negative loc values means it's a clean, just-initialized file.
       //
@@ -397,8 +396,8 @@ abstract class DirStorage(subDir: File) extends Storage {
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storageInfo.fs.append(func)
   
   val initialPermaLoc: StorageLoc = 
-    (currentStorages.map(x => x._2.permaHeader.initialPermaLoc). // Scan backwards thru log files.
-                     filter(_ != StorageLoc(-1, -1L)).           // Find the first good permaLoc.
+    (currentStorages.map(x => x._2.permaHeader.scanForPermaMarker(true)). // Scan backwards thru log files, 
+                     filter(_ != StorageLoc(-1, -1L)).                    // and, find the first good permaLoc.
                      toList ::: (StorageLoc(-1, -1L) :: Nil)).head
   
   def permaMarker: Array[Byte] = storageInfo.permaHeader.permaMarker
