@@ -216,6 +216,8 @@ class FileStorage(f: File) extends FileStorageReader(f) with Storage {
  * An append-only file with a header and a "permaMarker", which is a unique 
  * marker that signals a high-water point in the file.  All data to the left
  * or written before the permaMarker is stable.
+ *
+ * TODO: Should read the header, do version comparisons, etc.
  */
 class FileWithPermaHeader(
         f: File, 
