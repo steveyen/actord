@@ -394,14 +394,22 @@ abstract class DirStorage(subDir: File) extends Storage {
 
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = storageInfo.fs.readAt(loc, func)
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storageInfo.fs.append(func)
+
+  def appendWithPermaMarker(func: (StorageLoc, StorageLocAppender, Array[Byte]) => Unit): StorageLoc = {
+    val si = storageInfo 
+    
+    // We grab a snapshot of storageInfo above to avoid race conditions, so
+    // that we have the right permaMarker associated with the right appender,
+    // and can pass it all together to the callback worker func.
+    //
+    si.fs.append((loc, appender) => func(loc, appender, si.permaHeader.permaMarker))
+  }
   
   val initialPermaLoc: StorageLoc = 
     (currentStorages.map(x => x._2.permaHeader.scanForPermaMarker(true)). // Scan backwards thru log files, 
                      filter(_ != StorageLoc(-1, -1L)).                    // and, find the first good permaLoc.
                      toList ::: (StorageLoc(-1, -1L) :: Nil)).head
   
-  def permaMarker: Array[Byte] = storageInfo.permaHeader.permaMarker
-      
   def close: Unit = 
     synchronized {
       for ((id, si) <- currentStorages) // TODO: Race condition in close with in-flight reads/appends.
