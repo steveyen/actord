@@ -39,7 +39,7 @@ trait StorageAppender {
 }
 
 trait Storage extends StorageReader with StorageAppender {
-  def storageLocSize: Int = 2 + 8 /* sizeof(short) + sizeof(long) */
+  def storageLocSize: Int = 4 + 8 /* sizeof(int) + sizeof(long) */
 }
 
 // ---------------------------------------------------------
