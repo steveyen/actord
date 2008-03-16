@@ -60,7 +60,7 @@ class MSubServerStorage(subDir: File) extends Storage {
   val fileSuffixLog = ".log" // A append-only log file.
   val fileSuffixChk = ".cpt" // A compacted checkPoint file.
 
-  // List of all the relevant files in the dir when we first started,
+  // List of all the db files in the subDir when we first started,
   // lowest numbered files first.
   //  
   val initialFileNames = subDir.list.toList.
@@ -84,19 +84,19 @@ class MSubServerStorage(subDir: File) extends Storage {
   //   Nil
   //
   val initialFileNameGroups: List[Pair[Option[String], List[String]]] = 
-        initialFileNames.foldLeft[List[Pair[Option[String], List[String]]]](Nil)(
-          (accum, nextFileName) =>
-            if (nextFileName.endsWith(fileSuffixChk))
-              Pair(Some(nextFileName), Nil) :: accum
-            else {
-              accum match {
-                case group :: xs =>
-                  Pair(group._1, nextFileName :: group._2) :: xs
-                case Nil =>
-                  Pair(None, List(nextFileName)) :: Nil
-              }
+      initialFileNames.foldLeft[List[Pair[Option[String], List[String]]]](Nil)(
+        (accum, nextFileName) =>
+          if (nextFileName.endsWith(fileSuffixChk))
+            Pair(Some(nextFileName), Nil) :: accum
+          else {
+            accum match {
+              case group :: xs =>
+                Pair(group._1, nextFileName :: group._2) :: xs
+              case Nil =>
+                Pair(None, List(nextFileName)) :: Nil
             }
-          ) 
+          }
+        ) 
 
   def fileId(fileName: String): Short =
       fileIdPart(fileName).toShort
@@ -104,31 +104,33 @@ class MSubServerStorage(subDir: File) extends Storage {
   def fileIdPart(fileName: String): String =
       fileName.substring(filePrefix.length, fileName.indexOf("."))
 
-  private var storages: immutable.Map[Short, SingleFileStorage] = 
+  private var currentStorages: immutable.SortedMap[Short, SingleFileStorage] = 
     openStorages(initialFileNameGroups.headOption.
                                        map(group => group._2.concat(group._1.toList).toList).
                                        getOrElse(Nil))
 
-  def openStorages(fileNames: Seq[String]): immutable.Map[Short, SingleFileStorage] =
+  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Short, SingleFileStorage] =
     immutable.TreeMap[Short, SingleFileStorage](
-      fileNames.map(fileName => Pair(fileId(fileName), 
-                                     new SingleFileStorage(new File(subDir + "/" + fileName)))):_*)
+      fileNames.map(fileName => 
+                      Pair(fileId(fileName), 
+                           new SingleFileStorage(new File(subDir + "/" + fileName)))):_*)
 
-  def close: Unit = 
-    synchronized {
-      for ((id, s) <- storages) // TODO: Race condition in close with in-flight reads/appends.
-        s.close                 // TODO: Need to wait for current ops to finish first?
-      storages = storages.empty
-    }
-
+  var currentStorageId: Short = 
+    synchronized { currentStorages }.lastKey
+  
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = 
-    synchronized { storages(loc.id) }.readAt(loc, func)
+    synchronized { currentStorages(loc.id) }.readAt(loc, func)
   
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc =
-    synchronized { storages(currentStorageId) }.append(func)
+    synchronized { currentStorages(currentStorageId) }.append(func)
   
-  var currentStorageId: Short = 0
-  
+  def close: Unit = 
+    synchronized {
+      for ((id, s) <- currentStorages) // TODO: Race condition in close with in-flight reads/appends.
+        s.close                        // TODO: Need to wait for current ops to finish first?
+      currentStorages = currentStorages.empty
+    }
+
   /**
    * A checkPoint collapses all current logs and the previous checkPoint file (if any)
    * into a brand new checkPoint file.  After that, those log and previous 
@@ -143,8 +145,16 @@ class MSubServerStorage(subDir: File) extends Storage {
     // rename to actual checkpoint file
     // all writes are stopped while this is happening?
     //   better would be if writes are just slowed down
-  } 
+  }
   
+  /**
+   * Start a new log file.
+   */
+  def logFilePush: Unit = 
+    synchronized {
+      val nextLogFileId = Math.max(0, currentStorageId + 1)
+      nextLogFileId
+    }
 
   // TODO: File rotation.
   //
