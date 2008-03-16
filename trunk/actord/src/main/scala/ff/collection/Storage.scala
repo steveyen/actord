@@ -333,7 +333,7 @@ class FileWithPermaHeader(
  * you can have pointers (aka, StorageLoc's) that point to any file in the directory.
  *
  * A file name looks like db_XXXXXXXX.[log|chk], 
- * where XXXXXXXX is the id part of the file name.
+ * where XXXXXXXX is the id part in hexadecimal.
  *
  * A log file and checkPoint file have the same file format.
  *
@@ -343,7 +343,7 @@ abstract class DirStorage(subDir: File) extends Storage {
   def filePrefix    = "db_"
   def fileSuffixLog = ".log" // A append-only log file.
   def fileSuffixChk = ".cpt" // A compacted checkPoint file.
-  def fileInitial   = "00000000"
+  def fileIdInitial = 0
 
   def defaultHeader: String
   def defaultPermaMarker: Array[Byte]
@@ -385,9 +385,16 @@ abstract class DirStorage(subDir: File) extends Storage {
             }
           }
         ) 
+        
+  val manyZeros = "00000000000000"
+        
+  def fileIdPart(id: Int): String = { // Returns a string like "00000000", "00000123", zero-prefixed.
+      val s = Integer.toHexString(id)
+      manyZeros.substring(0, 8 - s.length) + s
+  }
 
   def fileNameId(fileName: String): Int =
-      fileNameIdPart(fileName).toInt
+      Integer.parseInt(fileNameIdPart(fileName), 16)
     
   def fileNameIdPart(fileName: String): String =
       fileName.substring(filePrefix.length, fileName.indexOf("."))
@@ -397,7 +404,7 @@ abstract class DirStorage(subDir: File) extends Storage {
   private var currentStorages: immutable.SortedMap[Int, StorageInfo] = 
     openStorages(initialFileNameGroups.headOption.
                                        map(group => group._2.concat(group._1.toList).toList).
-                                       getOrElse(List(filePrefix + fileInitial + fileSuffixLog)))
+                                       getOrElse(List(filePrefix + fileIdPart(fileIdInitial) + fileSuffixLog)))
 
   def openStorages(fileNames: Seq[String]): immutable.SortedMap[Int, StorageInfo] =
     immutable.TreeMap[Int, StorageInfo](
