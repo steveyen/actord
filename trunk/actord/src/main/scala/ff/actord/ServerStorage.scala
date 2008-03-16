@@ -104,16 +104,16 @@ class MSubServerStorage(subDir: File) extends Storage {
   def fileIdPart(fileName: String): String =
       fileName.substring(filePrefix.length, fileName.indexOf("."))
 
-  private var currentStorages: immutable.SortedMap[Short, SingleFileStorage] = 
+  private var currentStorages: immutable.SortedMap[Short, FileStorage] = 
     openStorages(initialFileNameGroups.headOption.
                                        map(group => group._2.concat(group._1.toList).toList).
                                        getOrElse(Nil))
 
-  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Short, SingleFileStorage] =
-    immutable.TreeMap[Short, SingleFileStorage](
+  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Short, FileStorage] =
+    immutable.TreeMap[Short, FileStorage](
       fileNames.map(fileName => 
                       Pair(fileId(fileName), 
-                           new SingleFileStorage(new File(subDir + "/" + fileName)))):_*)
+                           new FileStorage(new File(subDir + "/" + fileName)))):_*)
 
   var currentStorageId: Short = 
     synchronized { currentStorages }.lastKey
@@ -158,100 +158,16 @@ class MSubServerStorage(subDir: File) extends Storage {
 
   // TODO: File rotation.
   //
-  val f = new File(subDir + "/db_00000000.data")
+  val f = new File(subDir + "/db_00000000.log")
   
-  def HEADER_LENGTH = 300
-  def HEADER_LINE   = "# actord data file, format: binary-0.0.1\n\n"
-  def HEADER_SUFFIX = (0 until (HEADER_LENGTH - HEADER_LINE.length)).map(x => "\n").mkString
-  def HEADER        = HEADER_LINE + HEADER_SUFFIX
-
-  def PERMA_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes // Sort of like a anchor/checkpoint marker.
-  def PERMA_LENGTH  = PERMA_DEFAULT.length            // Everything before the PERMA_MARKER is stable.
+  val fwph = new FileWithPermaHeader(f, 
+                    "# actord data file, format: binary-0.0.1\n\n",
+                    "a#Fq9a2b3Kh5sYf8x001".getBytes)
   
-  val PERMA_MARKER: Array[Byte] = {
-    if (f.exists &&
-        f.length >= (HEADER_LENGTH + PERMA_LENGTH).toLong) {
-      // Read PERMA_MARKER from header area of existing file.
-      //
-      if (!f.isFile)
-        throw new MStorageException("not a file: " + f.getPath)
-      if (!f.canRead)
-        throw new MStorageException("could not read file: " + f.getPath)
-
-      val i = new DataInputStream(new FileInputStream(f))
-      try {
-        i.skipBytes(HEADER_LENGTH)
-        val n = i.readInt
-        if (n != PERMA_LENGTH)
-          throw new MStorageException("perma marker length mismatch: " + n + " in file: " + f.getPath)
-        val m = new Array[Byte](n)
-        i.read(m)
-        m
-      } finally {
-        i.close
-      }
-    } else {
-      // Create and emit header for a brand new file.
-      //
-      f.delete
-
-      val o = new DataOutputStream(new FileOutputStream(f))
-      try {
-        o.write(HEADER.getBytes)
-        o.writeInt(PERMA_LENGTH) // Note: same as appender.appendArray format, of array length.
-        o.write(PERMA_DEFAULT)   // Note: same as appender.appendArray format, of array body.
-        o.flush
-      } finally {
-        o.close
-      }
-      PERMA_DEFAULT
-    }
-  }
+  def initialPermaLoc = fwph.initialPermaLoc
+  def permaMarker     = fwph.permaMarker
   
-  val initialPermaLoc: StorageLoc = {
-    // Scan backwards for the last PERMA_MARKER.  Also, truncate file if found.
-    //
-    // TODO: Handle multi-file truncation during backwards scan.
-    //
-    val raf = new RandomAccessFile(f, "rws")
-    try {
-      val sizeOfInt  = 4
-      val minimumPos = (HEADER_LENGTH + sizeOfInt).toLong
-
-      val mArr = new Array[Byte](PERMA_LENGTH)
-      var mPos = -1L
-      var cPos = raf.length - PERMA_LENGTH.toLong
-      while (mPos < 0L &&
-             cPos >= minimumPos) {
-        raf.seek(cPos)
-        raf.read(mArr)
-        if (mArr.deepEquals(PERMA_MARKER))
-          mPos = cPos
-        else
-          cPos = cPos - 1L // TODO: Do a faster backwards scan.
-      }
-
-      if (mPos < minimumPos)
-        throw new MStorageException("could not find PERMA_MARKER in file: " + f.getPath)
-        
-      // Truncate the file, because everything after the last PERMA_MARKER
-      // is a data write/append that got only partially written,
-      // perhaps due to a crash or process termination.
-      //
-      raf.setLength(mPos + PERMA_MARKER.length.toLong)
-
-      // Negative loc values means it's a clean, just-initialized file.
-      //
-      if (mPos == minimumPos)
-        StorageLoc(-1, -1L)
-      else
-        StorageLoc(0, mPos - sizeOfInt.toLong)
-    } finally {
-      raf.close
-    }
-  }
-    
-  val s = new SingleFileStorage(f)
+  val s = new FileStorage(f)
   
   def storage: Storage = s
 }
@@ -299,7 +215,7 @@ class MPersistentSubServer(override val id: Int,
                     
                     currTreap.io.append((loc, appender) => {
                       appender.appendLoc(locRoot)
-                      appender.appendArray(ss.PERMA_MARKER, 0, ss.PERMA_MARKER.length)
+                      appender.appendArray(ss.permaMarker, 0, ss.permaMarker.length)
                     })
                   }
                   prevTreap = currTreap
