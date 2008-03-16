@@ -32,17 +32,17 @@ class StorageTest extends TestConsoleMain {
       "should handle loc append/read" ::
       "should handle byte append/read" ::
       Nil
-    ).map(name => new SingleFileStorageTestCase(name)):_*
+    ).map(name => new FileStorageTestCase(name)):_*
   )
 }
 
-class SingleFileStorageTestCase(name: String) extends TestCase(name) {
+class FileStorageTestCase(name: String) extends TestCase(name) {
   override def runTest = {
     println("test: " + name)
     name match {
       case "should be empty after create" =>
         val f = File.createTempFile("test_sfs", ".tmp")
-        val s = new SingleFileStorage(f)
+        val s = new FileStorage(f)
         val loc = s.append((loc, appender) => appender.appendUTF("hello"))
         assertEquals(loc, StorageLoc(0, 0L))
 
@@ -51,17 +51,17 @@ class SingleFileStorageTestCase(name: String) extends TestCase(name) {
         
       case "should handle simple appends and reads" =>
         val f = File.createTempFile("test_sfs1", ".tmp")
-        val s = new SingleFileStorage(f)
+        val s = new FileStorage(f)
         val loc = s.append((loc, appender) => appender.appendUTF("hello"))
         assertEquals(loc, StorageLoc(0, 0L))
         s.close
 
-        val s2 = new SingleFileStorage(f)
+        val s2 = new FileStorage(f)
         val b2 = s2.readAt(loc, _.readUTF)
         assertEquals("hello", b2)
         s2.close
 
-        val s3 = new SingleFileStorage(f)
+        val s3 = new FileStorage(f)
         val loc3 = s3.append((loc, appender) => appender.appendUTF("world"))
         assertEquals(loc3, StorageLoc(0, 7L))
         val loc4 = s3.append((loc, appender) => appender.appendUTF("there"))
@@ -79,7 +79,7 @@ class SingleFileStorageTestCase(name: String) extends TestCase(name) {
 
       case "should handle loc append/read" =>
         val f = File.createTempFile("test_sfs2", ".tmp")
-        val s = new SingleFileStorage(f)
+        val s = new FileStorage(f)
 
         val loc1 = s.append((loc, appender) => appender.appendUTF("hello"))
         val loc2 = s.append((loc, appender) => appender.appendUTF("world"))
@@ -103,7 +103,7 @@ class SingleFileStorageTestCase(name: String) extends TestCase(name) {
 
         s.close        
         
-        val s2 = new SingleFileStorage(f)
+        val s2 = new FileStorage(f)
         assertEquals(loc1, s2.readAt(locA, _.readLoc))
         assertEquals(loc2, s2.readAt(locB, _.readLoc))
         assertEquals(loc3, s2.readAt(locC, _.readLoc))
@@ -113,7 +113,7 @@ class SingleFileStorageTestCase(name: String) extends TestCase(name) {
 
       case "should handle byte append/read" =>
         val f = File.createTempFile("test_sfs3", ".tmp")
-        val s = new SingleFileStorage(f)
+        val s = new FileStorage(f)
 
         val loc1 = s.append((loc, appender) => appender.appendArray("hello".getBytes, 0, 5))
         val loc2 = s.append((loc, appender) => appender.appendArray("world".getBytes, 0, 5))
@@ -129,7 +129,7 @@ class SingleFileStorageTestCase(name: String) extends TestCase(name) {
 
         s.close        
 
-        val s2 = new SingleFileStorage(f)
+        val s2 = new FileStorage(f)
         assertEquals("hello", new String(s2.readAt(loc1, _.readArray)))
         assertEquals("world", new String(s2.readAt(loc2, _.readArray)))
         assertEquals("there", new String(s2.readAt(loc3, _.readArray)))

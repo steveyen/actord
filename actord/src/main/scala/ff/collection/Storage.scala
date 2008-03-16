@@ -19,6 +19,8 @@ import scala.collection._
 
 import java.io._
 
+class StorageException(m: String) extends Exception(m)
+
 /** 
  * Interface for a journaling, append-only nonvolatile storage.
  * The interface abstracts away underlying details of actual files,
@@ -110,7 +112,7 @@ class StorageSwizzle[S <: AnyRef] {
 /**
  * A simple storage implementation that accesses a single file.
  */
-class SingleFileStorageReader(f: File) extends StorageReader {
+class FileStorageReader(f: File) extends StorageReader {
   private val raf = new RandomAccessFile(f, "r")
   
   def close = synchronized { raf.close }
@@ -157,7 +159,7 @@ class SingleFileStorageReader(f: File) extends StorageReader {
  *
  * TODO: Need a separate sync/lock for read operations than for append operations.
  */
-class SingleFileStorage(f: File) extends SingleFileStorageReader(f) with Storage {
+class FileStorage(f: File) extends FileStorageReader(f) with Storage {
   private val fos        = new FileOutputStream(f, true)
   private val fosData    = new DataOutputStream(new BufferedOutputStream(fos))
   private val fosChannel = fos.getChannel
@@ -206,4 +208,116 @@ class SingleFileStorage(f: File) extends SingleFileStorageReader(f) with Storage
 
       loc
     }
+}
+
+// ---------------------------------------------------------
+
+/**
+ * An append-only file with a header and a "permaMarker", which is a unique 
+ * marker that signals a high-water point in the file.  All data to the left
+ * or written before the permaMarker is stable.
+ */
+class FileWithPermaHeader(
+        f: File, 
+        headerLines: String, 
+        permaMarkerDefault: Array[Byte]) {
+  def headerLength = 300
+  def headerSuffix = (0 until (headerLength - headerLines.length)).map(x => "\n").mkString
+  def header       = headerLines + headerSuffix
+
+  def permaMarkerLength = permaMarkerDefault.length
+  
+  val permaMarker: Array[Byte] = 
+    if (f.exists &&
+        f.length >= (headerLength + permaMarkerLength).toLong)
+      readHeaderPermaMarker
+    else 
+      initHeaderPermaMarker
+  
+  /**
+   * Read permaMarker bytes from header area of existing file.
+   */
+  def readHeaderPermaMarker: Array[Byte] = {
+    if (!f.isFile)
+      throw new StorageException("not a file: " + f.getPath)
+    if (!f.canRead)
+      throw new StorageException("could not read file: " + f.getPath)
+
+    val i = new DataInputStream(new FileInputStream(f))
+    try {
+      i.skipBytes(headerLength)
+      val n = i.readInt
+      if (n != permaMarkerLength)
+        throw new StorageException("perma marker length mismatch: " + n + " in file: " + f.getPath)
+      val m = new Array[Byte](n)
+      i.read(m)
+      m
+    } finally {
+      i.close
+    }
+  }
+  
+  /**
+   * Create and emit header for a brand new file.
+   */
+  def initHeaderPermaMarker: Array[Byte] = {
+    f.delete
+
+    val o = new DataOutputStream(new FileOutputStream(f))
+    try {
+      o.write    (header.getBytes)
+      o.writeInt (permaMarkerLength)  // Note: same as appender.appendArray format, of array length.
+      o.write    (permaMarkerDefault) // Note: same as appender.appendArray format, of array body.
+      o.flush
+    } finally {
+      o.close
+    }
+    permaMarkerDefault
+  }
+  
+  /**
+   * Scan backwards in storage for the last permaMarker.  Also, truncate file if found.
+   *
+   * TODO: Handle multi-file truncation during backwards scan.
+   */
+  val initialPermaLoc: StorageLoc = scanForPermaMarker
+  
+  def scanForPermaMarker: StorageLoc = {
+    val raf = new RandomAccessFile(f, "rws")
+    try {
+      val sizeOfInt  = 4
+      val minimumPos = (headerLength + sizeOfInt).toLong
+
+      val mArr = new Array[Byte](permaMarkerLength)
+      var mPos = -1L
+      var cPos = raf.length - permaMarkerLength.toLong
+      while (mPos < 0L &&
+             cPos >= minimumPos) {
+        raf.seek(cPos)
+        raf.read(mArr)
+        if (mArr.deepEquals(permaMarker))
+          mPos = cPos
+        else
+          cPos = cPos - 1L // TODO: Do a faster backwards scan.
+      }
+
+      if (mPos < minimumPos)
+        throw new StorageException("could not find permaMarker in file: " + f.getPath)
+        
+      // Truncate the file, because everything after the last permaMarker
+      // is a data write/append that got only partially written,
+      // perhaps due to a crash or process termination.
+      //
+      raf.setLength(mPos + permaMarker.length.toLong)
+
+      // Negative loc values means it's a clean, just-initialized file.
+      //
+      if (mPos == minimumPos)
+        StorageLoc(-1, -1L)
+      else
+        StorageLoc(0, mPos - sizeOfInt.toLong)
+    } finally {
+      raf.close
+    }
+  }
 }
