@@ -264,7 +264,7 @@ class FileWithPermaHeader(
   }
   
   /**
-   * Create and emit header for a brand new file.
+   * Create and emit header and permaMarker bytes for a brand new file.
    */
   def initHeaderPermaMarker: Array[Byte] = {
     f.delete
