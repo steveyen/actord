@@ -328,69 +328,37 @@ class FileWithPermaHeader(
 // ---------------------------------------------------------
 
 /**
- * A storage implementation that tracks multiple files in a directory,
+ * A storage implementation that tracks multiple db log files in a directory,
  * appending to the most recent file, but reading from any file.  That is,
- * you can have pointers (aka, StorageLoc's) that point to any file in the directory.
+ * you can have pointers (aka, StorageLoc's) that point to any (active) 
+ * log file in the directory.
  *
- * A file name looks like db_XXXXXXXX.[log|chk], 
+ * A log file name looks like "db_XXXXXXXX.log"
  * where XXXXXXXX is the id part in hexadecimal.
- *
- * A log file and checkPoint file have the same file format.
  *
  * TODO: Need a separate sync/lock for read operations than for append operations.
  */
 abstract class DirStorage(subDir: File) extends Storage {
   def filePrefix    = "db_"
-  def fileSuffixLog = ".log" // A append-only log file.
-  def fileSuffixChk = ".cpt" // A compacted checkPoint file.
+  def fileSuffix    = ".log" // An append-only db log file.
   def fileIdInitial = 0
 
   def defaultHeader: String
   def defaultPermaMarker: Array[Byte]
   
   // List of all the db files in the subDir when we first started,
-  // lowest numbered files first.
+  // highest numbered files first.
   //  
   val initialFileNames = subDir.list.toList.
-                                filter(n => n.startsWith(filePrefix)).
-                                filter(n => n.endsWith(fileSuffixLog) ||
-                                            n.endsWith(fileSuffixChk)).
-                                sort(_ < _)
+                                filter(n => n.startsWith(filePrefix) &&
+                                            n.endsWith(fileSuffix)).
+                                sort(_ > _)
 
-  // Group the initialFileNames by their checkPoint files, with
-  // highest numbers (most recent) coming first.
-  // 
-  // For example....
-  //
-  //   List(db_000.log, db_001.cpt, db_002.log, db_003.log, db_004.cpt, db_005.log, db_006.log)
-  //
-  // Should be grouped like...
-  //
-  //   Pair(Some("db_004.cpt"), List("db_006.log", "db_005.log")] ::
-  //   Pair(Some("db_001.cpt"), List("db_003.log", "db_002.log")] ::
-  //   Pair(None,               List("db_000.log")] ::
-  //   Nil
-  //
-  val initialFileNameGroups: List[Pair[Option[String], List[String]]] = 
-      initialFileNames.foldLeft[List[Pair[Option[String], List[String]]]](Nil)(
-        (accum, nextFileName) =>
-          if (nextFileName.endsWith(fileSuffixChk))
-            Pair(Some(nextFileName), Nil) :: accum
-          else {
-            accum match {
-              case group :: xs =>
-                Pair(group._1, nextFileName :: group._2) :: xs
-              case Nil =>
-                Pair(None, List(nextFileName)) :: Nil
-            }
-          }
-        ) 
+  val MANY_ZEROS = "00000000000000"
         
-  val manyZeros = "00000000000000"
-        
-  def fileIdPart(id: Int): String = { // Returns a string like "00000000", "00000123", zero-prefixed.
+  def fileIdPart(id: Int): String = {           // Returns a string like "00000000", "00000123".
       val s = Integer.toHexString(id)
-      manyZeros.substring(0, 8 - s.length) + s
+      MANY_ZEROS.substring(0, 8 - s.length) + s // Returned string is zero-perfixed to reach 8 chars.
   }
 
   def fileNameId(fileName: String): Int =
@@ -402,9 +370,10 @@ abstract class DirStorage(subDir: File) extends Storage {
   case class StorageInfo(fs: FileStorage, permaHeader: FileWithPermaHeader)
 
   private var currentStorages: immutable.SortedMap[Int, StorageInfo] = 
-    openStorages(initialFileNameGroups.headOption.
-                                       map(group => group._2.concat(group._1.toList).toList).
-                                       getOrElse(List(filePrefix + fileIdPart(fileIdInitial) + fileSuffixLog)))
+    openStorages(initialFileNames match {
+                    case Nil => List(filePrefix + fileIdPart(fileIdInitial) + fileSuffix)
+                    case xs  => xs
+                 })
 
   def openStorages(fileNames: Seq[String]): immutable.SortedMap[Int, StorageInfo] =
     immutable.TreeMap[Int, StorageInfo](
@@ -412,21 +381,20 @@ abstract class DirStorage(subDir: File) extends Storage {
         fileName => {
           val f  = new File(subDir + "/" + fileName)
           val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
-          val fs = new FileStorage(f)
+          val fs = new FileStorage(f) // Note: we create fs after ph, because ph has initialization code.
 
           Pair(fileNameId(fileName), StorageInfo(fs, ph))
         }
       ):_*)
 
-  // TODO: Should use FileStorageReader's for old files and 
-  // use FileStorage for only the most recent/active file.
+  // TODO: Should use FileStorageReader's (read-only) for old files and 
+  // use FileStorage (read & append) for only the most recent/active file.
   //
   def currentStorageId: Int    = synchronized { currentStorages }.lastKey
   def storageInfo: StorageInfo = synchronized { currentStorages(currentStorageId) }
-  def storage                  = storageInfo.fs
 
-  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = storage.readAt(loc, func)
-  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storage.append(func)
+  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = storageInfo.fs.readAt(loc, func)
+  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storageInfo.fs.append(func)
   
   val initialPermaLoc = storageInfo.permaHeader.initialPermaLoc
   def permaMarker     = storageInfo.permaHeader.permaMarker
