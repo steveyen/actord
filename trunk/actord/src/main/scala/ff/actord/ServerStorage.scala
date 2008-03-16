@@ -56,10 +56,13 @@ class MSubServerStorage(subDir: File) extends Storage {
   //
   // A log file and checkPoint file have the same file format.
   //
-  val filePrefix    = "db_"
-  val fileSuffixLog = ".log" // A append-only log file.
-  val fileSuffixChk = ".cpt" // A compacted checkPoint file.
+  def filePrefix    = "db_"
+  def fileSuffixLog = ".log" // A append-only log file.
+  def fileSuffixChk = ".cpt" // A compacted checkPoint file.
 
+  def defaultHeader      = "# actord data file, format: binary-0.0.1\n\n"
+  def defaultPermaMarker = "a#Fq9a2b3Kh5sYf8x001".getBytes
+  
   // List of all the db files in the subDir when we first started,
   // lowest numbered files first.
   //  
@@ -103,31 +106,39 @@ class MSubServerStorage(subDir: File) extends Storage {
     
   def fileIdPart(fileName: String): String =
       fileName.substring(filePrefix.length, fileName.indexOf("."))
+      
+  case class StorageInfo(fs: FileStorage, permaHeader: FileWithPermaHeader)
 
-  private var currentStorages: immutable.SortedMap[Short, FileStorage] = 
+  private var currentStorages: immutable.SortedMap[Short, StorageInfo] = 
     openStorages(initialFileNameGroups.headOption.
                                        map(group => group._2.concat(group._1.toList).toList).
                                        getOrElse(Nil))
 
-  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Short, FileStorage] =
-    immutable.TreeMap[Short, FileStorage](
-      fileNames.map(fileName => 
-                      Pair(fileId(fileName), 
-                           new FileStorage(new File(subDir + "/" + fileName)))):_*)
+  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Short, StorageInfo] =
+    immutable.TreeMap[Short, StorageInfo](
+      fileNames.map(
+        fileName => {
+          val f = new File(subDir + "/" + fileName)
+          Pair(fileId(fileName), 
+               StorageInfo(new FileStorage(f),
+                           new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)))
+        }
+      ):_*)
 
-  var currentStorageId: Short = 
-    synchronized { currentStorages }.lastKey
+  def currentStorageId: Short  = synchronized { currentStorages }.lastKey
+  def storageInfo: StorageInfo = synchronized { currentStorages(currentStorageId) }
+  def storage                  = storageInfo.fs
+
+  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = storage.readAt(loc, func)
+  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storage.append(func)
   
-  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = 
-    synchronized { currentStorages(loc.id) }.readAt(loc, func)
-  
-  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc =
-    synchronized { currentStorages(currentStorageId) }.append(func)
-  
+  val initialPermaLoc = storageInfo.permaHeader.initialPermaLoc
+  def permaMarker     = storageInfo.permaHeader.permaMarker
+      
   def close: Unit = 
     synchronized {
-      for ((id, s) <- currentStorages) // TODO: Race condition in close with in-flight reads/appends.
-        s.close                        // TODO: Need to wait for current ops to finish first?
+      for ((id, si) <- currentStorages) // TODO: Race condition in close with in-flight reads/appends.
+        si.fs.close                     // TODO: Need to wait for current ops to finish first?
       currentStorages = currentStorages.empty
     }
 
@@ -155,21 +166,6 @@ class MSubServerStorage(subDir: File) extends Storage {
       val nextLogFileId = Math.max(0, currentStorageId + 1)
       nextLogFileId
     }
-
-  // TODO: File rotation.
-  //
-  val f = new File(subDir + "/db_00000000.log")
-  
-  val fwph = new FileWithPermaHeader(f, 
-                    "# actord data file, format: binary-0.0.1\n\n",
-                    "a#Fq9a2b3Kh5sYf8x001".getBytes)
-  
-  def initialPermaLoc = fwph.initialPermaLoc
-  def permaMarker     = fwph.permaMarker
-  
-  val s = new FileStorage(f)
-  
-  def storage: Storage = s
 }
 
 // ------------------------------------------------
