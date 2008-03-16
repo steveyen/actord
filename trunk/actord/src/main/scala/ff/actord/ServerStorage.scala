@@ -165,13 +165,13 @@ class MSubServerStorage(subDir: File) extends Storage {
   def HEADER_SUFFIX = (0 until (HEADER_LENGTH - HEADER_LINE.length)).map(x => "\n").mkString
   def HEADER        = HEADER_LINE + HEADER_SUFFIX
 
-  def ROOT_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes // Sort of like a checkpoint marker.
-  def ROOT_LENGTH  = ROOT_DEFAULT.length
+  def PERMA_DEFAULT = "a#Fq9a2b3Kh5sYf8x001".getBytes // Sort of like a anchor/checkpoint marker.
+  def PERMA_LENGTH  = PERMA_DEFAULT.length            // Everything before the PERMA_MARKER is stable.
   
-  val ROOT_MARKER: Array[Byte] = {
+  val PERMA_MARKER: Array[Byte] = {
     if (f.exists &&
-        f.length >= (HEADER_LENGTH + ROOT_LENGTH).toLong) {
-      // Read ROOT_MARKER from header area of existing file.
+        f.length >= (HEADER_LENGTH + PERMA_LENGTH).toLong) {
+      // Read PERMA_MARKER from header area of existing file.
       //
       if (!f.isFile)
         throw new MStorageException("not a file: " + f.getPath)
@@ -182,8 +182,8 @@ class MSubServerStorage(subDir: File) extends Storage {
       try {
         i.skipBytes(HEADER_LENGTH)
         val n = i.readInt
-        if (n != ROOT_LENGTH)
-          throw new MStorageException("root length mismatch: " + n + " in file: " + f.getPath)
+        if (n != PERMA_LENGTH)
+          throw new MStorageException("perma marker length mismatch: " + n + " in file: " + f.getPath)
         val m = new Array[Byte](n)
         i.read(m)
         m
@@ -198,18 +198,18 @@ class MSubServerStorage(subDir: File) extends Storage {
       val o = new DataOutputStream(new FileOutputStream(f))
       try {
         o.write(HEADER.getBytes)
-        o.writeInt(ROOT_LENGTH) // Note: same as appender.appendArray format, of array length.
-        o.write(ROOT_DEFAULT)   // Note: same as appender.appendArray format, of array body.
+        o.writeInt(PERMA_LENGTH) // Note: same as appender.appendArray format, of array length.
+        o.write(PERMA_DEFAULT)   // Note: same as appender.appendArray format, of array body.
         o.flush
       } finally {
         o.close
       }
-      ROOT_DEFAULT
+      PERMA_DEFAULT
     }
   }
   
-  val initialRootLoc: StorageLoc = {
-    // Scan backwards for the last ROOT_MARKER.  Also, truncate file if found.
+  val initialPermaLoc: StorageLoc = {
+    // Scan backwards for the last PERMA_MARKER.  Also, truncate file if found.
     //
     // TODO: Handle multi-file truncation during backwards scan.
     //
@@ -218,27 +218,27 @@ class MSubServerStorage(subDir: File) extends Storage {
       val sizeOfInt  = 4
       val minimumPos = (HEADER_LENGTH + sizeOfInt).toLong
 
-      val mArr = new Array[Byte](ROOT_LENGTH)
+      val mArr = new Array[Byte](PERMA_LENGTH)
       var mPos = -1L
-      var cPos = raf.length - ROOT_LENGTH.toLong
+      var cPos = raf.length - PERMA_LENGTH.toLong
       while (mPos < 0L &&
              cPos >= minimumPos) {
         raf.seek(cPos)
         raf.read(mArr)
-        if (mArr.deepEquals(ROOT_MARKER))
+        if (mArr.deepEquals(PERMA_MARKER))
           mPos = cPos
         else
           cPos = cPos - 1L // TODO: Do a faster backwards scan.
       }
 
       if (mPos < minimumPos)
-        throw new MStorageException("could not find ROOT_MARKER in file: " + f.getPath)
+        throw new MStorageException("could not find PERMA_MARKER in file: " + f.getPath)
         
-      // Truncate the file, because everything after the last ROOT_MARKER
+      // Truncate the file, because everything after the last PERMA_MARKER
       // is a data write/append that got only partially written,
       // perhaps due to a crash or process termination.
       //
-      raf.setLength(mPos + ROOT_MARKER.length.toLong)
+      raf.setLength(mPos + PERMA_MARKER.length.toLong)
 
       // Negative loc values means it's a clean, just-initialized file.
       //
@@ -272,13 +272,13 @@ class MPersistentSubServer(override val id: Int,
       //
       // TODO: What about file versioning?
       //
-      val locSize = io.storageLocSize
-      val locRoot = ss.initialRootLoc
-      if (locRoot.id >= 0 &&
-          locRoot.position > locSize) {
-        val loc = io.readAt(StorageLoc(locRoot.id, locRoot.position - locSize), _.readLoc)
+      val locSize  = io.storageLocSize
+      val locPerma = ss.initialPermaLoc
+      if (locPerma.id >= 0 &&
+          locPerma.position > locSize) {
+        val locRoot = io.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
         
-        new MEntryTreapStorable(t.loadNodeAt(loc, None), io)
+        new MEntryTreapStorable(t.loadNodeAt(locRoot, None), io)
       } else
         t
     })
@@ -299,7 +299,7 @@ class MPersistentSubServer(override val id: Int,
                     
                     currTreap.io.append((loc, appender) => {
                       appender.appendLoc(locRoot)
-                      appender.appendArray(ss.ROOT_MARKER, 0, ss.ROOT_MARKER.length)
+                      appender.appendArray(ss.PERMA_MARKER, 0, ss.PERMA_MARKER.length)
                     })
                   }
                   prevTreap = currTreap
