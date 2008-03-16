@@ -329,9 +329,9 @@ class FileWithPermaHeader(
 
 /**
  * A storage implementation that tracks multiple db log files in a directory,
- * appending to the most recent file, but reading from any file.  That is,
- * you can have pointers (aka, StorageLoc's) that point to any (active) 
- * log file in the directory.
+ * appending to the most recent file, but reading from any active log file.  
+ * That is, you can have pointers (aka, StorageLoc's) that point to any 
+ * active log file in the directory.
  *
  * A log file name looks like "db_XXXXXXXX.log"
  * where XXXXXXXX is the id part in hexadecimal.
