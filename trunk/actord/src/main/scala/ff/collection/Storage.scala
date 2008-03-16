@@ -221,6 +221,8 @@ class FileWithPermaHeader(
         f: File, 
         headerLines: String, 
         permaMarkerDefault: Array[Byte]) {
+  val sizeOfInt = 4
+
   def headerLength = 300
   def headerSuffix = (0 until (headerLength - headerLines.length)).map(x => "\n").mkString
   def header       = headerLines + headerSuffix
@@ -229,7 +231,7 @@ class FileWithPermaHeader(
   
   val permaMarker: Array[Byte] = 
     if (f.exists &&
-        f.length >= (headerLength + permaMarkerLength).toLong)
+        f.length >= (headerLength + sizeOfInt + permaMarkerLength).toLong)
       readHeaderPermaMarker
     else 
       initHeaderPermaMarker
@@ -285,7 +287,6 @@ class FileWithPermaHeader(
   def scanForPermaMarker: StorageLoc = {
     val raf = new RandomAccessFile(f, "rws")
     try {
-      val sizeOfInt  = 4
       val minimumPos = (headerLength + sizeOfInt).toLong
 
       val mArr = new Array[Byte](permaMarkerLength)
