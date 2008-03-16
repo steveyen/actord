@@ -347,7 +347,7 @@ abstract class DirStorage(subDir: File) extends Storage {
   def defaultPermaMarker: Array[Byte]
   
   // List of all the db files in the subDir when we first started,
-  // highest numbered files first.
+  // with files of highest id sorted first.
   //  
   val initialFileNames = subDir.list.toList.
                                 filter(n => n.startsWith(filePrefix) &&
@@ -371,8 +371,8 @@ abstract class DirStorage(subDir: File) extends Storage {
 
   private var currentStorages: immutable.SortedMap[Int, StorageInfo] = 
     openStorages(initialFileNames match {
-                    case Nil => List(filePrefix + fileIdPart(fileIdInitial) + fileSuffix)
-                    case xs  => xs
+                   case Nil => List(filePrefix + fileIdPart(fileIdInitial) + fileSuffix)
+                   case xs  => xs
                  })
 
   def openStorages(fileNames: Seq[String]): immutable.SortedMap[Int, StorageInfo] =
