@@ -110,7 +110,7 @@ class StorageSwizzle[S <: AnyRef] {
 // ---------------------------------------------------------
 
 /**
- * A simple storage implementation that accesses a single file.
+ * A simple storage reader that accesses a single file.
  */
 class FileStorageReader(f: File) extends StorageReader {
   private val raf = new RandomAccessFile(f, "r")
@@ -155,7 +155,7 @@ class FileStorageReader(f: File) extends StorageReader {
 // ---------------------------------------------------------
 
 /**
- * A simple storage implementation that appends to a single file.
+ * A simple storage implementation that reads and appends to a single file.
  *
  * TODO: Need a separate sync/lock for read operations than for append operations.
  */
@@ -330,7 +330,7 @@ class FileWithPermaHeader(
 /**
  * A storage implementation that tracks multiple files in a directory,
  * appending to the most recent file, but reading from any file.  That is,
- * you can have pointers (aka, StorageLoc's) that point to any file.
+ * you can have pointers (aka, StorageLoc's) that point to any file in the directory.
  *
  * A file name looks like db_XXXXXXXX.[log|chk], 
  * where XXXXXXXX is the id part of the file name.
@@ -411,6 +411,9 @@ abstract class DirStorage(subDir: File) extends Storage {
         }
       ):_*)
 
+  // TODO: Should use FileStorageReader's for old files and 
+  // use FileStorage for only the most recent/active file.
+  //
   def currentStorageId: Int    = synchronized { currentStorages }.lastKey
   def storageInfo: StorageInfo = synchronized { currentStorages(currentStorageId) }
   def storage                  = storageInfo.fs
