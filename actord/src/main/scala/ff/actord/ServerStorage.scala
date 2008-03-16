@@ -80,6 +80,30 @@ class MPersistentSubServer(override val id: Int,
       } else
         t
     })
+    
+  override protected def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
+    synchronized { 
+      super.data_i_!!(d) 
+      version_i = Math.max(0L, version_i + 1L)
+    }
+
+  protected var version_i: Long = 0L
+  def version: Long = synchronized { version_i }
+  
+  def dataWithVersion = 
+    synchronized {
+      Pair(data, version)
+    }
+  
+  protected var lastPersistedVersion_i: Long = -1L
+  protected def lastPersistedVerison_!!(v: Long) = 
+    synchronized {
+      lastPersistedVersion_i = v
+    }
+  def lastPersistedVersion: Long = 
+    synchronized { 
+      lastPersistedVersion_i 
+    }
   
   def startPersistence(initialData: immutable.SortedMap[String, MEntry]): 
                                     immutable.SortedMap[String, MEntry] = {
@@ -90,7 +114,8 @@ class MPersistentSubServer(override val id: Int,
             var prevTreap = initialTreap
             while (true) {
               val beg = System.currentTimeMillis
-              data match {
+              val (d, v) = dataWithVersion
+              d match {
                 case currTreap: MEntryTreapStorable => 
                   if (currTreap != prevTreap) {
                     val locRoot = currTreap.appendNode(currTreap.root)
@@ -99,6 +124,8 @@ class MPersistentSubServer(override val id: Int,
                       appender.appendLoc(locRoot)
                       appender.appendArray(permaMarker, 0, permaMarker.length)
                     })
+
+                    lastPersistedVerison_!!(v)
                   }
                   prevTreap = currTreap
               }
