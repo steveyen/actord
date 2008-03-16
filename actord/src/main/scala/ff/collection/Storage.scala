@@ -283,6 +283,10 @@ class FileWithPermaHeader(
    * Scan backwards in storage for the last permaMarker.  Also, truncate file if found.
    *
    * TODO: Handle multi-file truncation during backwards scan.
+   *       This might happend if stored data is huge, and we never
+   *       get to write a permaMarker in a one or more files because
+   *       they got rotated out.  So, we'd need to scan backards thru
+   *       all those files until we hit a real permaMarker.
    */
   val initialPermaLoc: StorageLoc = scanForPermaMarker
   
