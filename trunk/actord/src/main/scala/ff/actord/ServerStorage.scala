@@ -112,16 +112,17 @@ class MSubServerStorage(subDir: File) extends Storage {
   private var currentStorages: immutable.SortedMap[Short, StorageInfo] = 
     openStorages(initialFileNameGroups.headOption.
                                        map(group => group._2.concat(group._1.toList).toList).
-                                       getOrElse(Nil))
+                                       getOrElse(List(filePrefix + "00000000" + fileSuffixLog)))
 
   def openStorages(fileNames: Seq[String]): immutable.SortedMap[Short, StorageInfo] =
     immutable.TreeMap[Short, StorageInfo](
       fileNames.map(
         fileName => {
-          val f = new File(subDir + "/" + fileName)
-          Pair(fileId(fileName), 
-               StorageInfo(new FileStorage(f),
-                           new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)))
+          val f  = new File(subDir + "/" + fileName)
+          val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
+          val fs = new FileStorage(f)
+
+          Pair(fileId(fileName), StorageInfo(fs, ph))
         }
       ):_*)
 
