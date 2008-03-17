@@ -105,7 +105,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       
   def swizzleSaveNode(s: StorageSwizzle[TreapNode[A, B]]): StorageLoc = 
     s.synchronized {
-      if (s.loc != null)
+      if (s.loc != null &&
+          io.storageLocRefresh(s.loc) == false)
           s.loc
       else
           s.loc_!!(appendNode(s.value))
@@ -185,7 +186,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
   def swizzleSaveValue(s: StorageSwizzle[B]): StorageLoc = 
     s.synchronized {
-      if (s.loc != null)
+      if (s.loc != null &&
+          io.storageLocRefresh(s.loc) == false)
           s.loc
       else 
           s.loc_!!(appendValue(s.value))

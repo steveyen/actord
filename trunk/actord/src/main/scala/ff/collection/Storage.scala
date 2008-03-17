@@ -40,6 +40,15 @@ trait StorageAppender {
 
 trait Storage extends StorageReader with StorageAppender {
   def storageLocSize: Int = 4 + 8 /* sizeof(int) + sizeof(long) */
+  
+  /**
+   * Return true if a given loc should be re-saved again,
+   * since the loc might point to an valid, but ancient location.
+   *
+   * Subclasses that implement multiple, rotated storage files 
+   * can override this method to provide cleanup/vacuum behavior.
+   */
+  def storageLocRefresh(loc: StorageLoc): Boolean = false
 }
 
 // ---------------------------------------------------------
