@@ -142,8 +142,6 @@ class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
     val cid     = reader.readLong
     MEntry(key, flags, expTime, data.size, data, cid)
   }
-  
-  def rootStorable = root.asInstanceOf[TreapStorableNode[String, MEntry]]
 }
 
 // ------------------------------------------------
