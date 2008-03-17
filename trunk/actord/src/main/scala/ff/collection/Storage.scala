@@ -411,7 +411,14 @@ abstract class DirStorage(subDir: File) extends Storage {
     cs(cs.lastKey)
   }
 
-  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = fileInfo.fs.readAt(loc, func)
+  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = {
+    val cs = synchronized { currentFiles }
+    
+    // Since currentFiles is immutable, we can traverse outside the synchronized.
+    //
+    cs(loc.id).fs.readAt(loc, func)
+  }
+  
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = fileInfo.fs.append(func)
 
   def appendWithPermaMarker(func: (StorageLoc, StorageLocAppender, Array[Byte]) => Unit): StorageLoc = {
