@@ -95,6 +95,9 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
   // --------------------------------------------
   
+  // TODO: Need separate locks for readers/loaders versus writers/savers,
+  //       so that readers never get blocked by slow writers.
+  //
   def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = 
     s.synchronized {
       if (s.value != null)
