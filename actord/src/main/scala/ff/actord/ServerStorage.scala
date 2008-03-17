@@ -201,26 +201,10 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
         if (v != subServer.lastCleanedVersion)
           d match {
             case currTreap: MEntryTreapStorable => 
-              currTreap.root
-              
-              // TODO: Implement cleaner/compacter.
-              //
-              // Walk through treap nodes, looking at swizzle objects.
-              // If swizzle value loc < minFileId
-              //   If swizzle value value not loaded, load it from old file.
-              //   Save swizzle value value to new loc in most recent file.
-              //   If we (the cleaner) loaded the value, then unlink it from memory for GC.
-              // Got to make sure concurrent appenders aren't saving locs that point to old files.
-              //
-              // If swizzle self loc < minFileId
-              //   If swizzle self value not loaded, load it from old file.
-              //   Save swizzle self value to new loc in most recent file.
-              //   If we (the cleaner) loaded the self value, then unlink it from memory for GC.
-              // Got to make sure concurrent appenders aren't saving locs that point to old files.
-              //
-              // Recurse on node left and right
- 
-              subServer.lastCleanedVersion_!!(v)
+              if (currTreap.subServerStorage == subServer.subServerStorage) {
+                walk(currTreap.root)           
+                subServer.lastCleanedVersion_!!(v)
+              }
           }
       }
         
@@ -230,5 +214,24 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
         Thread.sleep(amt)
     }
   } 
+  
+  def walk(n: TreapNode[String, MEntry]) = {
+    // TODO: Implement cleaner/compacter.
+    //
+    // Walk through treap nodes, looking at swizzle objects.
+    // If swizzle value loc != null && loc.id < minFileId
+    //   If swizzle value value not loaded, load it from old file.
+    //   Save swizzle value value to new loc in most recent file.
+    //   If we (the cleaner) loaded the value, then unlink it from memory for GC.
+    // Got to make sure concurrent appenders aren't saving locs that point to old files.
+    //
+    // If swizzle self loc < minFileId
+    //   If swizzle self value not loaded, load it from old file.
+    //   Save swizzle self value to new loc in most recent file.
+    //   If we (the cleaner) loaded the self value, then unlink it from memory for GC.
+    // Got to make sure concurrent appenders aren't saving locs that point to old files.
+    //
+    // Recurse on node left and right
+  }
 }
 
