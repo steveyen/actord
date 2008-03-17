@@ -389,8 +389,15 @@ abstract class DirStorage(subDir: File) extends Storage {
   // TODO: Should use FileStorageReader's (read-only) for old files and 
   // use FileStorage (read & append) for only the most recent/active file.
   //
-  def currentStorageId: Int    = synchronized { currentStorages }.lastKey
-  def storageInfo: StorageInfo = synchronized { currentStorages(currentStorageId) }
+  def currentStorageId: Int = synchronized { currentStorages }.lastKey
+  
+  def storageInfo: StorageInfo = {
+    val cs = synchronized { currentStorages }
+    
+    // Since currentStorages is immutable, we can traverse outside the synchronized.
+    //
+    cs(cs.lastKey)
+  }
 
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = storageInfo.fs.readAt(loc, func)
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storageInfo.fs.append(func)
