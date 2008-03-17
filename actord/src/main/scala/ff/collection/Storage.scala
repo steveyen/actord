@@ -376,15 +376,14 @@ abstract class DirStorage(subDir: File) extends Storage {
 
   def openStorages(fileNames: Seq[String]): immutable.SortedMap[Int, StorageInfo] =
     immutable.TreeMap[Int, StorageInfo](
-      fileNames.map(
-        fileName => {
-          val f  = new File(subDir + "/" + fileName)
-          val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
-          val fs = new FileStorage(f) // Note: we create ph before fs, because ph has initialization code.
-
-          Pair(fileNameId(fileName), StorageInfo(fs, ph))
-        }
-      ):_*)
+      fileNames.map(fileName => Pair(fileNameId(fileName), openStorage(fileName))):_*)
+      
+  def openStorage(fileName: String) = {
+    val f  = new File(subDir + "/" + fileName)
+    val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
+    val fs = new FileStorage(f) // Note: we create ph before fs, because ph has initialization code.
+    StorageInfo(fs, ph)
+  }      
 
   // TODO: Should use FileStorageReader's (read-only) for old files and 
   // use FileStorage (read & append) for only the most recent/active file.
