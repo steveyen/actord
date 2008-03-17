@@ -223,10 +223,10 @@ class FileStorage(f: File, id: Int) extends FileStorageReader(f) with Storage {
  *
  * TODO: Should read the header, have callbacks to handle old versions/formats, etc.
  */
-class FileWithPermaHeader(
-        f: File, 
-        headerLines: String, 
-        permaMarkerDefault: Array[Byte]) {
+class FileWithPermaHeader(f: File, 
+                          id: Int,
+                          headerLines: String, 
+                          permaMarkerDefault: Array[Byte]) {
   val sizeOfInt = 4
 
   def headerLength = 300
@@ -319,7 +319,7 @@ class FileWithPermaHeader(
       if (mPos == minimumPos)
         StorageLoc(-1, -1L)
       else
-        StorageLoc(0, mPos - sizeOfInt.toLong)
+        StorageLoc(id, mPos - sizeOfInt.toLong)
     } finally {
       raf.close
     }
@@ -384,9 +384,10 @@ abstract class DirStorage(subDir: File) extends Storage {
       fileNames.map(fileName => Pair(fileNameId(fileName), openFile(fileName))):_*)
       
   def openFile(fileName: String) = {
+    val id = fileNameId(fileName)
     val f  = new File(subDir + "/" + fileName)
-    val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
-    val fs = new FileStorage(f, fileNameId(fileName)) // Note: we create ph before fs, because ph has initialization code.
+    val ph = new FileWithPermaHeader(f, id, defaultHeader, defaultPermaMarker)
+    val fs = new FileStorage(f, id) // Note: we create ph before fs, because ph has initialization code.
     FileInfo(fs, ph)
   }
   
@@ -419,6 +420,9 @@ abstract class DirStorage(subDir: File) extends Storage {
     cs(loc.id).fs.readAt(loc, func)
   }
   
+  // TODO: Check the logic to make sure append never gets splits across 
+  //       two files, such as if pushNextFile is called concurrently during append.
+  //
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = fileInfo.fs.append(func)
 
   def appendWithPermaMarker(func: (StorageLoc, StorageLocAppender, Array[Byte]) => Unit): StorageLoc = {
@@ -433,8 +437,9 @@ abstract class DirStorage(subDir: File) extends Storage {
   
   val initialPermaLoc: StorageLoc = 
     (currentFiles.map(x => x._2.permaHeader.scanForPermaMarker(true)). // Scan backwards thru log files, 
-                  filter(_ != StorageLoc(-1, -1L)).                    // and, find the first good permaLoc.
-                  toList ::: (StorageLoc(-1, -1L) :: Nil)).head
+                  filter(_ != StorageLoc(-1, -1L)).                    // and, find the largest good permaLoc.
+                  toList.
+                  sort(_.id > _.id) ::: (StorageLoc(-1, -1L) :: Nil)).head
   
   def close: Unit = 
     synchronized {
