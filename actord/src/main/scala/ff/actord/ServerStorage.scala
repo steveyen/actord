@@ -147,7 +147,8 @@ class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
 // ------------------------------------------------
 
 class MPersister(subServersIn: Seq[MSubServer], // The subServers that this persister will manage.
-                 checkInterval: Int)            // In millisecs, interval to check for dirty data.
+                 checkInterval: Int,            // In millisecs, interval to check for dirty data.
+                 limitFileSize: Long)           // In bytes, max size for each db log file.
   extends Runnable {
   def run { 
     val subServers = subServersIn.map(_.asInstanceOf[MPersistentSubServer])
@@ -169,6 +170,9 @@ class MPersister(subServersIn: Seq[MSubServer], // The subServers that this pers
                 })
     
                 subServer.lastPersistedVersion_!!(v)
+                
+                if (locRoot.position >= limitFileSize)
+                  currTreap.subServerStorage.pushNextFile
               }
           }
       }
