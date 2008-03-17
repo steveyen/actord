@@ -70,7 +70,6 @@ class MPersistentSubServer(override val id: Int,
     //
     val locSize  = subServerStorage.storageLocSize
     val locPerma = subServerStorage.initialPermaLoc
-println(locPerma)
     if (locPerma.id >= 0 &&
         locPerma.position > locSize) {
       val locRoot = subServerStorage.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
