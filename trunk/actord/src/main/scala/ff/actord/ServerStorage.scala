@@ -200,6 +200,16 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
               currTreap.root
               
               // TODO: Implement cleaner/compacter.
+              // Walk through treap nodes, looking at swizzle objects.
+              // If swizzle value loc < minFileId
+              //   If swizzle value value not loaded, load it from old file.
+              //   Save swizzle value value to new loc in most recent file.
+              // Got to make sure concurrent appenders aren't saving locs that point to old files.
+              //
+              // If swizzle left/right loc < minFileId
+              //   If swizzle left/right value not loaded, load it from old file.
+              //   Save swizzle left/right value to new loc in most recent file.
+              // Got to make sure concurrent appenders aren't saving locs that point to old files.
  
               subServer.lastCleanedVersion_!!(v)
           }
