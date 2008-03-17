@@ -212,11 +212,13 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
               //   If we (the cleaner) loaded the value, then unlink it from memory for GC.
               // Got to make sure concurrent appenders aren't saving locs that point to old files.
               //
-              // If swizzle left/right loc < minFileId
-              //   If swizzle left/right value not loaded, load it from old file.
-              //   Save swizzle left/right value to new loc in most recent file.
-              //   If we (the cleaner) loaded the left/right value, then unlink it from memory for GC.
+              // If swizzle self loc < minFileId
+              //   If swizzle self value not loaded, load it from old file.
+              //   Save swizzle self value to new loc in most recent file.
+              //   If we (the cleaner) loaded the self value, then unlink it from memory for GC.
               // Got to make sure concurrent appenders aren't saving locs that point to old files.
+              //
+              // Recurse on node left and right
  
               subServer.lastCleanedVersion_!!(v)
           }
