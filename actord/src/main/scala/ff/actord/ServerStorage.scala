@@ -104,8 +104,48 @@ class MPersistentSubServer(override val id: Int,
   
   def lastPersistedVersion_!!(v: Long) = synchronized { lastPersistedVersion_i = v }
   def lastPersistedVersion: Long       = synchronized { lastPersistedVersion_i }
+
+  /**
+   * Which transient version number/counter was last completely cleaned.
+   */
+  protected var lastCleanedVersion_i: Long = -1L
+  
+  def lastCleanedVersion_!!(v: Long) = synchronized { lastCleanedVersion_i = v }
+  def lastCleanedVersion: Long       = synchronized { lastCleanedVersion_i }
 }
   
+// ------------------------------------------------
+
+class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
+                          override val io: Storage)
+  extends TreapStorable[String, MEntry](root, io) {
+  override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
+    new MEntryTreapStorable(r, io)    
+  
+  def serializeKey(x: String): Array[Byte]     = x.getBytes
+  def unserializeKey(arr: Array[Byte]): String = new String(arr)
+
+  def serializeValue(x: MEntry, loc: StorageLoc, appender: StorageLocAppender): Unit = {
+    val arr = x.key.getBytes
+    appender.appendArray(arr, 0, arr.length)
+    appender.appendLong(x.flags)
+    appender.appendLong(x.expTime)
+    appender.appendArray(x.data, 0, x.data.length)
+    appender.appendLong(x.cid)
+  }
+    
+  def unserializeValue(loc: StorageLoc, reader: StorageLocReader): MEntry = {
+    val key     = new String(reader.readArray)
+    val flags   = reader.readLong
+    val expTime = reader.readLong
+    val data    = reader.readArray
+    val cid     = reader.readLong
+    MEntry(key, flags, expTime, data.size, data, cid)
+  }
+  
+  def rootStorable = root.asInstanceOf[TreapStorableNode[String, MEntry]]
+}
+
 // ------------------------------------------------
 
 class MPersister(subServersIn: Seq[MSubServer], // The subServers that this persister will manage.
@@ -143,33 +183,33 @@ class MPersister(subServersIn: Seq[MSubServer], // The subServers that this pers
 
 // ------------------------------------------------
 
-class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
-                          override val io: Storage)
-  extends TreapStorable[String, MEntry](root, io) {
-  override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
-    new MEntryTreapStorable(r, io)    
+class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleaner will manage.
+               checkInterval: Int)            // In millisecs, interval to run cleaning.
+  extends Runnable {
+  def run { 
+    val subServers = subServersIn.map(_.asInstanceOf[MPersistentSubServer])
   
-  def serializeKey(x: String): Array[Byte]     = x.getBytes
-  def unserializeKey(arr: Array[Byte]): String = new String(arr)
-
-  def serializeValue(x: MEntry, loc: StorageLoc, appender: StorageLocAppender): Unit = {
-    val arr = x.key.getBytes
-    appender.appendArray(arr, 0, arr.length)
-    appender.appendLong(x.flags)
-    appender.appendLong(x.expTime)
-    appender.appendArray(x.data, 0, x.data.length)
-    appender.appendLong(x.cid)
-  }
-    
-  def unserializeValue(loc: StorageLoc, reader: StorageLocReader): MEntry = {
-    val key     = new String(reader.readArray)
-    val flags   = reader.readLong
-    val expTime = reader.readLong
-    val data    = reader.readArray
-    val cid     = reader.readLong
-    MEntry(key, flags, expTime, data.size, data, cid)
-  }
-  
-  def rootStorable = root.asInstanceOf[TreapStorableNode[String, MEntry]]
+    while (true) {
+      val beg = System.currentTimeMillis
+      
+      for (subServer <- subServers) {
+        val (d, v) = subServer.dataWithVersion
+        if (v != subServer.lastCleanedVersion)
+          d match {
+            case currTreap: MEntryTreapStorable => 
+              currTreap.root
+              
+              // TODO: Implement cleaner/compacter.
+ 
+              subServer.lastCleanedVersion_!!(v)
+          }
+      }
+        
+      val end = System.currentTimeMillis
+      val amt = checkInterval - (end - beg)
+      if (amt > 0)
+        Thread.sleep(amt)
+    }
+  } 
 }
 
