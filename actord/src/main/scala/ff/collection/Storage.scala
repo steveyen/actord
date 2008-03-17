@@ -89,8 +89,8 @@ object NullStorageLoc extends StorageLoc(-1, -1L)
  *   in-memory value.
  */
 class StorageSwizzle[S <: AnyRef] {
-  private var loc_i: StorageLoc = null
-  private var value_i: S        = _
+  protected var loc_i: StorageLoc = null
+  protected var value_i: S        = _
 
   def loc: StorageLoc = synchronized { loc_i }
   def loc_!!(x: StorageLoc) = synchronized { 
@@ -115,11 +115,11 @@ class StorageSwizzle[S <: AnyRef] {
  * A simple storage reader that accesses a single file.
  */
 class FileStorageReader(f: File) extends StorageReader {
-  private val raf = new RandomAccessFile(f, "r")
+  protected val raf = new RandomAccessFile(f, "r")
   
   def close = synchronized { raf.close }
   
-  private val reader = new StorageLocReader {
+  protected val reader = new StorageLocReader {
     def readArray: Array[Byte] = {
       val len = raf.readInt
       val arr = new Array[Byte](len)
@@ -162,9 +162,9 @@ class FileStorageReader(f: File) extends StorageReader {
  * TODO: Need a separate sync/lock for read operations than for append operations.
  */
 class FileStorage(f: File) extends FileStorageReader(f) with Storage {
-  private val fos        = new FileOutputStream(f, true)
-  private val fosData    = new DataOutputStream(new BufferedOutputStream(fos))
-  private val fosChannel = fos.getChannel
+  protected val fos        = new FileOutputStream(f, true)
+  protected val fosData    = new DataOutputStream(new BufferedOutputStream(fos))
+  protected val fosChannel = fos.getChannel
   
   override def close = synchronized {
     appender.flush
@@ -172,7 +172,7 @@ class FileStorage(f: File) extends FileStorageReader(f) with Storage {
     super.close
   }
 
-  private val appender = new StorageLocAppender {
+  protected val appender = new StorageLocAppender {
     def appendArray(arr: Array[Byte], offset: Int, len: Int): Unit = {
       fosData.writeInt(len)
       fosData.write(arr, offset, len)
@@ -366,61 +366,72 @@ abstract class DirStorage(subDir: File) extends Storage {
   def fileNameIdPart(fileName: String): String =
       fileName.substring(filePrefix.length, fileName.indexOf("."))
       
-  case class StorageInfo(fs: FileStorage, permaHeader: FileWithPermaHeader)
+  // TODO: Should use FileStorageReader's (read-only) for old files and 
+  // use FileStorage (read & append) for only the most recent/active file.
+  //
+  case class FileInfo(fs: FileStorage, permaHeader: FileWithPermaHeader)
 
-  private var currentStorages: immutable.SortedMap[Int, StorageInfo] = 
-    openStorages(initialFileNames match {
+  protected var currentFiles: immutable.SortedMap[Int, FileInfo] = 
+    openFiles(initialFileNames match {
                    case Nil => List(filePrefix + fileIdPart(fileIdInitial) + fileSuffix)
                    case xs  => xs
                  })
 
-  def openStorages(fileNames: Seq[String]): immutable.SortedMap[Int, StorageInfo] =
-    immutable.TreeMap[Int, StorageInfo](
-      fileNames.map(fileName => Pair(fileNameId(fileName), openStorage(fileName))):_*)
+  def openFiles(fileNames: Seq[String]): immutable.SortedMap[Int, FileInfo] =
+    immutable.TreeMap[Int, FileInfo](
+      fileNames.map(fileName => Pair(fileNameId(fileName), openFile(fileName))):_*)
       
-  def openStorage(fileName: String) = {
+  def openFile(fileName: String) = {
     val f  = new File(subDir + "/" + fileName)
     val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
     val fs = new FileStorage(f) // Note: we create ph before fs, because ph has initialization code.
-    StorageInfo(fs, ph)
-  }      
-
-  // TODO: Should use FileStorageReader's (read-only) for old files and 
-  // use FileStorage (read & append) for only the most recent/active file.
-  //
-  def currentStorageId: Int = synchronized { currentStorages }.lastKey
+    FileInfo(fs, ph)
+  }
   
-  def storageInfo: StorageInfo = {
-    val cs = synchronized { currentStorages }
+  def pushNextFile: Int =
+    synchronized {
+      val nextFileId   = Math.max(0, currentFileId + 1)
+      val nextFileName = filePrefix + fileIdPart(nextFileId) + fileSuffix
+      currentFiles     = currentFiles + (nextFileId -> openFile(nextFileName))
+      nextFileId
+    }
+
+  protected def currentFileId: Int = synchronized { currentFiles }.lastKey
+
+  /**
+   * Returns the FileInfo for the current (newest) appendable log file.
+   */  
+  protected def fileInfo: FileInfo = {
+    val cs = synchronized { currentFiles }
     
-    // Since currentStorages is immutable, we can traverse outside the synchronized.
+    // Since currentFiles is immutable, we can traverse outside the synchronized.
     //
     cs(cs.lastKey)
   }
 
-  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = storageInfo.fs.readAt(loc, func)
-  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = storageInfo.fs.append(func)
+  def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T         = fileInfo.fs.readAt(loc, func)
+  def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = fileInfo.fs.append(func)
 
   def appendWithPermaMarker(func: (StorageLoc, StorageLocAppender, Array[Byte]) => Unit): StorageLoc = {
-    val si = storageInfo 
+    val fi = fileInfo 
     
-    // We grab a snapshot of storageInfo above to avoid race conditions, so
+    // We grab a snapshot of fileInfo above to avoid race conditions, so
     // that we have the right permaMarker associated with the right appender,
     // and can pass it all together to the callback worker func.
     //
-    si.fs.append((loc, appender) => func(loc, appender, si.permaHeader.permaMarker))
+    fi.fs.append((loc, appender) => func(loc, appender, fi.permaHeader.permaMarker))
   }
   
   val initialPermaLoc: StorageLoc = 
-    (currentStorages.map(x => x._2.permaHeader.scanForPermaMarker(true)). // Scan backwards thru log files, 
-                     filter(_ != StorageLoc(-1, -1L)).                    // and, find the first good permaLoc.
-                     toList ::: (StorageLoc(-1, -1L) :: Nil)).head
+    (currentFiles.map(x => x._2.permaHeader.scanForPermaMarker(true)). // Scan backwards thru log files, 
+                  filter(_ != StorageLoc(-1, -1L)).                    // and, find the first good permaLoc.
+                  toList ::: (StorageLoc(-1, -1L) :: Nil)).head
   
   def close: Unit = 
     synchronized {
-      for ((id, si) <- currentStorages) // TODO: Race condition in close with in-flight reads/appends.
+      for ((id, si) <- currentFiles) // TODO: Race condition in close with in-flight reads/appends.
         si.fs.close                     // TODO: Need to wait for current ops to finish first?
-      currentStorages = currentStorages.empty
+      currentFiles = currentFiles.empty
     }
 }
 

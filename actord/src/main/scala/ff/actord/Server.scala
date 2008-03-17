@@ -58,7 +58,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
    * Track an array of MSubServers, meant to locally "shard" the 
    * key/value data across multiple cores.
    */
-  private val subServers = new Array[MSubServer](subServerNum)
+  protected val subServers = new Array[MSubServer](subServerNum)
   for (i <- 0 until subServerNum)
     subServers(i) = createSubServer(i)
     
