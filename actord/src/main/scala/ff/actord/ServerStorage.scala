@@ -85,6 +85,9 @@ class MPersistentSubServer(override val id: Int,
       version_i = Math.max(0L, version_i + 1L)
     }
 
+  /**
+   * A transient counter of how many times the data has changed in memory.
+   */
   protected var version_i: Long = 0L
   def version: Long = synchronized { version_i }
   
@@ -93,6 +96,10 @@ class MPersistentSubServer(override val id: Int,
       Pair(data, version)
     }
   
+  /**
+   * Which transient version number/counter was last completely 
+   * saved or persisted to nonvolatile storage.
+   */
   protected var lastPersistedVersion_i: Long = -1L
   
   def lastPersistedVersion_!!(v: Long) = synchronized { lastPersistedVersion_i = v }
