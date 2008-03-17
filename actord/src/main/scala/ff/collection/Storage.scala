@@ -114,7 +114,9 @@ class StorageSwizzle[S <: AnyRef] {
 /**
  * A simple storage reader that accesses a single file.
  */
-class FileStorageReader(f: File) extends StorageReader {
+class FileStorageReader(f: File, id: Int) extends StorageReader {
+  def this(f: File) = this(f, 0)
+  
   protected val raf = new RandomAccessFile(f, "r")
   
   def close = synchronized { raf.close }
@@ -147,7 +149,7 @@ class FileStorageReader(f: File) extends StorageReader {
   def checkLoc(loc: StorageLoc) = {
     if (loc == null)
       throw new RuntimeException("bad loc during SFS readAt: " + loc)
-    if (loc.id != 0)
+    if (loc.id != id)
       throw new RuntimeException("bad loc id during SFS readAt: " + loc)
     if (loc.position >= raf.length)
       throw new RuntimeException("bad loc position during SFS readAt: " + loc)
@@ -161,7 +163,7 @@ class FileStorageReader(f: File) extends StorageReader {
  *
  * TODO: Need a separate sync/lock for read operations than for append operations.
  */
-class FileStorage(f: File, id: Int) extends FileStorageReader(f) with Storage {
+class FileStorage(f: File, id: Int) extends FileStorageReader(f, id) with Storage {
   def this(f: File) = this(f, 0)
   
   protected val fos        = new FileOutputStream(f, true)
