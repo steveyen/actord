@@ -117,10 +117,10 @@ class MPersistentSubServer(override val id: Int,
 // ------------------------------------------------
 
 class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
-                          override val io: Storage)
-  extends TreapStorable[String, MEntry](root, io) {
+                          val subServerStorage: MSubServerStorage)
+  extends TreapStorable[String, MEntry](root, subServerStorage) {
   override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
-    new MEntryTreapStorable(r, io)    
+    new MEntryTreapStorable(r, subServerStorage)    
   
   def serializeKey(x: String): Array[Byte]     = x.getBytes
   def unserializeKey(arr: Array[Byte]): String = new String(arr)
@@ -162,14 +162,16 @@ class MPersister(subServersIn: Seq[MSubServer], // The subServers that this pers
         if (v != subServer.lastPersistedVersion)
           d match {
             case currTreap: MEntryTreapStorable => 
-              val locRoot = currTreap.appendNode(currTreap.root)
-              
-              subServer.subServerStorage.appendWithPermaMarker((loc, appender, permaMarker) => {
-                appender.appendLoc(locRoot)
-                appender.appendArray(permaMarker, 0, permaMarker.length)
-              })
-  
-              subServer.lastPersistedVersion_!!(v)
+              if (currTreap.subServerStorage == subServer.subServerStorage) {
+                val locRoot = currTreap.appendNode(currTreap.root)
+                
+                currTreap.subServerStorage.appendWithPermaMarker((loc, appender, permaMarker) => {
+                  appender.appendLoc(locRoot)
+                  appender.appendArray(permaMarker, 0, permaMarker.length)
+                })
+    
+                subServer.lastPersistedVersion_!!(v)
+              }
           }
       }
         
