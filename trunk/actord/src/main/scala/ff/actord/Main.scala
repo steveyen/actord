@@ -114,7 +114,7 @@ class MainProg {
     
     val server = createServer(availCpus, limitMem)
     startAcceptor(server, availCpus, port)
-    startPersister(server, 500)
+    startPersister(server, 500, 1000000L)
 
     println("limit memory      : " + limitMem)
     println("available cpus    : " + availCpus)
@@ -138,9 +138,9 @@ class MainProg {
     acceptor
   }
   
-  def startPersister(server: MServer, checkInterval: Int): Unit =
+  def startPersister(server: MServer, checkInterval: Int, limitFileSize: Long): Unit =
     if (storePath != null)
-      new Thread(createPersister(server.subServerList, checkInterval)).start
+      new Thread(createPersister(server.subServerList, checkInterval, limitFileSize)).start
   
   // Here are simple constructors that can be easily overridden by subclasses.
   //
@@ -167,8 +167,8 @@ class MainProg {
     }
   }
   
-  def createPersister(subServers: Seq[MSubServer], checkInterval: Int) =
-    new MPersister(subServers, checkInterval)
+  def createPersister(subServers: Seq[MSubServer], checkInterval: Int, limitFileSize: Long) =
+    new MPersister(subServers, checkInterval, limitFileSize)
     
   // ------------------------------------------------------
 
