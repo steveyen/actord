@@ -215,7 +215,25 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
     }
   } 
   
-  def walk(n: TreapNode[String, MEntry]) = {
+  def walk(node: TreapNode[String, MEntry]): Unit = {
+    node match {
+      case e: TreapEmptyNode[String, MEntry] =>
+      case x: TreapStorableNode[String, MEntry] =>
+        x.synchronized { // TODO: The synchronized block here is huge!
+          if (x.swizzleLeft.value == null) {
+            walk(x.left)
+            x.swizzleLeft.value_!!(null) // TODO: Possible concurrent error here?
+          } else
+            walk(x.left)
+          
+          if (x.swizzleRight.value == null) {
+            walk(x.right)
+            x.swizzleRight.value_!!(null) // TODO: Possible concurrent error here?
+          } else
+            walk(x.right)
+        }
+    }
+  
     // TODO: Implement cleaner/compacter.
     //
     // Walk through treap nodes, looking at swizzle objects.
