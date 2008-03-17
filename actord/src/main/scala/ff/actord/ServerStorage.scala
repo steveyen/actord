@@ -59,27 +59,25 @@ class MSubServerStorage(subDir: File) extends DirStorage(subDir) {
 
 class MPersistentSubServer(override val id: Int, 
                            override val limitMemory: Long, 
-                           checkInterval: Int,             // In millisecs, to check for dirty data.
                            val ss: MSubServerStorage)
   extends MSubServer(id, limitMemory) {
-  override def createSortedMap: immutable.SortedMap[String, MEntry] =
-    startPersistence({
-      val t  = new MEntryTreapStorable(TreapEmptyNode[String, MEntry], ss)
+  override def createSortedMap: immutable.SortedMap[String, MEntry] = {
+    val t  = new MEntryTreapStorable(TreapEmptyNode[String, MEntry], ss)
+    
+    // If the storage has a treap root, load it.
+    //
+    // TODO: What about file versioning?
+    //
+    val locSize  = ss.storageLocSize
+    val locPerma = ss.initialPermaLoc
+    if (locPerma.id >= 0 &&
+        locPerma.position > locSize) {
+      val locRoot = ss.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
       
-      // If the storage has a treap root, load it.
-      //
-      // TODO: What about file versioning?
-      //
-      val locSize  = ss.storageLocSize
-      val locPerma = ss.initialPermaLoc
-      if (locPerma.id >= 0 &&
-          locPerma.position > locSize) {
-        val locRoot = ss.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
-        
-        new MEntryTreapStorable(t.loadNodeAt(locRoot, None), ss)
-      } else
-        t
-    })
+      new MEntryTreapStorable(t.loadNodeAt(locRoot, None), ss)
+    } else
+      t
+  }
     
   override protected def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
     synchronized { 
@@ -96,51 +94,44 @@ class MPersistentSubServer(override val id: Int,
     }
   
   protected var lastPersistedVersion_i: Long = -1L
-  protected def lastPersistedVerison_!!(v: Long) = 
-    synchronized {
-      lastPersistedVersion_i = v
-    }
-  def lastPersistedVersion: Long = 
-    synchronized { 
-      lastPersistedVersion_i 
-    }
   
-  def startPersistence(initialData: immutable.SortedMap[String, MEntry]): 
-                                    immutable.SortedMap[String, MEntry] = {
-    initialData match {
-      case initialTreap: MEntryTreapStorable =>
-        val asyncPersister = new Thread { 
-          override def run { 
-            var prevTreap = initialTreap
-            while (true) {
-              val beg = System.currentTimeMillis
-              val (d, v) = dataWithVersion
-              d match {
-                case currTreap: MEntryTreapStorable => 
-                  if (currTreap != prevTreap) {
-                    val locRoot = currTreap.appendNode(currTreap.root)
-                    
-                    ss.appendWithPermaMarker((loc, appender, permaMarker) => {
-                      appender.appendLoc(locRoot)
-                      appender.appendArray(permaMarker, 0, permaMarker.length)
-                    })
+  def lastPersistedVersion_!!(v: Long) = synchronized { lastPersistedVersion_i = v }
+  def lastPersistedVersion: Long       = synchronized { lastPersistedVersion_i }
+}
+  
+// ------------------------------------------------
 
-                    lastPersistedVerison_!!(v)
-                  }
-                  prevTreap = currTreap
-              }
-              val end = System.currentTimeMillis
-              val amt = checkInterval - (end - beg)
-              if (amt > 0)
-                Thread.sleep(amt)
-            }
-          } 
-        }
-        asyncPersister.start
+class MPersister(subServersIn: Seq[MSubServer],
+                 checkInterval: Int) // In millisecs, to check for dirty data.
+  extends Runnable {
+  def run { 
+    val subServers = subServersIn.map(_.asInstanceOf[MPersistentSubServer])
+  
+    while (true) {
+      val beg = System.currentTimeMillis
+      
+      for (subServer <- subServers) {
+        val (d, v) = subServer.dataWithVersion
+        if (v != subServer.lastPersistedVersion)
+          d match {
+            case currTreap: MEntryTreapStorable => 
+              val locRoot = currTreap.appendNode(currTreap.root)
+              
+              subServer.ss.appendWithPermaMarker((loc, appender, permaMarker) => {
+                appender.appendLoc(locRoot)
+                appender.appendArray(permaMarker, 0, permaMarker.length)
+              })
+  
+              subServer.lastPersistedVersion_!!(v)
+          }
+      }
+        
+      val end = System.currentTimeMillis
+      val amt = checkInterval - (end - beg)
+      if (amt > 0)
+        Thread.sleep(amt)
     }
-
-    initialData // Returns initialData for chainability.
-  }
+  } 
 }
 
 // ------------------------------------------------
