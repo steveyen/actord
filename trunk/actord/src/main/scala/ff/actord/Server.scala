@@ -61,6 +61,8 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   private val subServers = new Array[MSubServer](subServerNum)
   for (i <- 0 until subServerNum)
     subServers(i) = createSubServer(i)
+    
+  def subServerList = subServers.toList
   
   /**
    * Subclasses might override to provide a custom MSubServer.

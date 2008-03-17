@@ -112,7 +112,9 @@ class MainProg {
     
     storePath = getFlagValue(m, "storePath", null)
     
-    startAcceptor(createServer(availCpus, limitMem), availCpus, port)
+    val server = createServer(availCpus, limitMem)
+    startAcceptor(server, availCpus, port)
+    startPersister(server, 500)
 
     println("limit memory      : " + limitMem)
     println("available cpus    : " + availCpus)
@@ -136,6 +138,10 @@ class MainProg {
     acceptor
   }
   
+  def startPersister(server: MServer, checkInterval: Int): Unit =
+    if (storePath != null)
+      new Thread(createPersister(server.subServerList, checkInterval)).start
+  
   // Here are simple constructors that can be easily overridden by subclasses.
   //
   def createHandler(server: MServer): IoHandler = new MHandler(server)
@@ -155,11 +161,14 @@ class MainProg {
     new MServer(numProcessors, limitMem) {
       override def createSubServer(id: Int): MSubServer = 
         if (store != null)
-          new MPersistentSubServer(id, limitMem / subServerNum, 500, store.subStorages(id))
+          new MPersistentSubServer(id, limitMem / subServerNum, store.subStorages(id))
         else
           super.createSubServer(id)
     }
   }
+  
+  def createPersister(subServers: Seq[MSubServer], checkInterval: Int) =
+    new MPersister(subServers, checkInterval)
     
   // ------------------------------------------------------
 
