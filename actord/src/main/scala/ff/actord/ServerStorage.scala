@@ -59,22 +59,22 @@ class MSubServerStorage(subDir: File) extends DirStorage(subDir) {
 
 class MPersistentSubServer(override val id: Int, 
                            override val limitMemory: Long, 
-                           val ss: MSubServerStorage)
+                           val subServerStorage: MSubServerStorage)
   extends MSubServer(id, limitMemory) {
   override def createSortedMap: immutable.SortedMap[String, MEntry] = {
-    val t  = new MEntryTreapStorable(TreapEmptyNode[String, MEntry], ss)
+    val t = new MEntryTreapStorable(TreapEmptyNode[String, MEntry], subServerStorage)
     
     // If the storage has a treap root, load it.
     //
     // TODO: What about file versioning?
     //
-    val locSize  = ss.storageLocSize
-    val locPerma = ss.initialPermaLoc
+    val locSize  = subServerStorage.storageLocSize
+    val locPerma = subServerStorage.initialPermaLoc
     if (locPerma.id >= 0 &&
         locPerma.position > locSize) {
-      val locRoot = ss.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
+      val locRoot = subServerStorage.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
       
-      new MEntryTreapStorable(t.loadNodeAt(locRoot, None), ss)
+      new MEntryTreapStorable(t.loadNodeAt(locRoot, None), subServerStorage)
     } else
       t
   }
@@ -164,7 +164,7 @@ class MPersister(subServersIn: Seq[MSubServer], // The subServers that this pers
             case currTreap: MEntryTreapStorable => 
               val locRoot = currTreap.appendNode(currTreap.root)
               
-              subServer.ss.appendWithPermaMarker((loc, appender, permaMarker) => {
+              subServer.subServerStorage.appendWithPermaMarker((loc, appender, permaMarker) => {
                 appender.appendLoc(locRoot)
                 appender.appendArray(permaMarker, 0, permaMarker.length)
               })
