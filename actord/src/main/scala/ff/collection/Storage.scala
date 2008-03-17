@@ -161,7 +161,9 @@ class FileStorageReader(f: File) extends StorageReader {
  *
  * TODO: Need a separate sync/lock for read operations than for append operations.
  */
-class FileStorage(f: File) extends FileStorageReader(f) with Storage {
+class FileStorage(f: File, id: Int) extends FileStorageReader(f) with Storage {
+  def this(f: File) = this(f, 0)
+  
   protected val fos        = new FileOutputStream(f, true)
   protected val fosData    = new DataOutputStream(new BufferedOutputStream(fos))
   protected val fosChannel = fos.getChannel
@@ -197,7 +199,7 @@ class FileStorage(f: File) extends FileStorageReader(f) with Storage {
 
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc = 
     synchronized {
-      val loc = StorageLoc(0, fosChannel.size)
+      val loc = StorageLoc(id, fosChannel.size)
 
       // We assume the callback func is not holding onto the appender parameter.
       //
@@ -384,7 +386,7 @@ abstract class DirStorage(subDir: File) extends Storage {
   def openFile(fileName: String) = {
     val f  = new File(subDir + "/" + fileName)
     val ph = new FileWithPermaHeader(f, defaultHeader, defaultPermaMarker)
-    val fs = new FileStorage(f) // Note: we create ph before fs, because ph has initialization code.
+    val fs = new FileStorage(f, fileNameId(fileName)) // Note: we create ph before fs, because ph has initialization code.
     FileInfo(fs, ph)
   }
   
@@ -395,7 +397,7 @@ abstract class DirStorage(subDir: File) extends Storage {
       currentFiles     = currentFiles + (nextFileId -> openFile(nextFileName))
       nextFileId
     }
-
+    
   protected def currentFileId: Int = synchronized { currentFiles }.lastKey
 
   /**
