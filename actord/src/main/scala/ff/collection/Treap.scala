@@ -199,7 +199,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
    * Subclasses will definitely want to think about override the
    * default weak hashCode based priority.  Especially, leveraging
    * the treap's heap-based ability to shuffle high-priority nodes
-   * to the top of the tree is useful for higher access performance.
+   * to the top of the tree for higher performance.
    */
   def priority = {
     val h = key.hashCode

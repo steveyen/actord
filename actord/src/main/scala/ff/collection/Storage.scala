@@ -136,7 +136,9 @@ class StorageSwizzle[S <: AnyRef] {
  */
 class FileStorageReader(f: File, id: Int) extends StorageReader {
   def this(f: File) = this(f, 0)
-  
+
+  // TODO: RandomAccessFile is very slow.  Need to roll our own buffering or find a modern alternative.
+  //   
   protected val raf = new RandomAccessFile(f, "r")
   
   def close = synchronized { raf.close }
