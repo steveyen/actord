@@ -96,6 +96,7 @@ object NullStorageLoc extends StorageLoc(-1, -1L)
  * - an unsaved swizzle has a in-memory value but no location yet.
  * - an unloaded swizzle has a storage location, but has null 
  *   in-memory value.
+ * - has both in-memory value and storage location.
  */
 class StorageSwizzle[S <: AnyRef] {
   protected var loc_i: StorageLoc = null
