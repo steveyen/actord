@@ -95,25 +95,28 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
   // --------------------------------------------
   
-  // TODO: Need separate locks for readers/loaders versus writers/savers,
-  //       so that readers never get blocked by slow writers.
-  //
-  def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = 
-    s.synchronized {
-      if (s.value != null)
-          s.value
+  def swizzleLoadNode(s: StorageSwizzle[TreapNode[A, B]]): TreapNode[A, B] = {
+    val loc = s.loc // Captured before the following synch block to avoid deadlocks.
+    s.valueSync.synchronized {
+      val v = s.value
+      if (v != null)
+          v
       else 
-          s.value_!!(loadNodeAt(s.loc, Some(s)))
+          s.value_!!(loadNodeAt(loc, Some(s)))
     }
+  }
       
-  def swizzleSaveNode(s: StorageSwizzle[TreapNode[A, B]]): StorageLoc = 
-    s.synchronized {
-      if (s.loc != null &&
-          io.storageLocRefresh(s.loc) == false)
-          s.loc
+  def swizzleSaveNode(s: StorageSwizzle[TreapNode[A, B]]): StorageLoc = {
+    val v = s.value // Captured before the following synch block to avoid deadlocks.
+    s.locSync.synchronized {
+      val loc = s.loc
+      if (loc != null &&
+          io.storageLocRefresh(loc) == false)
+          loc
       else
-          s.loc_!!(appendNode(s.value))
+          s.loc_!!(appendNode(v))
     }
+  }
     
   // --------------------------------------------
   
@@ -179,22 +182,28 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
   // --------------------------------------------
   
-  def swizzleLoadValue(s: StorageSwizzle[B]): B = 
-    s.synchronized {
-      if (s.value != null)
-          s.value
+  def swizzleLoadValue(s: StorageSwizzle[B]): B = {
+    val loc = s.loc // Captured before the following synch block to avoid deadlocks.
+    s.valueSync.synchronized {
+      val v = s.value
+      if (v != null)
+          v
       else
-          s.value_!!(loadValueAt(s.loc))
+          s.value_!!(loadValueAt(loc))
     }
+  }
 
-  def swizzleSaveValue(s: StorageSwizzle[B]): StorageLoc = 
-    s.synchronized {
-      if (s.loc != null &&
-          io.storageLocRefresh(s.loc) == false)
-          s.loc
+  def swizzleSaveValue(s: StorageSwizzle[B]): StorageLoc = {
+    val v = s.value // Captured before the following synch block to avoid deadlocks.
+    s.locSync.synchronized {
+      val loc = s.loc
+      if (loc != null &&
+          io.storageLocRefresh(loc) == false)
+          loc
       else 
-          s.loc_!!(appendValue(s.value))
+          s.loc_!!(appendValue(v))
     }
+  }
 
   // --------------------------------------------
   
