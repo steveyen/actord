@@ -202,7 +202,7 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
           d match {
             case currTreap: MEntryTreapStorable => 
               if (currTreap.subServerStorage == subServer.subServerStorage) {
-                walk(currTreap.root)           
+                walk(currTreap, 0, currTreap.root)           
                 subServer.lastCleanedVersion_!!(v)
               }
           }
@@ -215,23 +215,33 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
     }
   } 
   
-  def walk(node: TreapNode[String, MEntry]): Unit = {
+  def walk(treap: MEntryTreapStorable, minFileId: Int, node: TreapNode[String, MEntry]): Unit =
     node match {
       case e: TreapEmptyNode[String, MEntry] =>
       case x: TreapStorableNode[String, MEntry] =>
-        x.synchronized { // TODO: The synchronized block here is huge!
-          if (x.swizzleLeft.value == null) {
-            walk(x.left)
-            x.swizzleLeft.value_!!(null) // TODO: Possible concurrent error here?
-          } else
-            walk(x.left)
-          
-          if (x.swizzleRight.value == null) {
-            walk(x.right)
-            x.swizzleRight.value_!!(null) // TODO: Possible concurrent error here?
-          } else
-            walk(x.right)
+        val loc = x.swizzleValue.loc
+        if (loc != null &&
+            loc.id < minFileId) {
+            val vLoaded = x.swizzleValue.value != null
+            val v       = x.value // Forces a load, if not already loaded.
+            
+            x.swizzleValue.loc_!!(null)
+            
+            if (vLoaded == false)
+              x.swizzleValue.value_!!(null)
         }
+      
+        val lLoaded = x.swizzleLeft.value != null
+        walk(treap, minFileId, x.left)
+        if (lLoaded == false &&
+            x.swizzleLeft.loc != null)
+            x.swizzleLeft.value_!!(null) // TODO: Possible concurrent error here?
+        
+        val rLoaded = x.swizzleRight.value != null
+        walk(treap, minFileId, x.right)
+        if (rLoaded == false &&
+            x.swizzleRight.loc != null)
+            x.swizzleRight.value_!!(null) // TODO: Possible concurrent error here?
     }
   
     // TODO: Implement cleaner/compacter.
@@ -250,6 +260,5 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
     // Got to make sure concurrent appenders aren't saving locs that point to old files.
     //
     // Recurse on node left and right
-  }
 }
 
