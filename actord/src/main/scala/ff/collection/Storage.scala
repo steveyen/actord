@@ -131,32 +131,41 @@ class StorageSwizzle[S <: AnyRef] {
 
 // ---------------------------------------------------------
 
+class RAInputStream(raf: RandomAccessFile) extends InputStream {
+  override def read                                     = raf.read
+  override def read(b: Array[Byte])                     = raf.read(b)
+  override def read(b: Array[Byte], off: Int, len: Int) = raf.read(b, off, len)
+}
+
+// ---------------------------------------------------------
+
 /**
  * A simple storage reader that accesses a single file.
  */
 class FileStorageReader(f: File, id: Int) extends StorageReader {
   def this(f: File) = this(f, 0)
+  
+  protected val raf = new RandomAccessFile(f, "r") 
 
-  // TODO: RandomAccessFile is very slow.  Need to roll our own buffering or find a modern alternative.
-  //   
-  protected val raf = new RandomAccessFile(f, "r")
+  protected val ris: RAInputStream   = new RAInputStream(raf)
+  protected var dis: DataInputStream = null
   
   def close = synchronized { raf.close }
   
   protected val reader = new StorageLocReader {
     def readArray: Array[Byte] = {
-      val len = raf.readInt
+      val len = dis.readInt
       val arr = new Array[Byte](len)
-      raf.readFully(arr)
+      dis.readFully(arr)
       arr
     }
         
-    def readLoc: StorageLoc = StorageLoc(raf.readInt, raf.readLong)
-    def readUTF: String     = raf.readUTF
-    def readByte: Byte      = raf.readByte
-    def readShort: Short    = raf.readShort
-    def readInt: Int        = raf.readInt
-    def readLong: Long      = raf.readLong
+    def readLoc: StorageLoc = StorageLoc(dis.readInt, dis.readLong)
+    def readUTF: String     = dis.readUTF
+    def readByte: Byte      = dis.readByte
+    def readShort: Short    = dis.readShort
+    def readInt: Int        = dis.readInt
+    def readLong: Long      = dis.readLong
   }
   
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T = {
@@ -164,7 +173,10 @@ class FileStorageReader(f: File, id: Int) extends StorageReader {
 
     synchronized {
       raf.seek(loc.position)
-      func(reader)
+      dis = new DataInputStream(new BufferedInputStream(ris)) // TODO: Reduce throwaway garbage.
+      val result = func(reader)
+      dis = null
+      result
     }
   }
   
