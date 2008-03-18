@@ -99,24 +99,34 @@ object NullStorageLoc extends StorageLoc(-1, -1L)
  * - has both in-memory value and storage location.
  */
 class StorageSwizzle[S <: AnyRef] {
-  protected var loc_i: StorageLoc = null
   protected var value_i: S        = _
+  protected var loc_i: StorageLoc = null
 
-  def loc: StorageLoc = synchronized { loc_i }
-  def loc_!!(x: StorageLoc) = synchronized { 
+  def value: S       = valueSync.synchronized { value_i }
+  def value_!!(x: S) = valueSync.synchronized { 
+    if (x != null && value_i != null)
+      throw new RuntimeException("cannot overwrite an existing swizzle value")
+    value_i = x
+    value_i
+  }
+  
+  def loc: StorageLoc       = locSync.synchronized { loc_i }
+  def loc_!!(x: StorageLoc) = locSync.synchronized { 
     if (x != null && loc_i != null)
       throw new RuntimeException("cannot overwrite an existing swizzle loc")
     loc_i = x
     loc_i 
   }
 
-  def value: S = synchronized { value_i }
-  def value_!!(x: S) = synchronized { 
-    if (x != null && value_i != null)
-      throw new RuntimeException("cannot overwrite an existing swizzle value")
-    value_i = x
-    value_i
-  }
+  // We have separate sync monitors for the loc and value slots,
+  // for more concurrency.
+  //
+  // Be careful about deadlocks, though, during nested locking code.
+  //  
+  def valueSync = this
+  def locSync   = locSyncObj
+
+  protected val locSyncObj = new Object
 }
 
 // ---------------------------------------------------------
