@@ -102,7 +102,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       if (v != null)
           v
       else 
-          s.value_!!(loadNodeAt(loc, Some(s)))
+          loadNodeAt(loc, Some(s))
     }
   }
       
@@ -150,15 +150,21 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
       swizzleRight.loc_!!(locRight)
 
       val swizzleSelf = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
+        
+      val result = TreapStorableNode[A, B](this, 
+                                           key, 
+                                           swizzleValue,
+                                           swizzleSelf,
+                                           swizzleLeft,
+                                           swizzleRight)
+
       if (swizzleSelf.loc == null)
           swizzleSelf.loc_!!(loc)
-      
-      TreapStorableNode[A, B](this, 
-                              key, 
-                              swizzleValue,
-                              swizzleSelf,
-                              swizzleLeft,
-                              swizzleRight)
+          
+      if (swizzleSelf.value == null)
+          swizzleSelf.value_!!(result)
+                               
+      result
     }
   }
   
