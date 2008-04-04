@@ -79,7 +79,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   /**
    * Subclasses might override to provide a better hashing.
    */
-  def subServerIdForKey(key: String) = key.hashCode % subServerNum   
+  def subServerIdForKey(key: String) = Math.abs(key.hashCode) % subServerNum
   
   // --------------------------------------------------
 

@@ -130,7 +130,7 @@ class MainProg {
     val codecFactory = createCodecFactory
 
     codecFactory.addMessageDecoder(createMessageDecoder)
-    codecFactory.addMessageEncoder(classOf[List[MResponse]], createMessageEncoder)
+    codecFactory.addMessageEncoder[List[MResponse]](classOf[List[MResponse]], createMessageEncoder)
     
     acceptor.getFilterChain.
              addLast("codec", createCodecFilter(codecFactory))  
@@ -146,8 +146,8 @@ class MainProg {
   //
   def createHandler(server: MServer): IoHandler = new MHandler(server)
   def createAcceptor(numProcessors: Int): IoAcceptor   = new NioSocketAcceptor(numProcessors)
-  def createMessageDecoder: MessageDecoder = new MDecoder
-  def createMessageEncoder: MessageEncoder = new MEncoder
+  def createMessageDecoder: MessageDecoder[List[MResponse]] = new MDecoder
+  def createMessageEncoder: MessageEncoder[List[MResponse]] = new MEncoder
   def createCodecFactory: DemuxingProtocolCodecFactory     = new DemuxingProtocolCodecFactory
   def createCodecFilter(f: ProtocolCodecFactory): IoFilter = new ProtocolCodecFilter(f)
   
