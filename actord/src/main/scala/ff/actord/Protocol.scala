@@ -434,9 +434,9 @@ class MDecoder extends MessageDecoder {
 
 // -------------------------------------------------------
 
-class MEncoder extends MessageEncoder {
-	def encode(session: IoSession, message: Object, out: ProtocolEncoderOutput) {
-	  val resList = message.asInstanceOf[List[MResponse]]
+class MEncoder extends MessageEncoder[List[MResponse]] {
+	def encode(session: IoSession, message: List[MResponse], out: ProtocolEncoderOutput) {
+	  val resList = message // .asInstanceOf[List[MResponse]]
     val bufMax  = resList.foldLeft(0)((max, next) => Math.max(max, next.size))
     val buf     = IoBuffer.allocate(bufMax)
 
