@@ -219,28 +219,32 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
     node match {
       case e: TreapEmptyNode[String, MEntry] =>
       case x: TreapStorableNode[String, MEntry] =>
-        val loc = x.swizzleValue.loc
-        if (loc != null &&
-            loc.id < minFileId) {
+        val emptyNodeLoc = treap.emptyNodeLoc
+
+        val vloc = x.swizzleValue.loc
+        if (vloc != null &&
+            treap.io.storageLocRefresh(vloc)) {
             val vLoaded = x.swizzleValue.value != null
-            val v       = x.value // Forces a load, if not already loaded.
-            
-            x.swizzleValue.loc_!!(null)
-            
+            treap.swizzleSaveValue(x.swizzleValue)          
             if (vLoaded == false)
               x.swizzleValue.value_!!(null)
         }
       
+        val sloc = x.swizzleSelf.loc
+        if (sloc != null &&
+            treap.io.storageLocRefresh(sloc))
+            treap.swizzleSaveNode(x.swizzleSelf)          
+
         val lLoaded = x.swizzleLeft.value != null
         walk(treap, minFileId, x.left)
         if (lLoaded == false &&
-            x.swizzleLeft.loc != null)
+            x.swizzleLeft.loc != emptyNodeLoc)
             x.swizzleLeft.value_!!(null) // TODO: Possible concurrent error here?
-        
+
         val rLoaded = x.swizzleRight.value != null
         walk(treap, minFileId, x.right)
         if (rLoaded == false &&
-            x.swizzleRight.loc != null)
+            x.swizzleRight.loc != emptyNodeLoc)
             x.swizzleRight.value_!!(null) // TODO: Possible concurrent error here?
     }
   
