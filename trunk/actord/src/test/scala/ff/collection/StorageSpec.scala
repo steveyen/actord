@@ -26,7 +26,7 @@ class  StorageSpecTest   extends JUnit3(StorageSpec)
 object StorageSpecRunner extends ConsoleRunner(StorageSpec)
 object StorageSpec extends Specification {
   "FileStorage" should {
-    "should be empty after create" in {
+    "be empty after create" in {
       val f = File.createTempFile("test_sfs", ".tmp")
       val s = new FileStorage(f)
       val loc = s.append((loc, appender) => appender.appendUTF("hello"))
@@ -36,7 +36,7 @@ object StorageSpec extends Specification {
       f.delete
     }
         
-    "should handle simple appends and reads" in {
+    "handle simple appends and reads" in {
       val f = File.createTempFile("test_sfs1", ".tmp")
       val s = new FileStorage(f)
       val loc = s.append((loc, appender) => appender.appendUTF("hello"))
@@ -65,7 +65,7 @@ object StorageSpec extends Specification {
       f.delete
     }
 
-    "should handle loc append/read" in {
+    "handle loc append/read" in {
       val f = File.createTempFile("test_sfs2", ".tmp")
       val s = new FileStorage(f)
 
@@ -100,7 +100,7 @@ object StorageSpec extends Specification {
       f.delete
     }
 
-    "should handle byte append/read" in {
+    "handle byte append/read" in {
       val f = File.createTempFile("test_sfs3", ".tmp")
       val s = new FileStorage(f)
 
