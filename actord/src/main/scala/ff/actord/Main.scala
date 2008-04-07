@@ -84,7 +84,9 @@ class MainProg {
    * Start a server, parsing command-line arguments.
    */
   def start(args: Array[String]) {
-    val flagValueList = parseFlags(args)
+    import MainFlag._
+    
+    val flagValueList = parseFlags(args, flagSpecs)
 
     for (FlagValue(spec, values) <- flagValueList) {
       if (spec == FLAG_ERR) {
@@ -224,56 +226,4 @@ class MainProg {
 //           "-P <filename>" :: Nil,
 //           "Print pidfile to <filename>, only used under -d option.")
   )
-  
-  // ------------------------------------------------------
-
-  /**
-   * Parse the flags on a command-line.  The returned list
-   * might have an entry of FlagValue(FLAG_ERR, ...) to signal 
-   * a parsing error for a particular parameter.
-   */
-  def parseFlags(args: Array[String]): List[FlagValue] = {
-    val xs = (" " + args.mkString(" ")). // " -a 1 -b -c 2"
-               split(" -")               // ["", "a 1", "b", "c 2"]
-    if (xs.headOption.
-           map(_.trim.length > 0).
-           getOrElse(false))
-      List(FlagValue(FLAG_ERR, xs.toList))
-    else
-      xs.drop(1).                        // ["a 1", "b", "c 2"]
-         toList.
-         map(arg => { 
-           val argParts = ("-" + arg).split(" ").toList
-           flagSpecs.find(_.flags.contains(argParts(0))).
-                     map(spec => if (spec.check(argParts))
-                                   FlagValue(spec, argParts.tail)
-                                 else
-                                   FlagValue(FLAG_ERR, argParts)).
-                     getOrElse(FlagValue(FLAG_ERR, argParts))
-         })
-  }
-  
-  def getFlagValue(flagValues: immutable.Map[String, FlagValue],
-                   flagName: String, defaultVal: String) =
-    flagValues.get(flagName).map(_.value.head).getOrElse(defaultVal)
-  
-  case class FlagValue(spec: FlagSpec, value: List[String])
-
-  case class FlagSpec(name: String, specs: List[String], description: String) {
-    val flags = specs.map(_.split(" ")(0))
-    
-    def check(argParts: List[String]) = 
-      specs.filter(
-        spec => { 
-          val specParts = spec.split(" ")
-          specParts(0) == argParts(0) && 
-          specParts.length == argParts.length
-        }
-      ).isEmpty == false
-  }
-
-  /**
-   * A sentinel singleton that signals parseFlags errors.
-   */  
-  val FLAG_ERR = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")
 }
