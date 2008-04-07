@@ -45,7 +45,8 @@ object MServer {
  * MSubServer instance.  
  *
  * We ideally want the MServer/MSubServer classes to be 
- * independent of transport or wire protocol.
+ * independent of transport or wire protocol.  So grep'ing this 
+ * file should produce zero transport/wire dependencies.
  */
 class MServer(val subServerNum: Int,   // Number of internal "shards" for this server.
               val limitMemory: Long) { // Measured in bytes.
