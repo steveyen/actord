@@ -22,7 +22,7 @@ import scala.collection._
  * Concrete subclasses need to implement serialize/unserialize
  * of keys and values.
  */
-abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
+abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
   override val root: TreapNode[A, B],
   val io: Storage)
   extends Treap[A, B](root)
@@ -41,12 +41,12 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
     valSwizzle.value_!!(value)
     
-    val node = TreapStorableNode(this, 
-                                 key, 
-                                 valSwizzle, 
-                                 nodeSwizzle, 
-                                 emptyNodeSwizzle,
-                                 emptyNodeSwizzle)
+    val node = StorageTreapNode(this, 
+                                key, 
+                                valSwizzle, 
+                                nodeSwizzle, 
+                                emptyNodeSwizzle,
+                                emptyNodeSwizzle)
                                  
     nodeSwizzle.value_!!(node)
     
@@ -56,12 +56,12 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
   override def mkNode(basis: TreapFullNode[A, B], 
                       left:  TreapNode[A, B], 
                       right: TreapNode[A, B]): TreapNode[A, B] = basis match {
-    case TreapStorableNode(t, k, sv, oldSelf, oldLeft, oldRight) =>
+    case StorageTreapNode(t, k, sv, oldSelf, oldLeft, oldRight) =>
       if (t.io != this.io)
         throw new RuntimeException("treap io mismatch")
 
       val nodeSwizzle = new StorageSwizzle[TreapNode[A, B]]
-      val node        = TreapStorableNode(this, k, sv, 
+      val node        = StorageTreapNode(this, k, sv, 
                           nodeSwizzle,
                           mkNodeSwizzle(left,  oldLeft), 
                           mkNodeSwizzle(right, oldRight))
@@ -77,7 +77,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
     else next match {
       case e: TreapEmptyNode[A, B] =>
         emptyNodeSwizzle
-      case x: TreapStorableNode[A, B] =>
+      case x: StorageTreapNode[A, B] =>
         x.swizzleSelf
     }
 
@@ -151,12 +151,12 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
 
       val swizzleSelf = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
         
-      val result = TreapStorableNode[A, B](this, 
-                                           key, 
-                                           swizzleValue,
-                                           swizzleSelf,
-                                           swizzleLeft,
-                                           swizzleRight)
+      val result = StorageTreapNode[A, B](this, 
+                                          key, 
+                                          swizzleValue,
+                                          swizzleSelf,
+                                          swizzleLeft,
+                                          swizzleRight)
 
       if (swizzleSelf.loc == null)
           swizzleSelf.loc_!!(loc)
@@ -172,7 +172,7 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
     value match {
       case e: TreapEmptyNode[A, B] =>
         emptyNodeLoc
-      case x: TreapStorableNode[A, B] =>
+      case x: StorageTreapNode[A, B] =>
         val keyArr   = serializeKey(x.key)
         val locValue = swizzleSaveValue(x.swizzleValue)
         val locLeft  = swizzleSaveNode(x.swizzleLeft)
@@ -229,8 +229,8 @@ abstract class TreapStorable[A <% Ordered[A], B <: AnyRef](
  * A treap node that's potentially stored to nonvolatile/persistent 
  * storage.  So, it's evictable from memory.
  */
-case class TreapStorableNode[A <% Ordered[A], B <: AnyRef](
-  t: TreapStorable[A, B],
+case class StorageTreapNode[A <% Ordered[A], B <: AnyRef](
+  t: StorageTreap[A, B],
   key: A,
   swizzleValue: StorageSwizzle[B],
   swizzleSelf:  StorageSwizzle[TreapNode[A, B]],
