@@ -453,6 +453,9 @@ class MEncoder extends MessageEncoder[List[MResponse]] {
 
 // -------------------------------------------------------
 
+/**
+ * Represents an incoming command or request from a (remote) client.
+ */
 case class MCommand(args: Array[String], entry: MEntry) {
   def noReply = args.last == "noreply"
   
@@ -470,11 +473,18 @@ case class MCommand(args: Array[String], entry: MEntry) {
 
 // -------------------------------------------------------
 
+/**
+ * Abstract base class that represents a reply or response to processing a MCommand.
+ * One MCommand can result in a List of MResponse.
+ */
 abstract class MResponse {
   def size: Int
   def put(buf: IoBuffer): Unit
 }
 
+/**
+ * A response of a String of a single line.
+ */
 case class MResponseLine(line: String) extends MResponse {
   def size = line.length + CRNL.length
 
@@ -484,6 +494,9 @@ case class MResponseLine(line: String) extends MResponse {
   }
 }
 
+/**
+ * A response of a String of a single line, followed by a single MEntry data bytes.
+ */
 case class MResponseLineEntry(line: String, entry: MEntry) extends MResponse {
   def size = line.length    + CRNL.length +
              entry.dataSize + CRNL.length
