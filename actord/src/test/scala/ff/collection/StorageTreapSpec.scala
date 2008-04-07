@@ -22,14 +22,14 @@ import scala.collection._
 
 import java.io._
 
-class  TreapStorableSpecTest   extends JUnit3(TreapStorableSpec)
-object TreapStorableSpecRunner extends ConsoleRunner(TreapStorableSpec)
-object TreapStorableSpec extends Specification {
+class  StorageTreapSpecTest   extends JUnit3(StorageTreapSpec)
+object StorageTreapSpecRunner extends ConsoleRunner(StorageTreapSpec)
+object StorageTreapSpec extends Specification {
   val empty = TreapEmptyNode[String, String]
 
   class TS(override val root: TreapNode[String, String],
            override val io: Storage)
-    extends TreapStorable[String, String](root, io) {
+    extends StorageTreap[String, String](root, io) {
     override def mkTreap(r: TreapNode[String, String]): Treap[String, String] = 
       new TS(r, io)    
     
@@ -44,10 +44,10 @@ object TreapStorableSpec extends Specification {
     def unserializeValue(loc: StorageLoc, reader: StorageLocReader): String = 
       new String(reader.readArray)
     
-    def rootStorable = root.asInstanceOf[TreapStorableNode[String, String]]
+    def rootStorable = root.asInstanceOf[StorageTreapNode[String, String]]
   }
   
-  def assertInMemOnly(n: TreapStorableNode[String, String], k: String, v: String) = {
+  def assertInMemOnly(n: StorageTreapNode[String, String], k: String, v: String) = {
     k must_== n.key
     v must_== n.value
     n.swizzleValue.loc   must be(null)
@@ -56,7 +56,7 @@ object TreapStorableSpec extends Specification {
     n.swizzleSelf.value  must_== n
   }
   
-  def assertHasLoc(n: TreapStorableNode[String, String]) = {
+  def assertHasLoc(n: StorageTreapNode[String, String]) = {
     n.swizzleSelf.loc          must notBe(null)
     n.swizzleSelf.loc.position must beStrictlyGreaterThan(0L)
     n.swizzleSelf.value        must be_==(n)
@@ -70,7 +70,7 @@ object TreapStorableSpec extends Specification {
     (f, s, t)
   }
 
-  "TreapStorable" should {
+  "StorageTreap" should {
     "be empty after creation" in {
       var (f, s, t) = prep
       try {
@@ -100,7 +100,7 @@ object TreapStorableSpec extends Specification {
         swz.loc_!!(t.rootStorable.swizzleSelf.loc)
         swz.value mustEqual(null)
 
-        val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
+        val n = t.swizzleLoadNode(swz).asInstanceOf[StorageTreapNode[String, String]]
         t.count mustEqual(1L)
         "top" mustEqual(t.root.firstKey)
         "top" mustEqual(t.root.lastKey)
@@ -125,25 +125,25 @@ object TreapStorableSpec extends Specification {
         assertInMemOnly(t.rootStorable, "3", "333")
         assertInMemOnly(t.rootStorable.
                           left.
-                          asInstanceOf[TreapStorableNode[String, String]], 
+                          asInstanceOf[StorageTreapNode[String, String]], 
                         "2", "222")
         assertInMemOnly(t.rootStorable.
                           left.
-                          asInstanceOf[TreapStorableNode[String, String]].
+                          asInstanceOf[StorageTreapNode[String, String]].
                           left.
-                          asInstanceOf[TreapStorableNode[String, String]], 
+                          asInstanceOf[StorageTreapNode[String, String]], 
                         "1", "111")
 
         t.swizzleSaveNode(t.rootStorable.swizzleSelf)
         assertHasLoc(t.rootStorable)
         assertHasLoc(t.rootStorable.
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
         assertHasLoc(t.rootStorable.
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]].
+                       asInstanceOf[StorageTreapNode[String, String]].
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
 
         t.rootStorable.swizzleValue.loc.position mustEqual(0L)
         "333" mustEqual(t.rootStorable.value)
@@ -153,7 +153,7 @@ object TreapStorableSpec extends Specification {
         swz.loc_!!(t.rootStorable.swizzleSelf.loc)
         swz.value mustEqual(null)
 
-        val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
+        val n = t.swizzleLoadNode(swz).asInstanceOf[StorageTreapNode[String, String]]
         3L  mustEqual(t.count)
         "1" mustEqual(t.root.firstKey)
         "3" mustEqual(t.root.lastKey)
@@ -165,28 +165,28 @@ object TreapStorableSpec extends Specification {
 
         assertHasLoc(n)
         assertHasLoc(n.left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
         assertHasLoc(n.left.
-                       asInstanceOf[TreapStorableNode[String, String]].
+                       asInstanceOf[StorageTreapNode[String, String]].
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
 
         "2" mustEqual(n.left.
-                        asInstanceOf[TreapStorableNode[String, String]].
+                        asInstanceOf[StorageTreapNode[String, String]].
                         key)
         "1" mustEqual(n.left.
-                        asInstanceOf[TreapStorableNode[String, String]].
+                        asInstanceOf[StorageTreapNode[String, String]].
                         left.
-                        asInstanceOf[TreapStorableNode[String, String]].
+                        asInstanceOf[StorageTreapNode[String, String]].
                         key)
 
         "222" mustEqual(n.left.
-                          asInstanceOf[TreapStorableNode[String, String]].
+                          asInstanceOf[StorageTreapNode[String, String]].
                           value)
         "111" mustEqual(n.left.
-                          asInstanceOf[TreapStorableNode[String, String]].
+                          asInstanceOf[StorageTreapNode[String, String]].
                           left.
-                          asInstanceOf[TreapStorableNode[String, String]].
+                          asInstanceOf[StorageTreapNode[String, String]].
                           value)
       } finally {
         s.close        
@@ -206,12 +206,12 @@ object TreapStorableSpec extends Specification {
         assertHasLoc(t.rootStorable)
         assertHasLoc(t.rootStorable.
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
         assertHasLoc(t.rootStorable.
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]].
+                       asInstanceOf[StorageTreapNode[String, String]].
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
 
         t.rootStorable.swizzleValue.loc.position mustEqual(0L)
                      
@@ -225,12 +225,12 @@ object TreapStorableSpec extends Specification {
         assertHasLoc(t2.rootStorable)
         assertHasLoc(t2.rootStorable.
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
         assertHasLoc(t2.rootStorable.
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]].
+                       asInstanceOf[StorageTreapNode[String, String]].
                        left.
-                       asInstanceOf[TreapStorableNode[String, String]])
+                       asInstanceOf[StorageTreapNode[String, String]])
 
         val f2Length = f.length
         val intSize = 4 // in bytes
@@ -250,16 +250,16 @@ object TreapStorableSpec extends Specification {
         swz.loc_!!(t2.rootStorable.swizzleSelf.loc)
         swz.value mustEqual(null)
         
-        val n = t.swizzleLoadNode(swz).asInstanceOf[TreapStorableNode[String, String]]
+        val n = t.swizzleLoadNode(swz).asInstanceOf[StorageTreapNode[String, String]]
         3L  mustEqual(n.count)
         "1" mustEqual(t.root.firstKey)
         "3" mustEqual(t.root.lastKey)
         empty mustEqual(n.lookup(t, "0"))
-        var x = n.lookup(t, "3").asInstanceOf[TreapStorableNode[String, String]]
+        var x = n.lookup(t, "3").asInstanceOf[StorageTreapNode[String, String]]
         "345" mustEqual(x.value)
-        x = n.lookup(t, "2").asInstanceOf[TreapStorableNode[String, String]]
+        x = n.lookup(t, "2").asInstanceOf[StorageTreapNode[String, String]]
         "222" mustEqual(x.value)          
-        x = n.lookup(t, "1").asInstanceOf[TreapStorableNode[String, String]]
+        x = n.lookup(t, "1").asInstanceOf[StorageTreapNode[String, String]]
         "111" mustEqual(x.value)          
       } finally {
         s.close        

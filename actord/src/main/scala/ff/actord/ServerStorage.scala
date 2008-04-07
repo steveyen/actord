@@ -65,7 +65,7 @@ class MPersistentSubServer(override val id: Int,
                            val subServerStorage: MSubServerStorage)
   extends MSubServer(id, limitMemory) {
   override def createSortedMap: immutable.SortedMap[String, MEntry] = {
-    val t = new MEntryTreapStorable(TreapEmptyNode[String, MEntry], subServerStorage)
+    val t = new MEntryStorageTreap(TreapEmptyNode[String, MEntry], subServerStorage)
     
     // If the storage has a treap root, load it.
     //
@@ -77,7 +77,7 @@ class MPersistentSubServer(override val id: Int,
         locPerma.position > locSize) {
       val locRoot = subServerStorage.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
       
-      new MEntryTreapStorable(t.loadNodeAt(locRoot, None), subServerStorage)
+      new MEntryStorageTreap(t.loadNodeAt(locRoot, None), subServerStorage)
     } else
       t
   }
@@ -119,11 +119,11 @@ class MPersistentSubServer(override val id: Int,
   
 // ------------------------------------------------
 
-class MEntryTreapStorable(override val root: TreapNode[String, MEntry],
-                          val subServerStorage: MSubServerStorage)
-  extends TreapStorable[String, MEntry](root, subServerStorage) {
+class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
+                         val subServerStorage: MSubServerStorage)
+  extends StorageTreap[String, MEntry](root, subServerStorage) {
   override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
-    new MEntryTreapStorable(r, subServerStorage)    
+    new MEntryStorageTreap(r, subServerStorage)    
   
   def serializeKey(x: String): Array[Byte]     = x.getBytes
   def unserializeKey(arr: Array[Byte]): String = new String(arr)
@@ -163,7 +163,7 @@ class MPersister(subServersIn: Seq[MSubServer], // The subServers that this pers
         val (d, v) = subServer.dataWithVersion
         if (v != subServer.lastPersistedVersion)
           d match {
-            case currTreap: MEntryTreapStorable => 
+            case currTreap: MEntryStorageTreap => 
               if (currTreap.subServerStorage == subServer.subServerStorage) {
                 val locRoot = currTreap.appendNode(currTreap.root)
                 
@@ -203,7 +203,7 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
         val (d, v) = subServer.dataWithVersion
         if (v != subServer.lastCleanedVersion)
           d match {
-            case currTreap: MEntryTreapStorable => 
+            case currTreap: MEntryStorageTreap => 
               if (currTreap.subServerStorage == subServer.subServerStorage) {
                 walk(currTreap, 0, currTreap.root)           
                 subServer.lastCleanedVersion_!!(v)
@@ -218,10 +218,10 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
     }
   } 
   
-  def walk(treap: MEntryTreapStorable, minFileId: Int, node: TreapNode[String, MEntry]): Unit =
+  def walk(treap: MEntryStorageTreap, minFileId: Int, node: TreapNode[String, MEntry]): Unit =
     node match {
       case e: TreapEmptyNode[String, MEntry] =>
-      case x: TreapStorableNode[String, MEntry] =>
+      case x: StorageTreapNode[String, MEntry] =>
         val emptyNodeLoc = treap.emptyNodeLoc
 
         val vloc = x.swizzleValue.loc
