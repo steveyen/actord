@@ -53,6 +53,9 @@ class MServerStorage(dir: File, numSubServers: Int) {
 class MSubServerStorage(subDir: File) extends DirStorage(subDir) {
   def defaultHeader      = "# actord data file, format: binary-0.0.1\n\n"
   def defaultPermaMarker = "a#Fq9a2b3Kh5sYf8x001".getBytes
+  
+  // TODO: Need to scan for the above bytes (but that would be SLOW) for safety.
+  //       So, peversely, we cannot correctly store this actord source file into actord!
 }
 
 // ------------------------------------------------
