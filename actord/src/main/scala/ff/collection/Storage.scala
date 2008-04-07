@@ -26,7 +26,27 @@ class StorageException(m: String) extends Exception(m)
  * The interface abstracts away underlying details of actual files,
  * whether single or multiple, whether auto-rotated, compacted, encrypted, etc.
  */
+trait Storage extends StorageReader with StorageAppender {
+  def storageLocSize: Int = 4 + 8 /* sizeof(int) + sizeof(long) */
+  
+  /**
+   * Return true if a given loc should be re-saved again,
+   * since the loc might point to an valid, but ancient location.
+   * That is, the loc might point to an old file that needs to be compacted.
+   *
+   * Subclasses that implement multiple, rotated storage files 
+   * can override this method to provide cleanup/vacuum behavior.
+   */
+  def storageLocRefresh(loc: StorageLoc): Boolean = false
+}
+
 trait StorageReader {
+  /**
+   * Clients can call readAt, providing a loc and a func/callback.
+   * The func/callback is passed a managed StorageLocReader that is
+   * good only for the duration of the func/callback invocation.
+   * The managed StorageLocReader provides access to the bytes at the required loc.
+   */
   def readAt[T](loc: StorageLoc, func: StorageLocReader => T): T
   def close: Unit
   
@@ -34,21 +54,16 @@ trait StorageReader {
 }
 
 trait StorageAppender {
+  /**
+   * Clients can call append, providing a func/callback.
+   * The func/callback is passed a StorageLoc and a managed StorageLocAppender.
+   * The StorageLocAppender instance is good only for the duration of the 
+   * func/callback invocation.  The StorageLoc points to the location 
+   * where any bytes will be written/appended, and can be saved or held
+   * by the func/callback code for a future StorageReader#readAt call.
+   */
   def append(func: (StorageLoc, StorageLocAppender) => Unit): StorageLoc
   def close: Unit
-}
-
-trait Storage extends StorageReader with StorageAppender {
-  def storageLocSize: Int = 4 + 8 /* sizeof(int) + sizeof(long) */
-  
-  /**
-   * Return true if a given loc should be re-saved again,
-   * since the loc might point to an valid, but ancient location.
-   *
-   * Subclasses that implement multiple, rotated storage files 
-   * can override this method to provide cleanup/vacuum behavior.
-   */
-  def storageLocRefresh(loc: StorageLoc): Boolean = false
 }
 
 // ---------------------------------------------------------
