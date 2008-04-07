@@ -106,13 +106,20 @@ class MainProg {
       }
     }
     
-    val m = immutable.Map(flagValueList.map(x => (x.spec.name -> x)):_*)
-    
-    val port      = getFlagValue(m, "port",     "11211").toInt
-    val limitMem  = getFlagValue(m, "limitMem", "64"   ).toLong * 1024L * 1024L
+    start(immutable.Map(flagValueList.map(x => (x.spec.name -> x.value)):_*))
+  }
+  
+  def start(args: immutable.Map[String, List[String]]) {
+    def arg(flagName: String, defaultVal: String) =
+      args.get(flagName).
+           flatMap(_.headOption).
+           getOrElse(defaultVal)
+  
+    val port      = arg("port",     "11211").toInt
+    val limitMem  = arg("limitMem", "64"   ).toLong * 1024L * 1024L
     val availCpus = Runtime.getRuntime.availableProcessors
     
-    storePath = getFlagValue(m, "storePath", null)
+    storePath = arg("storePath", null)
     
     val server = createServer(availCpus, limitMem)
 

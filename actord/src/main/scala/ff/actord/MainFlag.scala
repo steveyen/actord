@@ -48,10 +48,6 @@ object MainFlag
          })
   }
   
-  def getFlagValue(flagValues: immutable.Map[String, FlagValue],
-                   flagName: String, defaultVal: String) =
-    flagValues.get(flagName).map(_.value.head).getOrElse(defaultVal)
-
   /**
    * A sentinel singleton that signals parseFlags errors.
    */  
