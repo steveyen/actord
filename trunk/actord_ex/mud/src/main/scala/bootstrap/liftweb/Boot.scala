@@ -8,7 +8,7 @@ import Helpers._
 import net.liftweb.mapper.{DB, ConnectionManager, Schemifier, DefaultConnectionIdentifier, ConnectionIdentifier}
 import java.sql.{Connection, DriverManager}
 import ff.mud.model._
- 
+
 /**
   * A class that's instantiated early and run.  It allows the application
   * to modify lift's environment
@@ -16,8 +16,10 @@ import ff.mud.model._
 class Boot {
   def boot {
     if (!DB.jndiJdbcConnAvailable_?) DB.defineConnectionManager(DefaultConnectionIdentifier, DBVendor)
+
     // where to search snippet
     LiftRules.addToPackages("ff.mud")     
+
     Schemifier.schemify(true, Log.infoF _, User)
 
     LiftRules.addTemplateBefore(User.templates)
@@ -25,7 +27,11 @@ class Boot {
     // Build SiteMap
     val entries = Menu(Loc("Home", "/", "Home")) :: User.sitemap
     LiftRules.setSiteMap(SiteMap(entries:_*))
+
     S.addAround(User.requestLoans)
+
+    // Exercise actord    
+    new ff.actord.MainProg().start(new Array[String](0))
   }
 }
 
