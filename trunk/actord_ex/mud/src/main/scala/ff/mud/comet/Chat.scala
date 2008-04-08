@@ -15,6 +15,7 @@ import JsCmds._
 class Chat(initInfo: CometActorInitInfo) extends CometActor(initInfo) {
   private var userName = ""
   private var currentData: List[ChatLine] = Nil
+
   def defaultPrefix = "chat"
 
   private lazy val infoId = uniqueId + "_info"
@@ -27,13 +28,14 @@ class Chat(initInfo: CometActorInitInfo) extends CometActor(initInfo) {
 
   override def lowPriority = {
     case ChatServerUpdate(value) =>
-    (value diff currentData) match {
-      case Nil =>
-      case diff => partialUpdate(diff.reverse.foldLeft(Noop)((a, b) => a & AppendHtml(infoId, line(b))))
-    }
-
-    currentData = value
+      (value diff currentData) match {
+        case Nil =>
+        case diff => partialUpdate(diff.reverse.foldLeft(Noop)((a, b) => a & AppendHtml(infoId, line(b))))
+      }
+      currentData = value
   }
+
+  def line(cl: ChatLine) = (<li>{hourFormat(cl.when)} {cl.user}: {cl.msg}</li>)
 
   override lazy val fixedRender: Can[NodeSeq] = {
     val n = "id" + randomString(10)
@@ -41,7 +43,7 @@ class Chat(initInfo: CometActorInitInfo) extends CometActor(initInfo) {
              (text("", sendMessage _) % ("id" -> n)) ++ <input type="submit" value="Chat"/> )
   }
 
-  def line(cl: ChatLine) = (<li>{hourFormat(cl.when)} {cl.user}: {cl.msg}</li>)
+  def sendMessage(msg: String) = server ! ChatServerMsg(userName, msg.trim)
 
   override def render = 
     <span>Hello "{userName}"
@@ -57,6 +59,4 @@ class Chat(initInfo: CometActorInitInfo) extends CometActor(initInfo) {
       }
     }
   }
-
-  def sendMessage(msg: String) = server ! ChatServerMsg(userName, msg.trim)
 }
