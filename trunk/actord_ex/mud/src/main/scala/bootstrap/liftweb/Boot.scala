@@ -25,7 +25,10 @@ class Boot {
     LiftRules.addTemplateBefore(User.templates)
 
     // Build SiteMap
-    val entries = Menu(Loc("Home", "/", "Home")) :: User.sitemap
+    val entries = 
+      Menu(Loc("Home", "/",     "Home")) :: 
+      Menu(Loc("Chat", "/chat", "Chat")) :: 
+      User.sitemap
     LiftRules.setSiteMap(SiteMap(entries:_*))
 
     S.addAround(User.requestLoans)
