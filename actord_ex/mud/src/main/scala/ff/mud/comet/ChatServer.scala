@@ -10,19 +10,8 @@ import net.liftweb.textile.TextileParser
 import scala.xml.Text
 import java.util.Date
 
-/**
- * A chat server.  It gets messages and returns them
- */
 class ChatServer extends Actor {
   def act = loop(Nil, Nil)
-
-  def toHtml(msg: String): NodeSeq = 
-    TextileParser.parse(msg, Empty).            // parse it
-                  map(_.toHtml.toList match {   // convert to html and get the first child (to avoid things being wrapped in <p>)
-                        case Nil => Nil 
-                        case x :: xs => x.child
-                      }). 
-                  getOrElse(Text(msg)) // if it wasn't parsable, then just return a Text node of the message
 
   def loop(chat: List[ChatLine], sessions: List[Actor]) {
     react {
@@ -41,6 +30,14 @@ class ChatServer extends Actor {
       case _ => loop(chat, sessions)
     }
   }
+
+  def toHtml(msg: String): NodeSeq = 
+    TextileParser.parse(msg, Empty).            // parse it
+                  map(_.toHtml.toList match {   // convert to html and get the first child (to avoid things being wrapped in <p>)
+                        case Nil => Nil 
+                        case x :: xs => x.child
+                      }). 
+                  getOrElse(Text(msg)) // if it wasn't parsable, then just return a Text node of the message
 }
 
 object ChatServer {
