@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
- xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
- xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
- <modelVersion>4.0.0</modelVersion>
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
 
- <groupId>actord</groupId>
- <artifactId>actord</artifactId>
- <packaging>jar</packaging>
- <name>actord</name>
- <version>0.1.0</version>
+  <groupId>ff.actord</groupId>
+  <artifactId>actord</artifactId>
+  <name>actord</name>
+  <version>0.1.0</version>
+  <packaging>jar</packaging>
 
   <properties>
     <scala.version>2.7.0</scala.version>
@@ -28,15 +28,15 @@
     </repository>
   </repositories>
 
- <pluginRepositories>
-  <pluginRepository>
-   <id>scala-tools.org</id>
-   <name>Scala Maven2 Repository</name>
-   <url>http://scala-tools.org/repo-releases</url>
-  </pluginRepository>
- </pluginRepositories>
+  <pluginRepositories>
+   <pluginRepository>
+    <id>scala-tools.org</id>
+    <name>Scala Maven2 Repository</name>
+    <url>http://scala-tools.org/repo-releases</url>
+   </pluginRepository>
+  </pluginRepositories>
 
- <dependencies>
+  <dependencies>
     <dependency>
       <groupId>scala</groupId>
       <artifactId>scala-library</artifactId>
@@ -68,9 +68,9 @@
       <version>1.2.5</version>
       <scope>test</scope>
     </dependency>
- </dependencies>
+  </dependencies>
 
- <build>
+  <build>
     <sourceDirectory>src/main/scala</sourceDirectory>
     <testSourceDirectory>src/test/scala</testSourceDirectory>
     <plugins>
@@ -91,14 +91,14 @@
         </configuration>
       </plugin>
     </plugins>
- </build>
+  </build>
 
- <reporting>
+  <reporting>
     <plugins>
       <plugin>
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
       </plugin>
     </plugins>
- </reporting>
+  </reporting>
 </project>
