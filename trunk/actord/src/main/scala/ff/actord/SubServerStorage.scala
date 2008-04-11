@@ -52,10 +52,10 @@ class MServerStorage(dir: File, numSubServers: Int) {
 
 class MSubServerStorage(subDir: File) extends DirStorage(subDir) {
   def defaultHeader      = "# actord data file, format: binary-0.0.1\n\n"
-  def defaultPermaMarker = "a#Fq9a2b3Kh5sYf8x001".getBytes
+  def defaultPermaMarker = ("a#Fq9a2b3" + "Kh5sYf8x001").getBytes
   
-  // TODO: Need to scan for the above bytes (but that would be SLOW) for safety.
-  //       So, peversely, we cannot correctly store this actord source file into actord!
+  // Note: we split the above magic permaMarker string just in case someone
+  //       perversely wants to store this source file into actord.
 }
 
 // ------------------------------------------------
@@ -157,12 +157,7 @@ class MPersister(subServersIn: Seq[MSubServer], // The subServers that this pers
           d match {
             case currTreap: MEntryStorageTreap => 
               if (currTreap.subServerStorage == subServer.subServerStorage) {
-                val locRoot = currTreap.appendNode(currTreap.root)
-                
-                currTreap.subServerStorage.appendWithPermaMarker((loc, appender, permaMarker) => {
-                  appender.appendLoc(locRoot)
-                  appender.appendArray(permaMarker, 0, permaMarker.length)
-                })
+                val locRoot = currTreap.appendRootNode(currTreap.subServerStorage)
     
                 subServer.lastPersistedVersion_!!(v)
                 
