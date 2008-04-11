@@ -1,14 +1,14 @@
-Collection classes for actord-d.
---------------------------------
+README for collection classes for actord-d.
+-------------------------------------------
 
-Source: 
+2207/04/11 - README created, steve.yen
 
-  http://code.google.com/p/actord/source/browse/trunk/actord/src/main/scala/ff/collection
+http://code.google.com/p/actord/source/browse/trunk/actord/src/main/scala/ff/collection
 
 Includes a basic, persistent, scala.collection.immutable.SortedMap 
 class.  It's based on a Treap data structure, which implements 
 scala.collection.immutable.SortedMap.  You can use the Treap 
-on its own, as a memory-only non-persistent data structure.
+on its own, as a memory-only, non-persistent data structure.
 
 Persistence is provided by a StorageTreap subclass and works by 
 appending to the end of a (binary, non-textual) log file.  
@@ -16,10 +16,11 @@ Log files are optionally 'rotatable', so you can end up
 with a series of log files to hold all your data.  
 
 The data in the StorageTreap can be dynamically, 
-partially swizzled in-and-out of memory to persistent storage.  
+partially swizzled in-and-out of memory to persistent storage
+if you want to reclaim memory.
 
 To use it, subclass StorageTreap and implement your own key 
-and value serialization methods.  Keys and valuds can be any 
+and value serialization methods.  Keys and values can be any 
 parametrized types.
 
 Here's a String key and String value example...
@@ -28,8 +29,7 @@ Here's a String key and String value example...
 
   class MyStuff(
       override val root: TreapNode[String, String], 
-      override val s: Storage
-  ) 
+      override val s: Storage) 
       extends StorageTreap[String, String](root, s) 
   {
     def serializeKey(x: String) = x.getBytes
@@ -50,9 +50,9 @@ Here's a String key and String value example...
       new MyStuff(r, s)       
   }
 
-You also have to define a Storage class.  Here is a DirStorage 
-subclass, which provides rotatable log files (many log 
-storage files in a directory).
+You also have to define a Storage class.  Here, I use a 
+DirStorage subclass, which provides rotatable log 
+files (many log/storage files in a directory).
 
   import java.io.File
 
