@@ -19,7 +19,8 @@ The data in the StorageTreap can be dynamically,
 partially swizzled in-and-out of memory to persistent storage.  
 
 To use it, subclass StorageTreap and implement your own key 
-and value serialization methods.  
+and value serialization methods.  Keys and valuds can be any 
+parametrized types.
 
 Here's a String key and String value example...
 
@@ -50,8 +51,8 @@ Here's a String key and String value example...
   }
 
 You also have to define a Storage class.  Here is a DirStorage 
-subclass, in order to get rotatable log files (many log 
-files in a directory).
+subclass, which provides rotatable log files (many log 
+storage files in a directory).
 
   import java.io.File
 
@@ -71,11 +72,13 @@ To load MyStuff from storage...
 
   var mySortedMap: scala.collection.immutable.SortedMap = myStuff
 
-To save MyStuff out to storage...
+To save MyStuff out to storage, which will only saved out 
+changed key/value node information...
 
   myStuff.appendRootNode(s)
 
-To 'rotate' or start a new log file...
+To 'rotate' (or add) a new log file once the current log file 
+gets too big...
 
   s.pushNextFile
 
