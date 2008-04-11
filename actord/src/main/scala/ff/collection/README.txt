@@ -74,10 +74,19 @@ To load MyStuff from storage...
 
   var mySortedMap: scala.collection.immutable.SortedMap = myStuff
 
-To save MyStuff out to storage, which will only saved out 
-changed key/value node information...
+To manipulate data, use the scala.collection.immutable.SortedMap
+interface methods...
 
-  myStuff.appendRootNode(s)
+  mySortedMap = mySortedMap + ("name" -> "steve")
+  mySortedMap = mySortedMap + ("site" -> "www.somesite.com")
+  mySortedMap = mySortedMap - "spam"
+
+To save it all out to storage...
+
+  mySortedMap.asInstanceOf[MyStuff].appendRootNode(s)
+
+Successive calls to appendRootNode() will only append
+changed/delta key-value information.
 
 To 'rotate' (or add) a new log file once the current log file 
 gets too big...
