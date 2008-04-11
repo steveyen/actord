@@ -17,13 +17,17 @@ appending to the end of a (binary, non-textual) log file.
 Log files are optionally 'rotatable', so you can end up 
 with a series of log files to hold all your data.  
 
-The data in the StorageTreap can be dynamically, 
-partially swizzled in-and-out of memory to persistent storage
-if you want to reclaim memory.
+During loads, the StorageTreap lazily reads key-value-nodes 
+into memory from the storage log(s).  During saves, only changed 
+key-value-nodes are appended out to the current storage log. 
 
-To use it, subclass StorageTreap and implement your own key 
+Advanced: the data in the StorageTreap can be dynamically 
+optionally swizzled out of memory and written to persistent 
+storage if you're under memory pressure.  
+
+Usage: just subclass StorageTreap and implement your own key 
 and value serialization methods.  Keys and values can be any 
-parametrized types.
+parameterized types.
 
 Here's a String key and String value example...
 
@@ -81,12 +85,18 @@ interface methods...
   mySortedMap = mySortedMap + ("site" -> "www.somesite.com")
   mySortedMap = mySortedMap - "spam"
 
-To save it all out to storage...
+To save your changes out to storage...
 
   mySortedMap.asInstanceOf[MyStuff].appendRootNode(s)
 
-Successive calls to appendRootNode() will only append
-changed/delta key-value information.
+For basic, naive crash safety during saves, a save operation is 
+not complete until a magic set of bytes, called the permaMarker, 
+is appended to the log.  When reloading, the StorageTreap code
+scans backwards for the latest complete permaMarker to find the 
+last good root node record of the treap, and any partially written 
+bytes after that last permaMarker is truncated.  Here we make 
+gigantic simplifying assumptions about the stability and 
+corruption behavior of append-only files.
 
 To 'rotate' (or add) a new log file once the current log file 
 gets too big...
