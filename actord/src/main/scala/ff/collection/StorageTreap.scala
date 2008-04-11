@@ -241,6 +241,17 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
     } else
       None
   }  
+  
+  def appendRootNode(s: StorageWithPermaMarker): StorageLoc = {
+    val locRoot = this.appendNode(root)
+                
+    s.appendWithPermaMarker((loc, appender, permaMarker) => {
+      appender.appendLoc(locRoot)
+      appender.appendArray(permaMarker, 0, permaMarker.length)
+    })
+    
+    locRoot
+  }
 }
 
 // ---------------------------------------------------------
