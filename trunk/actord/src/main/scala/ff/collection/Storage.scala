@@ -274,10 +274,10 @@ class FileStorage(f: File, id: Int) extends FileStorageReader(f, id) with Storag
  *
  * TODO: Should read the header, have callbacks to handle old versions/formats, etc.
  */
-class FileWithPermaHeader(f: File, 
-                          id: Int,
-                          headerLines: String, 
-                          permaMarkerDefault: Array[Byte]) {
+class FileWithPermaMarkerHeader(f: File, 
+                                id: Int,
+                                headerLines: String, 
+                                permaMarkerDefault: Array[Byte]) {
   val sizeOfInt = 4
 
   def headerLength = 300
@@ -379,6 +379,13 @@ class FileWithPermaHeader(f: File,
 
 // ---------------------------------------------------------
 
+trait StorageWithPermaMarker extends Storage {
+  def appendWithPermaMarker(func: (StorageLoc, StorageLocAppender, Array[Byte]) => Unit): StorageLoc
+  def initialPermaMarkerLoc: StorageLoc
+}
+
+// ---------------------------------------------------------
+
 /**
  * A storage implementation that tracks multiple db log files in a directory,
  * appending to the most recent file, but reading from any active log file.  
@@ -390,7 +397,7 @@ class FileWithPermaHeader(f: File,
  *
  * TODO: Need a separate sync/lock for read operations than for append operations.
  */
-abstract class DirStorage(subDir: File) extends Storage {
+abstract class DirStorage(subDir: File) extends StorageWithPermaMarker {
   def filePrefix    = "db_"
   def fileSuffix    = ".log" // An append-only db log file.
   def fileIdInitial = 0
@@ -422,7 +429,7 @@ abstract class DirStorage(subDir: File) extends Storage {
   // TODO: Should use FileStorageReader's (read-only) for old files and 
   // use FileStorage (read & append) for only the most recent/active file.
   //
-  case class FileInfo(fs: FileStorage, permaHeader: FileWithPermaHeader)
+  case class FileInfo(fs: FileStorage, permaMarkerHeader: FileWithPermaMarkerHeader)
 
   protected var currentFiles: immutable.SortedMap[Int, FileInfo] = 
     openFiles(initialFileNames match {
@@ -437,7 +444,7 @@ abstract class DirStorage(subDir: File) extends Storage {
   def openFile(fileName: String) = {
     val id = fileNameId(fileName)
     val f  = new File(subDir + "/" + fileName)
-    val ph = new FileWithPermaHeader(f, id, defaultHeader, defaultPermaMarker)
+    val ph = new FileWithPermaMarkerHeader(f, id, defaultHeader, defaultPermaMarker)
     val fs = new FileStorage(f, id) // Note: we create ph before fs, because ph has initialization code.
     FileInfo(fs, ph)
   }
@@ -483,12 +490,12 @@ abstract class DirStorage(subDir: File) extends Storage {
     // that we have the right permaMarker associated with the right appender,
     // and can pass it all together to the callback worker func.
     //
-    fi.fs.append((loc, appender) => func(loc, appender, fi.permaHeader.permaMarker))
+    fi.fs.append((loc, appender) => func(loc, appender, fi.permaMarkerHeader.permaMarker))
   }
   
-  val initialPermaLoc: StorageLoc = 
-    (currentFiles.map(x => x._2.permaHeader.scanForPermaMarker(true)). // Scan backwards thru log files, 
-                  filter(_ != StorageLoc(-1, -1L)).                    // and, find the largest good permaLoc.
+  val initialPermaMarkerLoc: StorageLoc = 
+    (currentFiles.map(x => x._2.permaMarkerHeader.scanForPermaMarker(true)). // Scan backwards thru log files, 
+                  filter(_ != StorageLoc(-1, -1L)).                          // and, find the largest good permaMarkerLoc.
                   toList.
                   sort(_.id > _.id) ::: (StorageLoc(-1, -1L) :: Nil)).head
   
