@@ -5,10 +5,10 @@ Source:
 
   http://code.google.com/p/actord/source/browse/trunk/actord/src/main/scala/ff/collection
 
-Includes an basic, persistent, scala.collection.immutable.SortedMap 
+Includes a basic, persistent, scala.collection.immutable.SortedMap 
 class.  It's based on a Treap data structure, which implements 
-scala.collection.immutable.SortedMap.  You can use the Treap o
-n its own, as a memory-only non-persistent data structure.
+scala.collection.immutable.SortedMap.  You can use the Treap 
+on its own, as a memory-only non-persistent data structure.
 
 Persistence is provided by a StorageTreap subclass and works by 
 appending to the end of a (binary, non-textual) log file.  
