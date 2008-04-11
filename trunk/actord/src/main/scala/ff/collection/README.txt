@@ -5,8 +5,10 @@ README for collection classes for actord-d.
 
 http://code.google.com/p/actord/source/browse/trunk/actord/src/main/scala/ff/collection
 
-Includes a basic, persistent, scala.collection.immutable.SortedMap 
-class.  It's based on a Treap data structure, which implements 
+This package includes a basic, persistent, open-source
+scala.collection.immutable.SortedMap class.  
+
+It's based on a Treap data structure, which implements 
 scala.collection.immutable.SortedMap.  You can use the Treap 
 on its own, as a memory-only, non-persistent data structure.
 
