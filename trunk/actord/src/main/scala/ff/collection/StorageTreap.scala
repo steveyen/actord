@@ -221,6 +221,26 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
 
   def appendValue(value: B): StorageLoc = 
     io.append((loc, appender) => serializeValue(value, loc, appender))
+
+  // --------------------------------------------
+  
+  /**
+   * Find the last good treap root in the storage, as marked 
+   * by the last permaLoc, and load it.
+   *
+   * TODO: What about file versioning?
+   */
+  def loadRootNode(s: DirStorage): Option[TreapNode[A, B]] = {
+    val locSize  = s.storageLocSize
+    val locPerma = s.initialPermaLoc
+    if (locPerma.id >= 0 &&
+        locPerma.position > locSize) {
+      val locRoot = s.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
+      
+      Some(loadNodeAt(locRoot, None))
+    } else
+      None
+  }  
 }
 
 // ---------------------------------------------------------

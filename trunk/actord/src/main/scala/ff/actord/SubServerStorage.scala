@@ -67,19 +67,11 @@ class MPersistentSubServer(override val id: Int,
   override def createSortedMap: immutable.SortedMap[String, MEntry] = {
     val t = new MEntryStorageTreap(TreapEmptyNode[String, MEntry], subServerStorage)
     
-    // If the storage has a treap root, load it.
-    //
     // TODO: What about file versioning?
     //
-    val locSize  = subServerStorage.storageLocSize
-    val locPerma = subServerStorage.initialPermaLoc
-    if (locPerma.id >= 0 &&
-        locPerma.position > locSize) {
-      val locRoot = subServerStorage.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
-      
-      new MEntryStorageTreap(t.loadNodeAt(locRoot, None), subServerStorage)
-    } else
-      t
+    t.loadRootNode(subServerStorage).
+      map(r => new MEntryStorageTreap(r, subServerStorage)).
+      getOrElse(t)
   }
     
   override protected def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
