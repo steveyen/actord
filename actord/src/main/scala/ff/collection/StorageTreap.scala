@@ -230,9 +230,9 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
    *
    * TODO: What about file versioning?
    */
-  def loadRootNode(s: DirStorage): Option[TreapNode[A, B]] = {
+  def loadRootNode(s: StorageWithPermaMarker): Option[TreapNode[A, B]] = {
     val locSize  = s.storageLocSize
-    val locPerma = s.initialPermaLoc
+    val locPerma = s.initialPermaMarkerLoc
     if (locPerma.id >= 0 &&
         locPerma.position > locSize) {
       val locRoot = s.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
