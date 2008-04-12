@@ -8,12 +8,13 @@ http://code.google.com/p/actord/source/browse/trunk/actord/src/main/scala/ff/col
 This package includes a basic, persistent, open-source
 scala.collection.immutable.SortedMap class.  
 
-It's based on a Treap data structure, which implements 
-scala.collection.immutable.SortedMap.  You can use the Treap 
-on its own, as a memory-only, non-persistent data structure.
+It's based on a binary treap data structure, implemented 
+by the Treap base class.  The Treap class provides a 
+scala.collection.immutable.SortedMap interface and
+can be used as a memory-only data structure.
 
-Persistence is provided by a StorageTreap subclass and works by 
-appending to the end of a (binary, non-textual) log file.  
+Persistence to storage is provided by a StorageTreap subclass and 
+works by appending to the end of a (binary, non-textual) log file.  
 Log files are optionally 'rotatable', so you can end up 
 with a series of log files to hold all your data.  
 
@@ -21,7 +22,7 @@ During loads, the StorageTreap lazily reads key-value-nodes
 into memory from the storage log(s).  During saves, only changed 
 key-value-nodes are appended out to the current storage log. 
 
-Advanced: the data in the StorageTreap can be dynamically 
+Advanced: subsets of data in the StorageTreap can be dynamically 
 optionally swizzled out of memory and written to persistent 
 storage if you're under memory pressure.  
 
@@ -56,7 +57,7 @@ Here's a String key and String value example...
       new MyStuff(r, s)       
   }
 
-You also have to define a Storage class.  Here, I use a 
+You also have to define a Storage subclass.  Here, I use a 
 DirStorage subclass, which provides rotatable log 
 files (many log/storage files in a directory).
 
@@ -71,12 +72,12 @@ To load MyStuff from storage...
 
   val s = new MyStorage(new java.io.File("/tmp/stuff/"))
 
-  val emptyStuff = new MyStuff(TreapEmptyNode[String, String], s)
-  var myStuff = emptyStuff.loadRootNode(s).
-                           map(root => new MyStuff(root, s)).
-                           getOrElse(emptyStuff)
+  val empty = new MyStuff(TreapEmptyNode[String, String], s)
 
-  var mySortedMap: scala.collection.immutable.SortedMap = myStuff
+  var mySortedMap: scala.collection.immutable.SortedMap = 
+        empty.loadRootNode(s).
+              map(root => new MyStuff(root, s)).
+              getOrElse(empty)
 
 To manipulate data, use the scala.collection.immutable.SortedMap
 interface methods...
@@ -90,13 +91,14 @@ To save your changes out to storage...
   mySortedMap.asInstanceOf[MyStuff].appendRootNode(s)
 
 For basic, naive crash safety during saves, a save operation is 
-not complete until a magic set of bytes, called the permaMarker, 
+not complete until a magic set of bytes, called a permaMarker, 
 is appended to the log.  When reloading, the StorageTreap code
-scans backwards for the latest complete permaMarker to find the 
-last good root node record of the treap, and any partially written 
-bytes after that last permaMarker is truncated.  Here we make 
-gigantic simplifying assumptions about the stability and 
-corruption behavior of append-only files.
+scans backwards through the log files for the latest complete 
+permaMarker to find the last good root node record of the treap, 
+and any partially written log bytes after that last permaMarker 
+are truncated away.  In this simple design, we make gigantic 
+assumptions about the stability and corruption behavior 
+of append-only files.
 
 To 'rotate' (or add) a new log file once the current log file 
 gets too big...
