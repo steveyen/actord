@@ -50,12 +50,12 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   def intersect(that: TreapNode[A, B]): Treap[A, B] = mkTreap(root.intersect(this, that))
   def diff(that: TreapNode[A, B]): Treap[A, B]      = mkTreap(root.diff(this, that))
   
-  lazy val count = root.count // TODO: Revisit treap size/count.
+  lazy val count = root.count // TODO: Revisit treap size/count. 
 
   def size: Int = count.toInt
 
   override def empty[C]: immutable.SortedMap[A, C] = 
-    throw new RuntimeException("TODO: empty method is unimplemented")
+    throw new RuntimeException("TODO: treap empty method is unimplemented")
   
   override def get(key: A): Option[B] = 
     root.lookup(this, key) match {
@@ -71,7 +71,7 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   override def update[B1 >: B](key: A, value: B1): immutable.SortedMap[A, B1] =
     value match {
       case v: B => upd(key, v)
-      case _ => throw new RuntimeException("TODO: update on type B1 unimplemented")
+      case _ => throw new RuntimeException("TODO: wrong treap update type")
     }
   
   def upd(key: A, value: B): Treap[A, B] =  
@@ -196,10 +196,10 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def value: B
   
   /**
-   * Subclasses will definitely want to think about override the
-   * default weak hashCode based priority.  Especially, leveraging
-   * the treap's heap-based ability to shuffle high-priority nodes
-   * to the top of the tree for higher performance.
+   * Subclasses will definitely want to consider overriding this
+   * weak priority calculation.  Consider, for example, leveraging
+   * the treap's heap-like ability to shuffle high-priority 
+   * nodes to the top of the heap for faster access.
    */
   def priority = {
     val h = key.hashCode
