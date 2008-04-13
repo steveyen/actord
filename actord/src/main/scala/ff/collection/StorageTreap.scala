@@ -33,6 +33,17 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
   def serializeValue(x: B, loc: StorageLoc, appender: StorageLocAppender): Unit
   def unserializeValue(loc: StorageLoc, reader: StorageLocReader): B
   
+  /**
+   * Subclasses will definitely want to consider overriding this
+   * weak priority calculation.  Consider, for example, leveraging
+   * the treap's heap-like ability to shuffle high-priority 
+   * nodes to the top of the heap for faster access.
+   */
+  def priority(node: StorageTreapNode[A, B]) = {
+    val h = node.key.hashCode
+    ((h << 16) & 0xffff0000) | ((h >> 16) & 0x0000ffff)
+  }
+  
   // --------------------------------------------
 
   override def mkLeaf(key: A, value: B) = {
@@ -41,12 +52,11 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
 
     valSwizzle.value_!!(value)
     
-    val node = StorageTreapNode(this, 
-                                key, 
-                                valSwizzle, 
-                                nodeSwizzle, 
-                                emptyNodeSwizzle,
-                                emptyNodeSwizzle)
+    val node = mkNode(key, 
+                      valSwizzle, 
+                      nodeSwizzle, 
+                      emptyNodeSwizzle,
+                      emptyNodeSwizzle)
                                  
     nodeSwizzle.value_!!(node)
     
@@ -61,13 +71,24 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
         throw new RuntimeException("treap io mismatch")
 
       val nodeSwizzle = new StorageSwizzle[TreapNode[A, B]]
-      val node        = StorageTreapNode(this, k, sv, 
-                          nodeSwizzle,
-                          mkNodeSwizzle(left,  oldLeft), 
-                          mkNodeSwizzle(right, oldRight))
+      val node        = mkNode(k, sv, 
+                               nodeSwizzle,
+                               mkNodeSwizzle(left,  oldLeft), 
+                               mkNodeSwizzle(right, oldRight))
       nodeSwizzle.value_!!(node)
       node
   }
+
+  def mkNode(key: A,
+             swizzleValue: StorageSwizzle[B],
+             swizzleSelf:  StorageSwizzle[TreapNode[A, B]],
+             swizzleLeft:  StorageSwizzle[TreapNode[A, B]],
+             swizzleRight: StorageSwizzle[TreapNode[A, B]]) = // Easy for subclass override.
+    StorageTreapNode(this, key, 
+                           swizzleValue, 
+                           swizzleSelf, 
+                           swizzleLeft,
+                           swizzleRight)  
   
   def mkNodeSwizzle(next: TreapNode[A, B], 
                     prev: StorageSwizzle[TreapNode[A, B]]): StorageSwizzle[TreapNode[A, B]] = 
@@ -272,5 +293,7 @@ case class StorageTreapNode[A <% Ordered[A], B <: AnyRef](
   def left  = t.swizzleLoadNode(swizzleLeft)
   def right = t.swizzleLoadNode(swizzleRight)
   def value = t.swizzleLoadValue(swizzleValue)
+  
+  override def priority = t.priority(this) // Forward to an easier place for overriding. 
 }
 

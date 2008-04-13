@@ -137,6 +137,11 @@ class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
     val cid     = reader.readLong
     MEntry(key, flags, expTime, data.size, data, cid)
   }
+
+  override def priority(node: StorageTreapNode[String, MEntry]) = {
+    val h = node.key.hashCode
+    ((h << 16) & 0xffff0000) | ((h >> 16) & 0x0000ffff)
+  }
 }
 
 // ------------------------------------------------
