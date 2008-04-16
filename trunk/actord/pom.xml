@@ -7,7 +7,7 @@
   <groupId>ff.actord</groupId>
   <artifactId>actord</artifactId>
   <name>actord</name>
-  <version>0.1.0</version>
+  <version>0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <properties>
@@ -27,6 +27,7 @@
       <snapshots />
     </repository>
   </repositories>
+
 
   <pluginRepositories>
    <pluginRepository>
@@ -101,4 +102,26 @@
       </plugin>
     </plugins>
   </reporting>
+
+  <profiles>
+    <profile>
+      <id>hudson</id>
+      <distributionManagement>
+	<repository>
+          <id>hudson.scala-tools.org</id>
+          <url>file://${user.home}/scala-tools.org/repo-snapshots</url>
+	</repository>
+	<snapshotRepository>
+          <id>hudson.scala-tools.org</id>
+          <url>file://${user.home}/scala-tools.org/repo-snapshots</url>
+          <uniqueVersion>false</uniqueVersion>
+	</snapshotRepository>
+	<site>
+          <id>hudson.scala-tools.org</id>
+          <url>file://${user.home}/scala-tools.org/mvnsites-snapshots/${project.artifactId}</url>
+	</site>
+      </distributionManagement>
+    </profile>
+  </profiles>
+
 </project>
