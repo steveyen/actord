@@ -100,21 +100,20 @@
         <artifactId>maven-antrun-plugin</artifactId>
         <configuration>
           <tasks>
-            <echo message="starting actord..."/>
+            <echo message="actord..."/>
 
             <property name="compile_classpath" refid="maven.compile.classpath"/>
             <property name="runtime_classpath" refid="maven.runtime.classpath"/>
             <property name="test_classpath"    refid="maven.test.classpath"/>
 
             <java classname="ff.actord.Main" 
-                  fork="true" 
-                  spawn="true">
+                  fork="true">
               <classpath>
                 <pathelement path="${runtime_classpath}"/>
               </classpath>
             </java>
 
-            <echo message="starting actord... running."/>
+            <echo message="actord... done."/>
           </tasks>
         </configuration>
       </plugin>
