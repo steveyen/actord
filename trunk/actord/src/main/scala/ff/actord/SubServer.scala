@@ -81,11 +81,11 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     else
       mod !? ModSet(el, async)
     true
-	}
+  }
 
   def delete(key: String, time: Long, async: Boolean) = 
-		getUnexpired(key).map(
-		  el => {
+    getUnexpired(key).map(
+      el => {
         if (async)
           mod ! ModDelete(el, time, async)
         else
@@ -129,15 +129,15 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     } else
       (mod !? ModCAS(el, cidPrev, async)).asInstanceOf[String]
 
-	def keys = data.keys
-	
-	def flushAll(expTime: Long) {
-	  for ((key, el) <- data)
-	    mod ! ModDelete(el, expTime, true)
-	}
-	
-	def stats: MServerStats = 
-	  (mod !? MServerStatsRequest).asInstanceOf[MServerStats]
+  def keys = data.keys
+  
+  def flushAll(expTime: Long) {
+    for ((key, el) <- data)
+      mod ! ModDelete(el, expTime, true)
+  }
+  
+  def stats: MServerStats = 
+    (mod !? MServerStatsRequest).asInstanceOf[MServerStats]
 
   def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
     var r = data.range(keyFrom, keyTo)
@@ -296,9 +296,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
         }
 
         case ModDelta(key, delta, noReply) => {
-      	  val result = (getUnexpired(key) match {
-      	    case None => -1L
-      	    case Some(el) => {
+          val result = (getUnexpired(key) match {
+            case None => -1L
+            case Some(el) => {
               val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + delta)
               val s = v.toString
               setEntry(el.updateData(s.getBytes))
@@ -336,7 +336,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
             reply(result)
         }
         
-        case MServerStatsRequest() =>
+        case MServerStatsRequest =>
+          // TODO: The data.size method is slow / walks all nodes!
+          //
           reply(MServerStats(data.size, usedMemory, evictions))
       }
     }

@@ -36,7 +36,7 @@ class MHandler(server: MServer) extends IoHandlerAdapter {
   }
   
   override def messageReceived(session: IoSession, message: Object): Unit = {
-    log.info("received: " + message)
+    // log.info("received: " + message)
     
     message match {
       case (spec: Spec, cmd: MCommand) => {
@@ -221,36 +221,36 @@ class MDecoder extends MessageDecoder {
   
   def decodable(session: IoSession, in: IoBuffer): MessageDecoderResult = {
     val waitingFor = session.getAttribute(WAITING_FOR, ZERO).asInstanceOf[java.lang.Integer].intValue
-  	if (waitingFor == 0) {
-  	  if (in.remaining >= MIN_CMD_SIZE)
-  	    MessageDecoderResult.OK
-  	  else
-  	    MessageDecoderResult.NEED_DATA
-  	}
-  	
-  	if (waitingFor <= in.remaining)
-  	  MessageDecoderResult.OK
-  	else	
-    	MessageDecoderResult.NEED_DATA
+    if (waitingFor == 0) {
+      if (in.remaining >= MIN_CMD_SIZE)
+        MessageDecoderResult.OK
+      else
+        MessageDecoderResult.NEED_DATA
+    }
+    
+    if (waitingFor <= in.remaining)
+      MessageDecoderResult.OK
+    else  
+      MessageDecoderResult.NEED_DATA
   }
   
   def decode(session: IoSession, in: IoBuffer, out: ProtocolDecoderOutput): MessageDecoderResult = {
-  	val remaining = in.remaining
+    val remaining = in.remaining
     val waitingFor = session.getAttribute(WAITING_FOR, ZERO).asInstanceOf[java.lang.Integer].intValue
-  	if (waitingFor > 0) {
-  	  if (waitingFor <= remaining)
+    if (waitingFor > 0) {
+      if (waitingFor <= remaining)
         session.setAttribute(WAITING_FOR, ZERO)
       else
         return MessageDecoderResult.NEED_DATA
-  	}
-  	
-  	val indexCR = in.indexOf(CR)
-  	if (indexCR < 0)
-  	    return MessageDecoderResult.NEED_DATA
+    }
+    
+    val indexCR = in.indexOf(CR)
+    if (indexCR < 0)
+        return MessageDecoderResult.NEED_DATA
 
-  	if (indexCR + CRNL.length > remaining) 
-  	    return MessageDecoderResult.NEED_DATA
-  	    
+    if (indexCR + CRNL.length > remaining) 
+        return MessageDecoderResult.NEED_DATA
+        
     val line = in.getString(indexCR + CRNL.length, charsetDecoder)
     if (line.endsWith(CRNL) == false)
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
@@ -270,10 +270,10 @@ class MDecoder extends MessageDecoder {
       }
     ) orElse lineWithDataCommands.get(cmdName).map(
       spec => {
-  			// Handle mutator command: 
-  			//   <cmdName> <key> <flags> <expTime> <bytes> [noreply]\r\n
+        // Handle mutator command: 
+        //   <cmdName> <key> <flags> <expTime> <bytes> [noreply]\r\n
         //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
-  			//
+        //
         if (spec.checkArgs(args)) {
           var dataSize  = args(4).trim.toInt
           val totalSize = line.length + dataSize + CRNL.length
@@ -329,24 +329,31 @@ class MDecoder extends MessageDecoder {
 
   // ----------------------------------------
 
-	def stats(svr: MServer, arg: String) = {
-	  var sb = new StringBuffer
-	  
-	  def statLine(k: String, v: String) = {
-	    sb.append("STAT ")
-	    sb.append(k)
-	    sb.append(" ")		    
-	    sb.append(v)		    
-	    sb.append(CRNL)
-	  }
-		
-		if (arg == "keys") {
-		  for (key <- svr.keys)
-		    statLine("key", key)
-		} else {
-		  val svrStats = svr.stats
-		
+  def stats(svr: MServer, arg: String) = {
+    var sb = new StringBuffer
+    
+    def statLine(k: String, v: String) = {
+      sb.append("STAT ")
+      sb.append(k)
+      sb.append(" ")        
+      sb.append(v)        
+      sb.append(CRNL)
+    }
+println("stats 1")    
+
+    if (arg == "keys") {
+      for (key <- svr.keys)
+        statLine("key", key)
+    } else {
+println("stats 2")
+
+      val svrStats = svr.stats
+
+println("stats 2x")
+    
       statLine("version", svr.version)
+
+println("stats 2a")
 
 //    statLine("cmd_gets",   String.valueOf(get_cmds))
 //    statLine("cmd_sets",   String.valueOf(set_cmds))
@@ -358,16 +365,23 @@ class MDecoder extends MessageDecoder {
 //    statLine("bytes_read",    0.toString)
 //    statLine("bytes_written", 0.toString)
 
-      statLine("time",   new java.util.Date() + " " + System.currentTimeMillis)
-      statLine("uptime", (System.currentTimeMillis - svr.createdAt).toString)
+      val ctm = System.currentTimeMillis
 
+      statLine("time",   (new java.util.Date()) + " " + ctm.toString)
+      statLine("uptime", (ctm - svr.createdAt).toString)
+
+println("stats 2b1")
       statLine("curr_items",     svrStats.numEntries.toString)
+println("stats 2b2")
       statLine("evictions",      svrStats.evictions.toString)
+println("stats 2b3")
       statLine("bytes",          svrStats.usedMemory.toString)
+println("stats 2b4")
       statLine("limit_maxbytes", svr.limitMemory.toString)
       statLine("current_bytes",  Runtime.getRuntime.totalMemory.toString)
       statLine("free_bytes",     Runtime.getRuntime.freeMemory.toString)
-      
+println("stats 3")      
+
 //    statLine("pid",           0.toString)
 //    statLine("pointer_size",  0.toString)
 //    statLine("rusage_user",   "0:0")
@@ -378,7 +392,7 @@ class MDecoder extends MessageDecoder {
 
     sb.append("END")
     sb.toString
-	}
+  }
 
 /*
     Info on how stats should work, from memcached protocol.txt...
@@ -435,8 +449,8 @@ class MDecoder extends MessageDecoder {
 // -------------------------------------------------------
 
 class MEncoder extends MessageEncoder[List[MResponse]] {
-	def encode(session: IoSession, message: List[MResponse], out: ProtocolEncoderOutput) {
-	  val resList = message
+  def encode(session: IoSession, message: List[MResponse], out: ProtocolEncoderOutput) {
+    val resList = message
     val bufMax  = resList.foldLeft(0)((max, next) => Math.max(max, next.size))
     val buf     = IoBuffer.allocate(bufMax)
 
