@@ -110,6 +110,7 @@
 
             <java classname="ff.actord.Main" 
                   fork="true">
+              <jvmarg value="-verbosegc"/>
               <classpath>
                 <pathelement path="${runtime_classpath}"/>
               </classpath>
