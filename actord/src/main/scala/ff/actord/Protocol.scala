@@ -339,21 +339,14 @@ class MDecoder extends MessageDecoder {
       sb.append(v)        
       sb.append(CRNL)
     }
-println("stats 1")    
 
     if (arg == "keys") {
       for (key <- svr.keys)
         statLine("key", key)
     } else {
-println("stats 2")
-
       val svrStats = svr.stats
 
-println("stats 2x")
-    
       statLine("version", svr.version)
-
-println("stats 2a")
 
 //    statLine("cmd_gets",   String.valueOf(get_cmds))
 //    statLine("cmd_sets",   String.valueOf(set_cmds))
@@ -370,17 +363,12 @@ println("stats 2a")
       statLine("time",   (new java.util.Date()) + " " + ctm.toString)
       statLine("uptime", (ctm - svr.createdAt).toString)
 
-println("stats 2b1")
       statLine("curr_items",     svrStats.numEntries.toString)
-println("stats 2b2")
       statLine("evictions",      svrStats.evictions.toString)
-println("stats 2b3")
       statLine("bytes",          svrStats.usedMemory.toString)
-println("stats 2b4")
       statLine("limit_maxbytes", svr.limitMemory.toString)
       statLine("current_bytes",  Runtime.getRuntime.totalMemory.toString)
       statLine("free_bytes",     Runtime.getRuntime.freeMemory.toString)
-println("stats 3")      
 
 //    statLine("pid",           0.toString)
 //    statLine("pointer_size",  0.toString)
