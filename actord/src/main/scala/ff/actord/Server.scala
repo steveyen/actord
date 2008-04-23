@@ -95,7 +95,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def defaultGetPf: MServer.MGetPf = { 
     case _ => { getMulti _ }
   }
-	
+  
   def defaultSetPf: MServer.MSetPf = { 
     case ("set", _, _)     => { (el, async) => subServerForKey(el.key).set(el, async) }
     case ("add", _, _)     => { (el, async) => subServerForKey(el.key).add(el, async) }
@@ -105,7 +105,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def defaultDeletePf: MServer.MDeletePf = { 
     case _ => { (k, time, async) => subServerForKey(k).delete(k, time, async) }
   }
-	
+  
   def defaultActPf: MServer.MActPf = { 
     case _ => { (el, async) => Iterator.empty }
   }
@@ -149,7 +149,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   /**
    * A transport protocol can convert incoming incr/decr messages to delta calls.
    */
-	def delta(key: String, mod: Long, async: Boolean): Long =
+  def delta(key: String, mod: Long, async: Boolean): Long =
     subServerForKey(key).delta(key, mod, async)
     
   /**
@@ -164,17 +164,17 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   /**
    * The keys in the returned Iterator are unsorted.
    */
-	def keys: Iterator[String] = {
-	  val empty = List[String]().elements
-	  subServers.foldLeft(empty)((accum, next) => next.keys.append(accum))
-	}
-	
-	def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
-	
-	def stats = {
-	  val empty = MServerStats(0L, 0L, 0L)
-	  subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
-	}
+  def keys: Iterator[String] = {
+    val empty = List[String]().elements
+    subServers.foldLeft(empty)((accum, next) => next.keys.append(accum))
+  }
+  
+  def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
+  
+  def stats = {
+    val empty = MServerStats(0L, 0L, 0L)
+    subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
+  }
 
   /**
    * The keyFrom is the range's lower-bound, inclusive.

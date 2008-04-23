@@ -239,6 +239,31 @@ object MServerSpec extends Specification with MTestUtil {
       assertEquals("get xx", true, m.get(List("c0")).toList.isEmpty)
     }
 
+    "have some stats" in {
+      val (m, ea, ea2) = prep
+
+      val r0: MServerStats = m.stats
+      assertEquals("r0 stats", 0L, r0.numEntries)
+      assertEquals("r0 stats", 0L, r0.usedMemory)
+      assertEquals("r0 stats", 0L, r0.evictions)
+
+      val entrya = MEntry("a", 0L, 0L, 10, new Array[Byte](10), 0L)
+      assertEquals("set 1", true, m.set(entrya, false))
+
+      val r1: MServerStats = m.stats
+      assertEquals("r1 stats", 1L,  r1.numEntries)
+      assertEquals("r1 stats", 10L, r1.usedMemory)
+      assertEquals("r1 stats", 0L,  r1.evictions)
+
+      val entryb = MEntry("b", 0L, 0L, 10, new Array[Byte](10), 0L)
+      assertEquals("set 2", true, m.set(entryb, false))
+
+      val r2: MServerStats = m.stats
+      assertEquals("r2 stats", 2L,  r2.numEntries)
+      assertEquals("r2 stats", 20L, r2.usedMemory)
+      assertEquals("r2 stats", 0L,  r2.evictions)
+    }
+
     "handle simple benchmark" in {
       val (m, ea, ea2) = prep
 
