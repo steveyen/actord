@@ -154,38 +154,44 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
       var locLeft: StorageLoc  = null
       var locRight: StorageLoc = null
 
-      io.readAt(loc, reader => {
-        keyArr   = reader.readArray
-        locValue = reader.readLoc
-        locLeft  = reader.readLoc
-        locRight = reader.readLoc
-      })
+      try {
+        io.readAt(loc, reader => {
+          keyArr   = reader.readArray
+          locValue = reader.readLoc
+          locLeft  = reader.readLoc
+          locRight = reader.readLoc
+        })
 
-      val key          = unserializeKey(keyArr)
-      val swizzleValue = new StorageSwizzle[B]
-      val swizzleLeft  = new StorageSwizzle[TreapNode[A, B]]
-      val swizzleRight = new StorageSwizzle[TreapNode[A, B]]
+        val key          = unserializeKey(keyArr)
+        val swizzleValue = new StorageSwizzle[B]
+        val swizzleLeft  = new StorageSwizzle[TreapNode[A, B]]
+        val swizzleRight = new StorageSwizzle[TreapNode[A, B]]
 
-      swizzleValue.loc_!!(locValue)
-      swizzleLeft.loc_!!(locLeft)
-      swizzleRight.loc_!!(locRight)
+        swizzleValue.loc_!!(locValue)
+        swizzleLeft.loc_!!(locLeft)
+        swizzleRight.loc_!!(locRight)
 
-      val swizzleSelf = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
+        val swizzleSelf = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
         
-      val result = StorageTreapNode[A, B](this, 
-                                          key, 
-                                          swizzleValue,
-                                          swizzleSelf,
-                                          swizzleLeft,
-                                          swizzleRight)
+        val result = StorageTreapNode[A, B](this, 
+                                            key, 
+                                            swizzleValue,
+                                            swizzleSelf,
+                                            swizzleLeft,
+                                            swizzleRight)
 
-      if (swizzleSelf.loc == null)
-          swizzleSelf.loc_!!(loc)
+        if (swizzleSelf.loc == null)
+            swizzleSelf.loc_!!(loc)
           
-      if (swizzleSelf.value == null)
-          swizzleSelf.value_!!(result)
+        if (swizzleSelf.value == null)
+            swizzleSelf.value_!!(result)
                                
-      result
+        result
+      } catch {
+        // Perhaps the log files got truncated or corrupted.
+        //
+        case _ => emptyNode
+      }
     }
   }
   
@@ -237,6 +243,7 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
   def loadValueAt(loc: StorageLoc): B = {
     if (loc == null)
       throw new RuntimeException("could not load value without a loc")
+
     io.readAt(loc, reader => unserializeValue(loc, reader))
   }
 
@@ -252,15 +259,19 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
    * TODO: What about file versioning?
    */
   def loadRootNode(s: StorageWithPermaMarker): Option[TreapNode[A, B]] = {
-    val locSize  = s.storageLocSize
-    val locPerma = s.initialPermaMarkerLoc
-    if (locPerma.id >= 0 &&
-        locPerma.position > locSize) {
-      val locRoot = s.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
+    try {
+      val locSize  = s.storageLocSize
+      val locPerma = s.initialPermaMarkerLoc
+      if (locPerma.id >= 0 &&
+          locPerma.position > locSize) {
+        val locRoot = s.readAt(StorageLoc(locPerma.id, locPerma.position - locSize), _.readLoc)
       
-      Some(loadNodeAt(locRoot, None))
-    } else
-      None
+        Some(loadNodeAt(locRoot, None))
+      } else
+        None
+    } catch {
+      case _ => None
+    }
   }  
   
   def appendRootNode(s: StorageWithPermaMarker): StorageLoc = {
