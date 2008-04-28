@@ -92,24 +92,23 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   var deletePf: MServer.MDeletePf = defaultDeletePf
   var actPf:    MServer.MActPf    = defaultActPf
   
-  def defaultGetPf: MServer.MGetPf = { 
-    case _ => { getMulti _ }
-  }
-  
+  def defaultGetPf: MServer.MGetPf = { case _ => defaultGetFunc }
   def defaultSetPf: MServer.MSetPf = { 
-    case ("set", _, _)     => { (el, async) => subServerForKey(el.key).set(el, async) }
-    case ("add", _, _)     => { (el, async) => subServerForKey(el.key).add(el, async) }
-    case ("replace", _, _) => { (el, async) => subServerForKey(el.key).replace(el, async) }
+    case ("set", _, _)     => defaultSetFunc
+    case ("add", _, _)     => defaultAddFunc
+    case ("replace", _, _) => defaultReplaceFunc
   }
+  def defaultDeletePf: MServer.MDeletePf = { case _ => defaultDeleteFunc }
+  def defaultActPf: MServer.MActPf       = { case _ => defaultActFunc }
+  
+  val defaultGetFunc     = getMulti _
+  val defaultSetFunc     = (el: MEntry, async: Boolean) => subServerForKey(el.key).set(el, async)
+  val defaultAddFunc     = (el: MEntry, async: Boolean) => subServerForKey(el.key).add(el, async)
+  val defaultReplaceFunc = (el: MEntry, async: Boolean) => subServerForKey(el.key).replace(el, async)
+  val defaultDeleteFunc  = (k: String, time: Long, async: Boolean) => 
+                             subServerForKey(k).delete(k, time, async)
+  val defaultActFunc     = (el: MEntry, async: Boolean) => Iterator.empty
 
-  def defaultDeletePf: MServer.MDeletePf = { 
-    case _ => { (k, time, async) => subServerForKey(k).delete(k, time, async) }
-  }
-  
-  def defaultActPf: MServer.MActPf = { 
-    case _ => { (el, async) => Iterator.empty }
-  }
-  
   // --------------------------------------------------
 
   def get(keys: Seq[String]): Iterator[MEntry] = getPf(keys)(keys)
