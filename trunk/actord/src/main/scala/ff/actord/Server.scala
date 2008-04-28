@@ -89,25 +89,24 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   //  
   var getPf:    MServer.MGetPf    = defaultGetPf
   var setPf:    MServer.MSetPf    = defaultSetPf
-  var deletePf: MServer.MDeletePf = defaultDeletePf
   var actPf:    MServer.MActPf    = defaultActPf
+  var deletePf: MServer.MDeletePf = defaultDeletePf
   
-  def defaultGetPf: MServer.MGetPf = { case _ => defaultGetFunc }
+  def defaultGetPf: MServer.MGetPf = { case _ => defaultGet }
   def defaultSetPf: MServer.MSetPf = { 
-    case ("set", _, _)     => defaultSetFunc
-    case ("add", _, _)     => defaultAddFunc
-    case ("replace", _, _) => defaultReplaceFunc
+    case ("set", _, _)     => defaultSet
+    case ("add", _, _)     => defaultAdd
+    case ("replace", _, _) => defaultReplace
   }
-  def defaultDeletePf: MServer.MDeletePf = { case _ => defaultDeleteFunc }
-  def defaultActPf: MServer.MActPf       = { case _ => defaultActFunc }
-  
-  val defaultGetFunc     = getMulti _
-  val defaultSetFunc     = (el: MEntry, async: Boolean) => subServerForKey(el.key).set(el, async)
-  val defaultAddFunc     = (el: MEntry, async: Boolean) => subServerForKey(el.key).add(el, async)
-  val defaultReplaceFunc = (el: MEntry, async: Boolean) => subServerForKey(el.key).replace(el, async)
-  val defaultDeleteFunc  = (k: String, time: Long, async: Boolean) => 
-                             subServerForKey(k).delete(k, time, async)
-  val defaultActFunc     = (el: MEntry, async: Boolean) => Iterator.empty
+  def defaultActPf: MServer.MActPf       = { case _ => defaultAct }
+  def defaultDeletePf: MServer.MDeletePf = { case _ => defaultDelete }
+
+  val defaultGet     = getMulti _
+  val defaultSet     = (el: MEntry, async: Boolean) => subServerForKey(el.key).set(el, async)
+  val defaultAdd     = (el: MEntry, async: Boolean) => subServerForKey(el.key).add(el, async)
+  val defaultReplace = (el: MEntry, async: Boolean) => subServerForKey(el.key).replace(el, async)
+  val defaultAct     = (el: MEntry, async: Boolean) => Iterator.empty
+  val defaultDelete  = (k: String, time: Long, async: Boolean) => subServerForKey(k).delete(k, time, async)
 
   // --------------------------------------------------
 
