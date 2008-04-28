@@ -117,7 +117,9 @@
               <classpath>
                 <pathelement path="${runtime_classpath}"/>
               </classpath>
-              <arg value="-s tmp/data"/>
+              <!--
+                <arg value="-s tmp/data"/>
+                -->
             </java>
 
             <echo message="actord... done."/>
