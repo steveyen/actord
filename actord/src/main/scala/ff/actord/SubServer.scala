@@ -55,7 +55,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       case s @ Some(el) => {
         if (el.isExpired) {
           if (queueExpired)
-            mod ! ModDelete(el, 0L, true) // TODO: Many readers of expired entries means redundant ModDelete messages.
+            mod ! ModDelete(key, el, 0L, true) // TODO: Many readers of expired entries means redundant ModDelete messages.
           None 
         } else 
           s
@@ -87,9 +87,9 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     getUnexpired(key).map(
       el => {
         if (async)
-          mod ! ModDelete(el, time, async)
+          mod ! ModDelete(key, el, time, async)
         else
-          mod !? ModDelete(el, time, async)
+          mod !? ModDelete(key, el, time, async)
         true
       }
     ).getOrElse(false)
@@ -133,7 +133,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   
   def flushAll(expTime: Long) {
     for ((key, el) <- data)
-      mod ! ModDelete(el, expTime, true)
+      mod ! ModDelete(key, el, expTime, true)
   }
   
   def stats: MServerStats = 
@@ -253,27 +253,30 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           evictCheck
         }
 
-        case ModDelete(el, expTime, noReply) => {
+        case ModDelete(key, el, expTime, noReply) => {
           val dataMod = data
 
-          dataMod.get(el.key) match {
+          dataMod.get(key) match {
             case Some(current) =>
-              if (current.cid == el.cid) {
-                if (expTime != 0L) {
+              val isErrorEntry = el.key.length <= 0
+              if (isErrorEntry ||          // Always delete error entries.
+                  current.cid == el.cid) { // Or, must have the same CAS value.
+                if (isErrorEntry ||
+                    expTime == 0L) {
+                  if (el.lru != null) 
+                      el.lru.remove
+                  
+                  data_i_!!(dataMod - key)
+                  usedMemory = usedMemory - el.dataSize
+                  
+                  if (!noReply) 
+                      reply(true)
+                } else {
                   if (el.expTime == 0L || 
                       el.expTime > (nowInSeconds + expTime)) 
                     setEntry(el.updateExpTime(nowInSeconds + expTime))
                   if (!noReply)
                     reply(true)
-                } else {
-                  if (el.lru != null) 
-                      el.lru.remove
-                  
-                  data_i_!!(dataMod - el.key)
-                  usedMemory = usedMemory - el.dataSize
-                  
-                  if (!noReply) 
-                      reply(true)
                 }
               } else {
                 if (!noReply) 
@@ -347,7 +350,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   val modThread = new Thread() { override def run = mod.start }
   
   case class ModSet    (el: MEntry, noReply: Boolean)
-  case class ModDelete (el: MEntry, expTime: Long,   noReply: Boolean)
+  case class ModDelete (key: String, el: MEntry, expTime: Long, noReply: Boolean)
   case class ModTouch  (els: Iterator[MEntry],       noReply: Boolean)
   case class ModDelta  (key: String, delta: Long,    noReply: Boolean)
   case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean) // For append/prepend.

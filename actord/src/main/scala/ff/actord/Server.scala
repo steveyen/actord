@@ -214,8 +214,9 @@ case class MEntry(key: String,
       isExpired(nowInSeconds)
   
   def isExpired(now: Long): Boolean = 
-    expTime != 0L &&
-    expTime < now
+    (key.length <= 0) || // An empty key means an error entry, possibly from unreadable files.
+    (expTime != 0L &&
+     expTime < now)
 
   // TODO: Revisit the cid + 1L update, as concurrent threads could
   //       generate the same updated cid number.  Not sure if that's
