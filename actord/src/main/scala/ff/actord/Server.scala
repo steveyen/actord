@@ -174,7 +174,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
   
   def stats = {
-    val empty = MServerStats(0L, 0L, 0L)
+    val empty = MServerStats(0L, 0L, 0L, 0L)
     subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
   }
 
@@ -195,11 +195,13 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 case class MServerStatsRequest
 case class MServerStats(numEntries: Long,
                         usedMemory: Long,
-                        evictions: Long) {
+                        evictions: Long,
+                        lruSize: Long) {
   def +(that: MServerStats) =
     MServerStats(numEntries + that.numEntries, 
                  usedMemory + that.usedMemory, 
-                 evictions  + that.evictions)
+                 evictions  + that.evictions,
+                 lruSize    + that.lruSize)
 }
 
 // -------------------------------------------------------

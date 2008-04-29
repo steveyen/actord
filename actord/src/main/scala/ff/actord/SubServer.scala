@@ -154,12 +154,13 @@ class MSubServer(val id: Int, val limitMemory: Long) {
    * MSubServer (and a matching mod actor) per processor core, to increase
    * writer concurrency.
    *
-   * TODO: Should the mod actor be on its own separate real, receive-based thread?
+   * Note: The receive-based loop is mysteriously much faster than a react-based loop.
    */
   val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
     val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
-    
+    var lruSize = 0L
+
     lruHead.append(lruTail)
     
     def touch(el: MEntry) =
@@ -167,7 +168,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           el.lru.remove
           lruTail.insert(el.lru)
       }
-      
+
+    // TODO: When using persistence, these stats are not updated as
+    //       data is transparently swizzled in from storage.
+    //
     var usedMemory = 0L // In bytes.
     var evictions  = 0L // Number of valid entries that were evicted since server start.
 
@@ -190,13 +194,14 @@ class MSubServer(val id: Int, val limitMemory: Long) {
              current != null) {
         val n = current.next
         current.remove
+        lruSize = lruSize - 1L
         dataMod.get(current.key).foreach(
           existing => {
             dataMod   = dataMod - current.key
             reclaimed = reclaimed + existing.dataSize
 
             if (!existing.isExpired(now))
-              evictions = evictions + 1
+              evictions = evictions + 1L
           }
         )
         current = n
@@ -220,8 +225,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
             }
           )
 
-          if (el.lru == null)
+          if (el.lru == null) {
               el.lru = new LRUList(el.key, null, null)
+              lruSize = lruSize + 1L
+          }
       }
       
       touch(el)
@@ -263,8 +270,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
                   current.cid == el.cid) { // Or, must have the same CAS value.
                 if (isErrorEntry ||
                     expTime == 0L) {
-                  if (el.lru != null) 
+                  if (el.lru != null) {
                       el.lru.remove
+                      lruSize = lruSize - 1L
+                  }
                   
                   data_i_!!(dataMod - key)
                   usedMemory = usedMemory - el.dataSize
@@ -342,7 +351,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
         case MServerStatsRequest =>
           // TODO: The data.size method is slow / walks all nodes!
           //
-          reply(MServerStats(data.size, usedMemory, evictions))
+          reply(MServerStats(data.size, usedMemory, evictions, lruSize))
       }
     }
   }
