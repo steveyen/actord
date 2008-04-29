@@ -133,7 +133,7 @@ class MainProg {
   
   // ------------------------------------------------------
   
-  def startAcceptor(server: MServer, numProcessors: Int, port: Int) = 
+  def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
     initAcceptor(server, createAcceptor(numProcessors)).bind(new InetSocketAddress(port))
   
   def initAcceptor(server: MServer, acceptor: IoAcceptor): IoAcceptor = {
@@ -150,10 +150,6 @@ class MainProg {
     acceptor
   }
   
-  def startPersister(server: MServer, checkInterval: Int, limitFileSize: Long): Unit =
-    if (storePath != null)
-      new Thread(createPersister(server.subServerList, checkInterval, limitFileSize)).start
-  
   // Here are simple constructors that can be easily overridden by subclasses.
   //
   def createProtocol: MProtocol                             = new MProtocol
@@ -165,6 +161,8 @@ class MainProg {
   def createMessageDecoder(server: MServer, protocol: MProtocol): MessageDecoder[List[MResponse]] = new MMinaDecoder(server, protocol)
   def createMessageEncoder(server: MServer, protocol: MProtocol): MessageEncoder[List[MResponse]] = new MMinaEncoder(server, protocol)
 
+  // ------------------------------------------------------
+  
   def createServer(numProcessors: Int, limitMem: Long) = {
     val store: MServerStorage = 
       if (storePath != null)
@@ -184,6 +182,10 @@ class MainProg {
   def createPersister(subServers: Seq[MSubServer], checkInterval: Int, limitFileSize: Long) =
     new MPersister(subServers, checkInterval, limitFileSize)
     
+  def startPersister(server: MServer, checkInterval: Int, limitFileSize: Long): Unit =
+    if (storePath != null)
+      new Thread(createPersister(server.subServerList, checkInterval, limitFileSize)).start
+  
   // ------------------------------------------------------
 
   /**
