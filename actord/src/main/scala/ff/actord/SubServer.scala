@@ -68,12 +68,11 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     //
     val d = data     
     val r = keys.flatMap(key => getUnexpired(key, d, true))
-    val e = r.elements
 
     if (!r.isEmpty)
-      mod ! ModTouch(e, true)
+      mod ! ModTouch(r.elements, true)
       
-    e
+    r.elements
   }
 
   def set(el: MEntry, async: Boolean) = {
