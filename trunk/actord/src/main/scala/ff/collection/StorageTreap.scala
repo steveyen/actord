@@ -99,8 +99,8 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
   
   def mkNodeSwizzle(next: TreapNode[A, B], 
                     prev: StorageSwizzle[TreapNode[A, B]]): StorageSwizzle[TreapNode[A, B]] = 
-    if (prev != null &&
-        prev.value == next)
+    if ((prev != null) &&
+        (prev.value eq next))
         prev // Don't create a new swizzle holder, just use old/previous one.
     else next match {
       case e: TreapEmptyNode[A, B] =>
