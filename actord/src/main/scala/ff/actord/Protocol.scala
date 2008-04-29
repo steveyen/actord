@@ -205,7 +205,7 @@ class MDecoder extends MessageDecoder {
   def reply(v: Boolean, t: String, f: String): List[MResponse] =
       reply(if (v) t else f)
       
-  def reply(v: Long): List[MResponse] =
+  def reply(v: Long): List[MResponse] = // Used by incr/decr processing.
       reply(if (v < 0)
               "NOT_FOUND"
             else
