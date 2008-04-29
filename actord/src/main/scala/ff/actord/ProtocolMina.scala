@@ -59,8 +59,7 @@ class MMinaHandler(server: MServer) extends IoHandlerAdapter {
  */
 class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder {
   val charsetDecoder     = Charset.forName("UTF-8").newDecoder
-  val SECONDS_IN_30_DAYS = 60*60*24*30
-  val MIN_CMD_SIZE       = "quit \r\n".length
+  val MIN_CMD_SIZE       = "quit\r\n".length
   val WAITING_FOR        = new AttributeKey(getClass, "waiting_for")  
   val STATS              = new AttributeKey(getClass, "stats")  
   
@@ -101,7 +100,7 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
         
     val bytesNeeded = protocol.process(server, WrapIoSession(session), line, WrapIoBufferIn(in), remaining)
-    if (bytesNeeded <= remaining) {
+    if (bytesNeeded == 0) {
       MessageDecoderResult.OK
     } else {
       session.setAttribute(WAITING_FOR, new java.lang.Integer(bytesNeeded))
@@ -124,9 +123,6 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
     def close: Unit                     = sess.close
     def write(r: List[MResponse]): Unit = sess.write(r)
   
-    def getAttribute(k: Object): Object            = sess.getAttribute(k)
-    def setAttribute(k: Object, v: Object): Object = sess.setAttribute(k, v)
-    
     def getReadMessages: Long = sess.getReadMessages
   }
 }

@@ -34,8 +34,6 @@ trait MSession {
   def getId: Long
   def close: Unit
   def write(r: List[MResponse]): Unit
-  def getAttribute(k: Object): Object
-  def setAttribute(k: Object, v: Object): Object
   def getReadMessages: Long
 }
 
