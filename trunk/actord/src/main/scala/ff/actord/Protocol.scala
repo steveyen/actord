@@ -203,12 +203,17 @@ class MProtocol {
    * Returns how many bytes more need to be read before
    * the message can be processed successfully.  Or, just
    * returns 0 (or OK) to mean we've processed the message.
+   *
+   * cmdLine    - the incoming message command line. 
+   * cmdData    - the secondary data/value part of the message, if any.
+   * readyCount - number of bytes from message start (including cmdLine) 
+   *              plus remaining data, available to be read.
    */
   def process(server: MServer,
               session: MSession, 
-              cmdLine: String,    // The incoming message command line. 
-              cmdData: MBufferIn, // The secondary data/value part of the message, if any.
-              readyCount: Int): Int = { // Number of bytes from message start (including cmdLine) plus remaining data, available to be read.
+              cmdLine: String,   
+              cmdData: MBufferIn,
+              readyCount: Int): Int = {
     val cmdArgs = cmdLine.trim.split(" ")             
     val cmdName = cmdArgs(0)
 
