@@ -33,7 +33,7 @@ trait MBufferOut {
 trait MSession {
   def getId: Long
   def close: Unit
-  def write(r: List[MResponse]): Unit
+  def write(r: MResponse): Unit
   def getReadMessages: Long
 }
 
@@ -45,7 +45,7 @@ trait MSession {
  * TODO: Is there an equivalent of writev/readv in mina?
  */
 case class Spec(line: String,
-                process: (MServer, MCommand, MSession) => List[MResponse]) {
+                process: (MServer, MCommand, MSession) => MResponse) {
   val args = line.split(" ")
   val name = args(0)
   
@@ -61,6 +61,13 @@ case class Spec(line: String,
  * http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt
  */
 class MProtocol {
+  val OK         = "OK"         + CRNL
+  val END        = "END"        + CRNL
+  val DELETED    = "DELETED"    + CRNL
+  val NOT_FOUND  = "NOT_FOUND"  + CRNL
+  val NOT_STORED = "NOT_STORED" + CRNL
+  val STORED     = "STORED"     + CRNL
+
   /**
    * Commands defined with a single line.
    *
@@ -70,21 +77,21 @@ class MProtocol {
       Spec("get <key>*",
            (svr, cmd, sess) => { 
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
-             reply("END")
+                 foreach(el => sess.write(MResponseLineEntry(asValueLine(el), el)))
+             reply(END)
            }),
 
       Spec("gets <key>*",
            (svr, cmd, sess) => {
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => sess.write(List(MResponseLineEntry(asValueLineCAS(el), el))))
-             reply("END")
+                 foreach(el => sess.write(MResponseLineEntry(asValueLineCAS(el), el)))
+             reply(END)
            }),
 
       Spec("delete <key> [<time>] [noreply]",
            (svr, cmd, sess) => 
              reply(svr.delete(cmd.args(1), cmd.argToLong(2), cmd.noReply), 
-                   "DELETED", "NOT_FOUND")),
+                   DELETED, NOT_FOUND)),
 
       Spec("incr <key> <value> [noreply]",
            (svr, cmd, sess) => reply(svr.delta(cmd.args(1),  cmd.argToLong(2), cmd.noReply))),
@@ -98,17 +105,17 @@ class MProtocol {
       Spec("flush_all [<delay>] [noreply]",
            (svr, cmd, sess) => {
               svr.flushAll(cmd.argToLong(1))
-              reply("OK")
+              reply(OK)
             }),
 
       Spec("version",
-           (svr, cmd, sess) => reply("VERSION " + svr.version)),
+           (svr, cmd, sess) => reply("VERSION " + svr.version + CRNL)),
       Spec("verbosity",
-           (svr, cmd, sess) => reply("OK")),
+           (svr, cmd, sess) => reply(OK)),
       Spec("quit",
            (svr, cmd, sess) => {
              sess.close
-             Nil
+             reply("")
            }),
 
       // Extensions to basic protocol.
@@ -116,8 +123,8 @@ class MProtocol {
       Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
            (svr, cmd, sess) => { 
              svr.range(cmd.args(1), cmd.args(2)).
-                 foreach(el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
-             reply("END")
+                 foreach(el => sess.write(MResponseLineEntry(asValueLine(el), el)))
+             reply(END)
            }))
            
   /**
@@ -129,27 +136,27 @@ class MProtocol {
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.set(cmd.entry, cmd.noReply), 
-                    "STORED", "NOT_STORED")),
+                    STORED, NOT_STORED)),
 
       Spec("add <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.add(cmd.entry, cmd.noReply), 
-                    "STORED", "NOT_STORED")),
+                    STORED, NOT_STORED)),
 
       Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.replace(cmd.entry, cmd.noReply), 
-                    "STORED", "NOT_STORED")),
+                    STORED, NOT_STORED)),
 
       Spec("append <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.xpend(cmd.entry, true, cmd.noReply), 
-                    "STORED", "NOT_STORED")),
+                    STORED, NOT_STORED)),
 
       Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
               reply(svr.xpend(cmd.entry, false, cmd.noReply), 
-                    "STORED", "NOT_STORED")),
+                    STORED, NOT_STORED)),
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
            (svr, cmd, sess) => 
@@ -160,8 +167,8 @@ class MProtocol {
       Spec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
            (svr, cmd, sess) => {
               svr.act(cmd.entry, cmd.noReply).
-                  foreach(el => sess.write(List(MResponseLineEntry(asValueLine(el), el))))
-              reply("END")
+                  foreach(el => sess.write(MResponseLineEntry(asValueLine(el), el)))
+              reply(END)
            }))
       
   val lineOnlyCommands = 
@@ -175,29 +182,29 @@ class MProtocol {
   // ----------------------------------------
 
   def asValueLine(e: MEntry) =
-      "VALUE " + e.key + " " + e.flags + " " + e.dataSize
+      "VALUE " + e.key + " " + e.flags + " " + e.dataSize + CRNL
   
   def asValueLineCAS(e: MEntry) =
-      asValueLine(e) + " " + e.cid
+      "VALUE " + e.key + " " + e.flags + " " + e.dataSize + " " + e.cid + CRNL
   
   // ----------------------------------------
 
-  def reply(s: String): List[MResponse] = List(MResponseLine(s))
+  def reply(s: String): MResponse = MResponseLine(s)
            
-  def reply(v: Boolean, t: String, f: String): List[MResponse] =
+  def reply(v: Boolean, t: String, f: String): MResponse =
       reply(if (v) t else f)
       
-  def reply(v: Long): List[MResponse] = // Used by incr/decr processing.
+  def reply(v: Long): MResponse = // Used by incr/decr processing.
       reply(if (v < 0)
-              "NOT_FOUND"
+              NOT_FOUND
             else
-              v.toString)
+              (v.toString + CRNL))
                           
   // ----------------------------------------
 
   val SECONDS_IN_30_DAYS = 60*60*24*30
 
-  val OK = 0
+  val GOOD = 0
 
   /**
    * Returns how many bytes more need to be read before
@@ -224,10 +231,10 @@ class MProtocol {
           val res = spec.process(server, cmd, session)
           if (cmd.noReply == false)
             session.write(res)
-          OK
+          GOOD
         } else {
-          session.write(List(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" "))))
-          OK
+          session.write(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL))
+          GOOD
         }
       }
     ) orElse lineWithDataCommands.get(cmdName).map(
@@ -266,22 +273,22 @@ class MProtocol {
               val res = spec.process(server, cmd, session)
               if (cmd.noReply == false)
                 session.write(res)
-              OK
+              GOOD
             } else {
-              session.write(List(MResponseLine("CLIENT_ERROR missing CRNL after data")))
-              OK
+              session.write(MResponseLine("CLIENT_ERROR missing CRNL after data" + CRNL))
+              GOOD
             }
           } else {
             totalNeeded
           }
         } else {
-          session.write(List(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" "))))
-          OK
+          session.write(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL))
+          GOOD
         }
       }
     ) getOrElse {
-      session.write(List(MResponseLine("ERROR " + cmdName))) // Saw an unknown command, but keep
-      OK                                                     // going and process the next command.
+      session.write(MResponseLine("ERROR " + cmdName + CRNL)) // Saw an unknown command, but keep
+      GOOD                                                    // going and process the next command.
     }
   }
 
@@ -336,7 +343,7 @@ class MProtocol {
 //    statLine("connection_structures", 0.toString)
     }
 
-    sb.append("END")
+    sb.append(END)
     sb.toString
   }
 
@@ -384,7 +391,6 @@ class MProtocol {
                                  to store items
       evictions         64u      Number of valid items removed from cache
                                  to free memory for new items
-
     server...
       version           string   Version string of this server
       uptime            32u      Number of seconds this server has been running
@@ -428,11 +434,10 @@ abstract class MResponse {
  * A response of a String of a single line.
  */
 case class MResponseLine(line: String) extends MResponse {
-  def size = line.length + CRNL.length
+  def size = line.length // The line includes CRNL already.
 
   def put(buf: MBufferOut) {
     buf.put(line.toString.getBytes) // TODO: Need a charset here?
-    buf.put(CRNLBytes)
   }
 }
 
@@ -440,12 +445,10 @@ case class MResponseLine(line: String) extends MResponse {
  * A response of a String of a single line, followed by a single MEntry data bytes.
  */
 case class MResponseLineEntry(line: String, entry: MEntry) extends MResponse {
-  def size = line.length    + CRNL.length +
-             entry.dataSize + CRNL.length
+  def size = line.length + entry.dataSize + CRNL.length // The line includes CRNL already.
 
   def put(buf: MBufferOut) {
     buf.put(line.toString.getBytes) // TODO: Need a charset here?
-    buf.put(CRNLBytes)
     buf.put(entry.data)
     buf.put(CRNLBytes)
   }

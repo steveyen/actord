@@ -124,11 +124,8 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
   } 
   
   def close: Unit = s.close
-  
-  def write(resList: List[MResponse]): Unit = {
-    for (res <- resList) 
-      res.put(this)
-  }
+
+  def write(res: MResponse): Unit = res.put(this)
   
   def getReadMessages: Long = numMessages
 
