@@ -112,13 +112,14 @@
                   fork="true">
               <jvmarg value="-verbosegc"/>
               <!--
-                <jvmarg value="-javaagent:tmp/shiftone-jrat.jar"/>
+              <jvmarg value="-javaagent:tmp/shiftone-jrat.jar"/>
                 -->
               <classpath>
                 <pathelement path="${runtime_classpath}"/>
               </classpath>
               <!--
-                <arg value="-s tmp/data"/>
+              <arg value="-s_path tmp/data"/>
+              <arg value="-s_log_file_size 1000000"/>
                 -->
             </java>
 
