@@ -138,9 +138,11 @@ class MainProg {
   
   def initAcceptor(server: MServer, acceptor: IoAcceptor): IoAcceptor = {
     val codecFactory = createCodecFactory
+    val protocol     = createProtocol
 
-    codecFactory.addMessageDecoder(createMessageDecoder)
-    codecFactory.addMessageEncoder[List[MResponse]](classOf[List[MResponse]], createMessageEncoder)
+    codecFactory.addMessageDecoder(createMessageDecoder(server, protocol))
+    codecFactory.addMessageEncoder[List[MResponse]](classOf[List[MResponse]], 
+                                                    createMessageEncoder(server, protocol))
     
     acceptor.getFilterChain.
              addLast("codec", createCodecFilter(codecFactory))  
@@ -154,13 +156,15 @@ class MainProg {
   
   // Here are simple constructors that can be easily overridden by subclasses.
   //
-  def createHandler(server: MServer): IoHandler             = new MHandler(server)
+  def createProtocol: MProtocol                             = new MProtocol
+  def createHandler(server: MServer): IoHandler             = new MMinaHandler(server)
   def createAcceptor(numProcessors: Int): IoAcceptor        = new NioSocketAcceptor(numProcessors)
-  def createMessageDecoder: MessageDecoder[List[MResponse]] = new MDecoder
-  def createMessageEncoder: MessageEncoder[List[MResponse]] = new MEncoder
   def createCodecFactory: DemuxingProtocolCodecFactory      = new DemuxingProtocolCodecFactory
   def createCodecFilter(f: ProtocolCodecFactory): IoFilter  = new ProtocolCodecFilter(f)
   
+  def createMessageDecoder(server: MServer, protocol: MProtocol): MessageDecoder[List[MResponse]] = new MMinaDecoder(server, protocol)
+  def createMessageEncoder(server: MServer, protocol: MProtocol): MessageEncoder[List[MResponse]] = new MMinaEncoder(server, protocol)
+
   def createServer(numProcessors: Int, limitMem: Long) = {
     val store: MServerStorage = 
       if (storePath != null)

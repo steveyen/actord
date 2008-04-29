@@ -16,49 +16,28 @@
 package ff.actord
 
 import java.net._
+import java.nio._
 import java.nio.charset._
-
-import org.slf4j._
-
-import org.apache.mina.common._
-import org.apache.mina.filter.codec._
-import org.apache.mina.filter.codec.demux._
-import org.apache.mina.transport.socket._
-import org.apache.mina.transport.socket.nio._
 
 import ff.actord.Util._
 
-class MHandler(server: MServer) extends IoHandlerAdapter {
-  val log = LoggerFactory.getLogger(getClass)
-  
-  override def exceptionCaught(session: IoSession, cause: Throwable) = {
-    log.warn("unexpected exception: ", cause)
-    session.close
-  }
-  
-  override def messageReceived(session: IoSession, message: Object): Unit = {
-    // log.info("received: " + message)
-    
-    message match {
-      case (spec: Spec, cmd: MCommand) => {
-        val res = spec.process(server, cmd, session)
-        if (cmd.noReply == false)
-          session.write(res)
-      }
-      case m: MResponse =>
-        session.write(List(m))
-    }
-  }
-
-  override def sessionOpened(sess: IoSession): Unit = {
-    sess.getConfig match {
-      case ssc: SocketSessionConfig => ssc.setTcpNoDelay(true)
-      case _ =>
-    }
-  }
+trait MBufferIn {
+  def read(bytes: Array[Byte]): Unit
+  def readString(num: Int): String
 }
 
-// -------------------------------------------------------
+trait MBufferOut {
+  def put(bytes: Array[Byte]): Unit
+}
+
+trait MSession {
+  def getId: Long
+  def close: Unit
+  def write(r: List[MResponse]): Unit
+  def getAttribute(k: Object): Object
+  def setAttribute(k: Object, v: Object): Object
+  def getReadMessages: Long
+}
 
 /**
  * Represents a specification, of a command in the protocol.
@@ -68,7 +47,7 @@ class MHandler(server: MServer) extends IoHandlerAdapter {
  * TODO: Is there an equivalent of writev/readv in mina?
  */
 case class Spec(line: String,
-                process: (MServer, MCommand, IoSession) => List[MResponse]) {
+                process: (MServer, MCommand, MSession) => List[MResponse]) {
   val args = line.split(" ")
   val name = args(0)
   
@@ -82,11 +61,8 @@ case class Spec(line: String,
 /**
  * Protocol is defined at:
  * http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt
- *
- * TODO: See if we can use something lower-level, like 
- *       CummulativeProtocolDecoder, for more performance.
  */
-class MDecoder extends MessageDecoder {
+class MProtocol {
   /**
    * Commands defined with a single line.
    *
@@ -221,59 +197,34 @@ class MDecoder extends MessageDecoder {
                           
   // ----------------------------------------
 
-  val charsetDecoder     = Charset.forName("UTF-8").newDecoder
   val SECONDS_IN_30_DAYS = 60*60*24*30
-  val MIN_CMD_SIZE       = "quit \r\n".length
-  val WAITING_FOR        = new AttributeKey(getClass, "waiting_for")  
-  val STATS              = new AttributeKey(getClass, "stats")  
-  
-  def decodable(session: IoSession, in: IoBuffer): MessageDecoderResult = {
-    val waitingFor = session.getAttribute(WAITING_FOR, ZERO).asInstanceOf[java.lang.Integer].intValue
-    if (waitingFor == 0) {
-      if (in.remaining >= MIN_CMD_SIZE)
-        MessageDecoderResult.OK
-      else
-        MessageDecoderResult.NEED_DATA
-    }
-    
-    if (waitingFor <= in.remaining)
-      MessageDecoderResult.OK
-    else  
-      MessageDecoderResult.NEED_DATA
-  }
-  
-  def decode(session: IoSession, in: IoBuffer, out: ProtocolDecoderOutput): MessageDecoderResult = {
-    val remaining = in.remaining
-    val waitingFor = session.getAttribute(WAITING_FOR, ZERO).asInstanceOf[java.lang.Integer].intValue
-    if (waitingFor > 0) {
-      if (waitingFor <= remaining)
-        session.setAttribute(WAITING_FOR, ZERO)
-      else
-        return MessageDecoderResult.NEED_DATA
-    }
-    
-    val indexCR = in.indexOf(CR)
-    if (indexCR < 0)
-        return MessageDecoderResult.NEED_DATA
 
-    if (indexCR + CRNL.length > remaining) 
-        return MessageDecoderResult.NEED_DATA
-        
-    val line = in.getString(indexCR + CRNL.length, charsetDecoder)
-    if (line.endsWith(CRNL) == false)
-        return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
-        
-    val args    = line.trim.split(" ")
-    val cmdName = args(0)
+  val OK = 0
+
+  /**
+   * Returns how many bytes more need to be read before
+   * the message can be processed successfully.  Or, just
+   * returns 0 (or OK) to mean we've processed the message.
+   */
+  def process(server: MServer,
+              session: MSession, 
+              cmdLine: String,    // The incoming message command line. 
+              cmdData: MBufferIn, // The secondary data/value part of the message, if any.
+              readyCount: Int): Int = { // Number of bytes from message start (including cmdLine) plus remaining data, available to be read.
+    val cmdArgs = cmdLine.trim.split(" ")             
+    val cmdName = cmdArgs(0)
 
     lineOnlyCommands.get(cmdName).map(
       spec => {
-        if (spec.checkArgs(args)) {
-          out.write(Pair(spec, MCommand(args, null)))
-          MessageDecoderResult.OK
+        if (spec.checkArgs(cmdArgs)) {
+          val cmd = MCommand(cmdArgs, null)
+          val res = spec.process(server, cmd, session)
+          if (cmd.noReply == false)
+            session.write(res)
+          OK
         } else {
-          out.write(MResponseLine("CLIENT_ERROR args: " + args.mkString(" ")))
-          MessageDecoderResult.OK
+          session.write(List(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" "))))
+          OK
         }
       }
     ) orElse lineWithDataCommands.get(cmdName).map(
@@ -282,57 +233,53 @@ class MDecoder extends MessageDecoder {
         //   <cmdName> <key> <flags> <expTime> <bytes> [noreply]\r\n
         //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
         //
-        if (spec.checkArgs(args)) {
-          var dataSize  = args(4).trim.toInt
-          val totalSize = line.length + dataSize + CRNL.length
-          if (totalSize <= remaining) {
-            val expTime = args(3).trim.toLong
+        if (spec.checkArgs(cmdArgs)) {
+          var dataSize    = cmdArgs(4).trim.toInt
+          val totalNeeded = cmdLine.length + dataSize + CRNL.length
+          if (totalNeeded <= readyCount) {
+            val expTime = cmdArgs(3).trim.toLong
             
             // TODO: Handle this better when dataSize is huge.
             //       Perhaps use mmap, or did mina read it entirely 
             //       into memory by this point already?
             //
-            val data = new Array[Byte](dataSize) 
-  
-            in.get(data)
+            val data = new Array[Byte](dataSize)
             
-            if (in.getString(CRNL.length, charsetDecoder) == CRNL) {
-              out.write(Pair(spec,
-                             MCommand(args,
-                                      MEntry(args(1),
-                                             args(2).toLong,
-                                             if (expTime != 0 &&
-                                                 expTime <= SECONDS_IN_30_DAYS)
-                                                 expTime + nowInSeconds
-                                             else
-                                                 expTime,
-                                             dataSize,
-                                             data,
-                                             (session.getId << 32) + 
-                                             (session.getReadMessages & 0xFFFFFFFFL)))))
-              MessageDecoderResult.OK
+            cmdData.read(data)
+            
+            if (cmdData.readString(CRNL.length) == CRNL) {
+              val cmd = MCommand(cmdArgs,
+                                 MEntry(cmdArgs(1),
+                                        cmdArgs(2).toLong,
+                                        if (expTime != 0 &&
+                                            expTime <= SECONDS_IN_30_DAYS)
+                                            expTime + nowInSeconds
+                                        else
+                                            expTime,
+                                        dataSize,
+                                        data,
+                                        (session.getId << 32) + 
+                                        (session.getReadMessages & 0xFFFFFFFFL)))
+              val res = spec.process(server, cmd, session)
+              if (cmd.noReply == false)
+                session.write(res)
+              OK
             } else {
-              out.write(MResponseLine("CLIENT_ERROR missing CRNL after data"))
-              MessageDecoderResult.OK
+              session.write(List(MResponseLine("CLIENT_ERROR missing CRNL after data")))
+              OK
             }
           } else {
-            session.setAttribute(WAITING_FOR, new java.lang.Integer(totalSize))
-            in.rewind
-            MessageDecoderResult.NEED_DATA
+            totalNeeded
           }
         } else {
-          out.write(MResponseLine("CLIENT_ERROR args: " + args.mkString(" ")))
-          MessageDecoderResult.OK
+          session.write(List(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" "))))
+          OK
         }
       }
     ) getOrElse {
-      out.write(MResponseLine("ERROR " + cmdName)) // Saw an unknown command,
-      MessageDecoderResult.OK                      // but keep going, and decode the next command.
+      session.write(List(MResponseLine("ERROR " + cmdName))) // Saw an unknown command, but keep
+      OK                                                     // going and process the next command.
     }
-  }
-  
-  def finishDecode(session: IoSession, out: ProtocolDecoderOutput) = {
-    // TODO: Do we need to do something here?  Or just drop the message on the floor?
   }
 
   // ----------------------------------------
@@ -445,27 +392,6 @@ class MDecoder extends MessageDecoder {
 
 // -------------------------------------------------------
 
-class MEncoder extends MessageEncoder[List[MResponse]] {
-  def encode(session: IoSession, message: List[MResponse], out: ProtocolEncoderOutput) {
-    val resList = message
-    val bufMax  = resList.foldLeft(0)(sizeMax)
-    val buf     = IoBuffer.allocate(bufMax)
-
-    buf.setAutoExpand(true)
-    
-    for (res <- resList) {
-      res.put(buf)
-      buf.flip
-      out.write(buf)
-      buf.clear
-    }
-  }
-
-  val sizeMax = (accum: Int, next: MResponse) => Math.max(accum, next.size)
-}
-
-// -------------------------------------------------------
-
 /**
  * Represents an incoming command or request from a (remote) client.
  */
@@ -492,7 +418,7 @@ case class MCommand(args: Array[String], entry: MEntry) {
  */
 abstract class MResponse {
   def size: Int
-  def put(buf: IoBuffer): Unit
+  def put(buf: MBufferOut): Unit
 }
 
 /**
@@ -501,7 +427,7 @@ abstract class MResponse {
 case class MResponseLine(line: String) extends MResponse {
   def size = line.length + CRNL.length
 
-  def put(buf: IoBuffer) {
+  def put(buf: MBufferOut) {
     buf.put(line.toString.getBytes) // TODO: Need a charset here?
     buf.put(CRNLBytes)
   }
@@ -514,7 +440,7 @@ case class MResponseLineEntry(line: String, entry: MEntry) extends MResponse {
   def size = line.length    + CRNL.length +
              entry.dataSize + CRNL.length
 
-  def put(buf: IoBuffer) {
+  def put(buf: MBufferOut) {
     buf.put(line.toString.getBytes) // TODO: Need a charset here?
     buf.put(CRNLBytes)
     buf.put(entry.data)
