@@ -67,12 +67,13 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     // Grab the data snapshot just once, outside the loop.
     //
     val d = data     
-    var r = keys.flatMap(key => getUnexpired(key, d, true))
+    val r = keys.flatMap(key => getUnexpired(key, d, true))
+    val e = r.elements
 
     if (!r.isEmpty)
-      mod ! ModTouch(r.elements, true)
+      mod ! ModTouch(e, true)
       
-    r.elements
+    e
   }
 
   def set(el: MEntry, async: Boolean) = {
