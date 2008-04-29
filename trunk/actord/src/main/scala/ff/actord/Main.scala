@@ -32,11 +32,15 @@ import ff.collection._
 
 object Main
 {
-  def main_default(args: Array[String]) {
+  def main(args: Array[String]) {
+    main_using_simple(args)
+  }
+  
+  def main_using_mina(args: Array[String]) { // Uses mina/NIO implementation.
     new MainProg().start(args)
   }
   
-  def main(args: Array[String]) {
+  def main_using_simple(args: Array[String]) { // Uses simple blocking i/o implementation.
     (new MainProg() {
       override def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
         (new SAcceptor(server, createProtocol, numProcessors, port)).start
