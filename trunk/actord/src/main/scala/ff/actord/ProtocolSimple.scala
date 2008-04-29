@@ -24,12 +24,12 @@ import ff.actord.Util._
 
 class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int) extends Thread {
   override def run = {
-    var idNext = 0L
-    val ss     = new ServerSocket(port)
+    var idGen = 0L
+    val ss    = new ServerSocket(port)
     
     while (true) {
-      (new SSession(server, protocol, ss.accept, idNext)).start
-      idNext = idNext + 1L
+      (new SSession(server, protocol, ss.accept, idGen)).start
+      idGen = idGen + 1L
     }
   }
 }
@@ -71,7 +71,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
         val indexCR = buf.indexOf(CR)
         if (indexCR < 0 ||
             indexCR + CRNL.length > available) {
-          waitingFor = waitingFor + 1024
+          waitingFor = waitingFor + 1
           if (waitingFor > buf.length)
             bufGrow(waitingFor)
         } else {

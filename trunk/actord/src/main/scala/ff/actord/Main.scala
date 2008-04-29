@@ -32,8 +32,15 @@ import ff.collection._
 
 object Main
 {
-  def main(args: Array[String]) {
+  def main_default(args: Array[String]) {
     new MainProg().start(args)
+  }
+  
+  def main(args: Array[String]) {
+    (new MainProg() {
+      override def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
+        (new SAcceptor(server, createProtocol, numProcessors, port)).start
+    }).start(args)
   }
   
   def main_with_example_of_custom_processing(args: Array[String]) {    
