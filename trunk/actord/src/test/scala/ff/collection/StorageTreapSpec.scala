@@ -44,6 +44,8 @@ object StorageTreapSpec extends Specification {
     def unserializeValue(loc: StorageLoc, reader: StorageLocReader): String = 
       new String(reader.readArray)
     
+    def errorValue(loc: StorageLoc, error: Object) = ""
+
     def rootStorable = root.asInstanceOf[StorageTreapNode[String, String]]
   }
   
