@@ -119,9 +119,9 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
   }
   
   case class WrapIoSession(sess: IoSession) extends MSession {
-    def getId: Long                     = sess.getId
-    def close: Unit                     = sess.close
-    def write(r: List[MResponse]): Unit = sess.write(r)
+    def getId: Long               = sess.getId
+    def close: Unit               = sess.close
+    def write(r: MResponse): Unit = sess.write(r)
   
     def getReadMessages: Long = sess.getReadMessages
   }
@@ -129,27 +129,18 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
 
 // -------------------------------------------------------
 
-class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[List[MResponse]] {
+class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[MResponse] {
   case class WrapIoBufferOut(buf: IoBuffer) extends MBufferOut {
     def put(bytes: Array[Byte]): Unit = buf.put(bytes)
   }
   
-  def encode(session: IoSession, message: List[MResponse], out: ProtocolEncoderOutput) {
-    val resList = message
-    val bufMax  = resList.foldLeft(0)(sizeMax)
-    val buf     = IoBuffer.allocate(bufMax)
-    val bufWrap = WrapIoBufferOut(buf)
+  def encode(session: IoSession, message: MResponse, out: ProtocolEncoderOutput) {
+    val buf = IoBuffer.allocate(message.size)
 
-    buf.setAutoExpand(true)
-    
-    for (res <- resList) {
-      res.put(bufWrap)
-      buf.flip
-      out.write(buf)
-      buf.clear
-    }
+    message.put(WrapIoBufferOut(buf))
+
+    buf.flip
+    out.write(buf)
   }
-
-  val sizeMax = (accum: Int, next: MResponse) => Math.max(accum, next.size)
 }
 
