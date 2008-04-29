@@ -139,9 +139,7 @@ class StorageSwizzle[S <: AnyRef] {
   // Be careful about deadlocks, though, during nested locking code.
   //  
   def valueSync = this
-  def locSync   = locSyncObj
-
-  protected val locSyncObj = new Object
+  val locSync   = new Object
 }
 
 // ---------------------------------------------------------
