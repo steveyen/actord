@@ -424,8 +424,9 @@ class MDecoder extends MessageDecoder {
         
       bytes             64u      Current number of bytes used by this server 
                                  to store items
-      evictions         64u      Number of valid items removed from cache                                                                           
-                                 to free memory for new items                                                                                       
+      evictions         64u      Number of valid items removed from cache
+                                 to free memory for new items
+
     server...
       version           string   Version string of this server
       uptime            32u      Number of seconds this server has been running
@@ -439,7 +440,7 @@ class MDecoder extends MessageDecoder {
 class MEncoder extends MessageEncoder[List[MResponse]] {
   def encode(session: IoSession, message: List[MResponse], out: ProtocolEncoderOutput) {
     val resList = message
-    val bufMax  = resList.foldLeft(0)((max, next) => Math.max(max, next.size))
+    val bufMax  = resList.foldLeft(0)(sizeMax)
     val buf     = IoBuffer.allocate(bufMax)
 
     buf.setAutoExpand(true)
@@ -451,6 +452,8 @@ class MEncoder extends MessageEncoder[List[MResponse]] {
       buf.clear
     }
   }
+
+  val sizeMax = (accum: Int, next: MResponse) => Math.max(accum, next.size)
 }
 
 // -------------------------------------------------------
