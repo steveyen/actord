@@ -158,7 +158,7 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
     if (loc == null)
       throw new RuntimeException("could not load node without a loc")
 
-    if (loc == emptyNodeLoc)
+    if (loc eq emptyNodeLoc)
       emptyNode
     else {
       var keyArr: Array[Byte]  = null
