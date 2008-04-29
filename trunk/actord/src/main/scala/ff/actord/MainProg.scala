@@ -85,6 +85,12 @@ abstract class MainProg {
     println("limit memory      : " + limitMem)
     println("available cpus    : " + availCpus)
     println("listening on port : " + port)
+
+    if (storePath != null) {
+      println("storage path         : " + storePath)
+      println("  check interval ms  : " + storeInterval)
+      println("  log file max bytes : " + storeLogFileSize)
+    }
   }
   
   // ------------------------------------------------------
@@ -139,12 +145,12 @@ abstract class MainProg {
              "-p <num>" :: Nil,
              "Listen on port <num>; default is " + default_port + "."),
     FlagSpec("storePath", 
-             "-s <dir_path>" :: Nil,
+             "-s_path <dir_path>" :: Nil,
              "Persist data to directory <dir_path>; default is no persistence."),
     FlagSpec("storeInterval", 
              "-s_interval <millisecs>" :: Nil,
              "Check for dirty data that needs persistence; default is " + default_storeInterval + "."),
-    FlagSpec("storeLogSize", 
+    FlagSpec("storeLogFileSize", 
              "-s_log_file_size <bytes>" :: Nil,
              "Max size for an individual persistence log file; default is " + default_storeLogFileSize + "."),
     FlagSpec("help", 
