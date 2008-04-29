@@ -23,7 +23,7 @@ import ff.actord.Util._
 
 class MSubServer(val id: Int, val limitMemory: Long) {
   /**
-   * Override to pass in other implementations, such as storage.SMap for persistence.
+   * Override to pass in other implementations, such as for persistence.
    */
   def createSortedMap: immutable.SortedMap[String, MEntry] =
                    new immutable.TreeMap[String, MEntry]
