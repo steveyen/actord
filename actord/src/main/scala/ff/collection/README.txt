@@ -52,6 +52,8 @@ Here's a String key and String value example...
                          reader: StorageLocReader) = 
       new String(reader.readArray)
 
+    def errorValue(loc: StorageLoc, error: Object) = ""
+
     override def mkTreap(r: TreapNode[String, String]): 
         Treap[String, String] =
       new MyStuff(r, s)       

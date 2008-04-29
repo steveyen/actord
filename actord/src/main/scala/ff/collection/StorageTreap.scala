@@ -32,6 +32,13 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
 
   def serializeValue(x: B, loc: StorageLoc, appender: StorageLocAppender): Unit
   def unserializeValue(loc: StorageLoc, reader: StorageLocReader): B
+
+  /**
+   * The errorValue is called when loading a value, and there's some exception.
+   * Possibly because a file was deleted/corrupted/unreadable.  This callback
+   * method should return a value representing this error.
+   */
+  def errorValue(loc: StorageLoc, error: Object): B
   
   /**
    * Subclasses will definitely want to consider overriding this
@@ -244,7 +251,11 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
     if (loc == null)
       throw new RuntimeException("could not load value without a loc")
 
-    io.readAt(loc, reader => unserializeValue(loc, reader))
+    try {
+      io.readAt(loc, reader => unserializeValue(loc, reader))
+    } catch {
+      case ex => errorValue(loc, ex)
+    }
   }
 
   def appendValue(value: B): StorageLoc = 
