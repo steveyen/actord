@@ -135,14 +135,19 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
   }
       
   def swizzleSaveNode(s: StorageSwizzle[TreapNode[A, B]]): StorageLoc = {
-    val v = s.value // Captured before the following synch block to avoid deadlocks.
-    s.locSync.synchronized {
-      val loc = s.loc
-      if (loc != null &&
-          io.storageLocRefresh(loc) == false)
-          loc
-      else
-          s.loc_!!(appendNode(v))
+    val oldLoc = s.loc
+    if (oldLoc != null &&
+        io.storageLocRefresh(oldLoc) == false)
+        oldLoc
+    else {
+        val newLoc = appendNode(s.value) // Do the saving outside of synchronized for more concurrency.
+        s.locSync.synchronized {         // Should be only one writer thread, but check if we were beaten.
+          val loc = s.loc
+          if (loc != null)
+              loc
+          else
+              s.loc_!!(newLoc)
+        }
     }
   }
     
@@ -234,14 +239,19 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
   }
 
   def swizzleSaveValue(s: StorageSwizzle[B]): StorageLoc = {
-    val v = s.value // Captured before the following synch block to avoid deadlocks.
-    s.locSync.synchronized {
-      val loc = s.loc
-      if (loc != null &&
-          io.storageLocRefresh(loc) == false)
-          loc
-      else 
-          s.loc_!!(appendValue(v))
+    val oldLoc = s.loc
+    if (oldLoc != null &&
+        io.storageLocRefresh(oldLoc) == false)
+        oldLoc
+    else {
+        val newLoc = appendValue(s.value) // Do the saving outside of synchronized for more concurrency.
+        s.locSync.synchronized {          // Should be only one writer thread, but check if we were beaten.
+          val loc = s.loc
+          if (loc != null)
+              loc
+          else
+              s.loc_!!(newLoc)
+        }
     }
   }
 
