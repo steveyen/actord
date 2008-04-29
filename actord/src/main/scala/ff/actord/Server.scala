@@ -119,22 +119,26 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
    * ordering of the input keys.
    */  
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
-    // First group the keys for each subServer, for better 
-    // cache locality and synchronization avoidance.
-    //
-    val groupedKeys = new Array[mutable.ArrayBuffer[String]](subServerNum) 
-    for (i <- 0 until subServerNum)
-      groupedKeys(i) = new mutable.ArrayBuffer[String]
+    if (subServerNum <= 1) 
+       subServers(0).getMulti(keys)
+    else {
+      // First group the keys for each subServer, for better 
+      // cache locality and synchronization avoidance.
+      //
+      val groupedKeys = new Array[mutable.ArrayBuffer[String]](subServerNum) 
+      for (i <- 0 until subServerNum)
+        groupedKeys(i) = new mutable.ArrayBuffer[String]
 
-    for (key <- keys) {
-      val i = subServerIdForKey(key)
-      groupedKeys(i) += key
+      for (key <- keys) {
+        val i = subServerIdForKey(key)
+        groupedKeys(i) += key
+      }
+    
+      val empty: Iterator[MEntry] = Iterator.empty
+    
+      (0 until subServerNum).
+        foldLeft(empty)((result, i) => result.append(subServers(i).getMulti(groupedKeys(i))))
     }
-    
-    val empty: Iterator[MEntry] = Iterator.empty
-    
-    (0 until subServerNum).
-      foldLeft(empty)((result, i) => result.append(subServers(i).getMulti(groupedKeys(i))))
   }
 
   def set(el: MEntry, async: Boolean)     = setPf("set",     el, async)(el, async)
