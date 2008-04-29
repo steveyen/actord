@@ -23,6 +23,7 @@ import org.slf4j._
 import org.apache.mina.common._
 import org.apache.mina.filter.codec._
 import org.apache.mina.filter.codec.demux._
+import org.apache.mina.transport.socket._
 import org.apache.mina.transport.socket.nio._
 
 import ff.actord.Util._
@@ -46,6 +47,13 @@ class MHandler(server: MServer) extends IoHandlerAdapter {
       }
       case m: MResponse =>
         session.write(List(m))
+    }
+  }
+
+  override def sessionOpened(sess: IoSession): Unit = {
+    sess.getConfig match {
+      case ssc: SocketSessionConfig => ssc.setTcpNoDelay(true)
+      case _ =>
     }
   }
 }
