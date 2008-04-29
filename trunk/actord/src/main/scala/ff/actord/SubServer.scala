@@ -233,7 +233,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     }
     
     loop {
-      react {
+      receive {
         case ModTouch(els, noReply) => {
           for (el <- els) {
             if (el.lru != null &&
@@ -344,7 +344,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     }
   }
   
-  mod.start
+  val modThread = new Thread() { override def run = mod.start }
   
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (el: MEntry, expTime: Long,   noReply: Boolean)
