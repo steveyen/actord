@@ -55,6 +55,8 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
 
   override def run = {
     while (s.isClosed == false) {
+      readPos = 0
+      
       val lastRead = is.read(buf, available, buf.length - available)
       if (lastRead <= -1)
         s.close
@@ -73,8 +75,6 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
           if (waitingFor > buf.length)
             bufGrow(waitingFor)
         } else {
-          readPos = 0
-          
           val line = readString(indexCR + CRNL.length)
           if (line.endsWith(CRNL) == false) {
             s.close
@@ -89,7 +89,6 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
             
               waitingFor = MIN_CMD_SIZE
               available  = available - readPos
-              readPos    = 0
             } else {
               waitingFor = bytesNeeded
               if (waitingFor > buf.length)
