@@ -188,7 +188,7 @@ class FileStorageReader(f: File, id: Int) extends StorageReader {
 
     synchronized {
       raf.seek(loc.position)
-      dis = new DataInputStream(new BufferedInputStream(ris)) // TODO: Reduce throwaway garbage.
+      dis = new DataInputStream(ris) // TODO: Reduce throwaway garbage.
       val result = func(reader)
       dis = null
       result
