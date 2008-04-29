@@ -167,7 +167,7 @@ class MPersister(subServersIn: Seq[MSubServer], // The subServers that this pers
         if (v != subServer.lastPersistedVersion)
           d match {
             case currTreap: MEntryStorageTreap => 
-              if (currTreap.subServerStorage == subServer.subServerStorage) {
+              if (currTreap.subServerStorage eq subServer.subServerStorage) {
                 val locRoot = currTreap.appendRootNode(currTreap.subServerStorage)
     
                 subServer.lastPersistedVersion_!!(v)
@@ -202,7 +202,7 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
         if (v != subServer.lastCleanedVersion)
           d match {
             case currTreap: MEntryStorageTreap => 
-              if (currTreap.subServerStorage == subServer.subServerStorage) {
+              if (currTreap.subServerStorage eq subServer.subServerStorage) {
                 walk(currTreap, 0, currTreap.root)           
                 subServer.lastCleanedVersion_!!(v)
               }
