@@ -26,7 +26,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
    * Override to pass in other implementations, such as for persistence.
    */
   def createSortedMap: immutable.SortedMap[String, MEntry] =
-                   new immutable.TreeMap[String, MEntry]
+                   new ff.collection.Treap[String, MEntry]
 
   /**
    * TODO: Maybe just use volatile, or AtomicReference around data_i.
