@@ -18,7 +18,7 @@ package ff.actord
 object Main
 {
   def main(args: Array[String]) {
-    main_using_mina(args)
+    main_using_simple(args)
   }
   
   def main_using_simple(args: Array[String]) { // Uses simple blocking i/o implementation.
