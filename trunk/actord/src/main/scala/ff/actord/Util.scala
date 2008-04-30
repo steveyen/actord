@@ -20,6 +20,7 @@ package ff.actord
  */
 object Util {
   final val ZERO      = java.lang.Integer.valueOf(0)
+  final val SPACE     = ' '.asInstanceOf[Byte]
   final val CR        = '\r'.asInstanceOf[Byte]
   final val NL        = '\n'.asInstanceOf[Byte]
   final val CRNL      = "\r\n"
@@ -27,7 +28,7 @@ object Util {
 
   def nowInSeconds: Long = System.currentTimeMillis / 1000
   
-  def itemToLong(items: Array[String], at: Int) =
+  def itemToLong(items: Seq[String], at: Int) =
     if (items.length > at)
       parseLong(items(at), 0L)
     else 

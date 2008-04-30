@@ -15,6 +15,8 @@
  */
 package ff.actord
 
+import scala.collection._
+
 import ff.actord.Util._
 
 trait MBufferIn {
@@ -169,12 +171,10 @@ class MProtocol {
            }))
       
   val lineOnlyCommands = 
-      Map[String, Spec](lineOnlySpecs.
-                          map(s => Pair(s.name, s)):_*)
+      immutable.HashMap[String, Spec](lineOnlySpecs.map(s => Pair(s.name, s)):_*)
 
   val lineWithDataCommands = 
-      Map[String, Spec](lineWithDataSpecs.
-                          map(s => Pair(s.name, s)):_*)
+      immutable.HashMap[String, Spec](lineWithDataSpecs.map(s => Pair(s.name, s)):_*)
                           
   // ----------------------------------------
 
@@ -199,16 +199,32 @@ class MProtocol {
                           
   // ----------------------------------------
 
-  val SECONDS_IN_30_DAYS = 60*60*24*30
+  final val GOOD               = 0
+  final val SECONDS_IN_30_DAYS = 60*60*24*30
 
-  val GOOD = 0
+  def splitArr(a: Array[Byte], len: Int): Seq[String] = { // Avoiding String.split() because it uses regexps.
+    val r = new mutable.ArrayBuffer[String]
+    var s = 0
+    var i = 0
+    while (i < len) {
+      if (a(i) == SPACE) {
+        if (s < i)
+          r += (new String(a, s, i - s, "US-ASCII"))
+        s = i + 1
+      }
+      i += 1
+    }
+    if (s < len)
+      r += (new String(a, s, len - s, "US-ASCII"))
+    r
+  }
 
   /**
    * Returns how many bytes more need to be read before
    * the message can be processed successfully.  Or, just
    * returns 0 (or OK) to mean we've processed the message.
    *
-   * cmdLine    - the incoming message command line. 
+   * cmdArr     - the incoming message command line bytes, including CRNL. 
    * cmdData    - the secondary data/value part of the message, if any.
    * readyCount - number of bytes from message start (including cmdLine) 
    *              plus remaining data, available to be read.
@@ -218,8 +234,7 @@ class MProtocol {
               cmdArr: Array[Byte],
               cmdData: MBufferIn,
               readyCount: Int): Int = {
-    val cmdLine = new String(cmdArr, 0, cmdArr.length - 2, "US-ASCII")
-    val cmdArgs = cmdLine.split(" ")
+    val cmdArgs = splitArr(cmdArr, cmdArr.length - CRNL.length)
     val cmdName = cmdArgs(0)
 
     lineOnlyCommands.get(cmdName).map(
@@ -404,7 +419,7 @@ class MProtocol {
 /**
  * Represents an incoming command or request from a (remote) client.
  */
-case class MCommand(args: Array[String], entry: MEntry) {
+case class MCommand(args: Seq[String], entry: MEntry) {
   def noReply = args.last == "noreply"
   
   def argToLong(at: Int) = itemToLong(args, at)
