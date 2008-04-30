@@ -39,19 +39,19 @@ abstract class MainProg {
   def start(args: Array[String]) {
     import MainFlag._
     
-    val flagValueList = parseFlags(args, flagSpecs)
+    val flagValues = parseFlags(args, flags)
 
-    for (FlagValue(spec, values) <- flagValueList) {
-      if (spec == FLAG_ERR) {
-        println("error: " + spec.specs.mkString(" | ") + " : " + values.mkString(" ").trim)
+    for (FlagValue(flag, values) <- flagValues) {
+      if (flag == FLAG_ERR) {
+        println("error: " + flag.specs.mkString(" | ") + " : " + values.mkString(" ").trim)
         System.exit(1)
       }
 
-      if (spec.name == "help") {
+      if (flag.name == "help") {
         println("actord -- simple mesh of actors\n")
         println(" version : " + MServer.version)
         println(" usage   : <java-invocation> [flags*]\n")
-        for (s <- flagSpecs) {
+        for (s <- flags) {
           println(s.specs.mkString(" | "))
           println(" " + s.description.split("\n").mkString("\n "))
         }
@@ -59,7 +59,7 @@ abstract class MainProg {
       }
     }
     
-    start(immutable.Map(flagValueList.map(x => (x.spec.name -> x.value)):_*))
+    start(immutable.Map(flagValues.map(x => (x.flag.name -> x.value)):_*))
   }
   
   def start(args: immutable.Map[String, List[String]]) {
@@ -132,59 +132,59 @@ abstract class MainProg {
    * Specifications of command-line parameters or flags.  
    * Subclasses might override this method to add/remove entries to the list.
    */
-  def flagSpecs = List(
-//  FlagSpec("ipAddr", 
+  def flags = List(
+//  Flag("ipAddr", 
 //           "-l <ip_addr>" :: Nil,
 //           "Listen on <ip_addr>; default to INDRR_ANY.\n" +
 //             "This is an important option to consider for security.\n" +
 //             "Binding to an internal or firewalled network interface is suggested."),
-    FlagSpec("limitMem", 
+    Flag("limitMem", 
              "-m <num>" :: Nil,
              "Use <num> MB memory max for data; default is " + default_limitMem + "."),
-    FlagSpec("port", 
+    Flag("port", 
              "-p <num>" :: Nil,
              "Listen on port <num>; default is " + default_port + "."),
-    FlagSpec("storePath", 
+    Flag("storePath", 
              "-s_path <dir_path>" :: Nil,
              "Persist data to directory <dir_path>; default is no persistence."),
-    FlagSpec("storeInterval", 
+    Flag("storeInterval", 
              "-s_interval <millisecs>" :: Nil,
              "Check for dirty data that needs persistence; default is " + default_storeInterval + "."),
-    FlagSpec("storeLogFileSize", 
+    Flag("storeLogFileSize", 
              "-s_log_file_size <bytes>" :: Nil,
              "Max size for an individual persistence log file; default is " + default_storeLogFileSize + "."),
-    FlagSpec("help", 
+    Flag("help", 
              "-h" :: "-?" :: "--help" :: Nil,
              "Show the version of the server and a summary of options."),
-    FlagSpec("verbose", 
+    Flag("verbose", 
              "-v" :: Nil,
              "Be verbose during processing; print out errors and warnings."),
-    FlagSpec("veryVerbose", 
+    Flag("veryVerbose", 
              "-vv" :: Nil,
              "Be even more verbose; for example, also print client requests and responses.")
-//  FlagSpec("noExpire", 
+//  Flag("noExpire", 
 //           "-M" :: Nil,
 //           "Instead of expiring items when max memory is reached, throw an error."),
-//  FlagSpec("maxConn", 
+//  Flag("maxConn", 
 //           "-c <num>" :: Nil,
 //           "Use <num> max simultaneous connections; the default is 1024."),
-//  FlagSpec("growCore", 
+//  Flag("growCore", 
 //           "-r" :: Nil,
 //           "Raise the core file size limit to the maximum allowable."),
-//  FlagSpec("daemon", 
+//  Flag("daemon", 
 //           "-d" :: Nil,
 //           "Run server as a daemon."),
-//  FlagSpec("username", 
+//  Flag("username", 
 //           "-u <username>" :: Nil,
 //           "Assume the identity of <username> (only when run as root)."),
-//  FlagSpec("lockMem", 
+//  Flag("lockMem", 
 //           "-k" :: Nil,
 //           "Lock down all paged memory. This is a somewhat dangerous option with large caches, " +
 //             "so consult the docs for configuration suggestions."),
-//  FlagSpec("licenses", 
+//  Flag("licenses", 
 //           "-i" :: Nil,
 //           "Print server and component licenses."),
-//  FlagSpec("pidFile", 
+//  Flag("pidFile", 
 //           "-P <filename>" :: Nil,
 //           "Print pidfile to <filename>, only used under -d option.")
   )

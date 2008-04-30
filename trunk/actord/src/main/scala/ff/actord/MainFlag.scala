@@ -27,7 +27,7 @@ object MainFlag
    * might have an entry of FlagValue(FLAG_ERR, ...) to signal 
    * a parsing error for a particular parameter.
    */
-  def parseFlags(args: Array[String], flagSpecs: List[FlagSpec]): List[FlagValue] = {
+  def parseFlags(args: Array[String], flags: List[Flag]): List[FlagValue] = {
     val xs = (" " + args.mkString(" ")). // " -a 1 -b -c 2"
                split(" -")               // ["", "a 1", "b", "c 2"]
     if (xs.headOption.
@@ -39,35 +39,34 @@ object MainFlag
          toList.
          map(arg => { 
            val argParts = ("-" + arg).split(" ").toList
-           flagSpecs.find(_.flags.contains(argParts(0))).
-                     map(spec => if (spec.check(argParts))
-                                   FlagValue(spec, argParts.tail)
-                                 else
-                                   FlagValue(FLAG_ERR, argParts)).
-                     getOrElse(FlagValue(FLAG_ERR, argParts))
+           flags.find(_.aliases.contains(argParts(0))).
+                 map(flag => if (flag.check(argParts))
+                               FlagValue(flag, argParts.tail)
+                             else
+                               FlagValue(FLAG_ERR, argParts)).
+                 getOrElse(FlagValue(FLAG_ERR, argParts))
          })
   }
   
   /**
    * A sentinel singleton that signals parseFlags errors.
    */  
-  val FLAG_ERR = FlagSpec("err", "incorrect flag or parameter" :: Nil, "")  
+  val FLAG_ERR = Flag("err", "incorrect flag or parameter" :: Nil, "")  
 }
 
 // ------------------------------------------------------
   
-case class FlagValue(spec: FlagSpec, value: List[String])
+case class FlagValue(flag: Flag, value: List[String])
 
-case class FlagSpec(name: String, specs: List[String], description: String) {
-  val flags = specs.map(_.split(" ")(0))
+case class Flag(name: String, specs: List[String], description: String) {
+  val aliases = specs.map(_.split(" ")(0))
   
   def check(argParts: List[String]) = 
-    specs.filter(
-      spec => { 
-        val specParts = spec.split(" ")
-        specParts(0) == argParts(0) && 
-        specParts.length == argParts.length
-      }
-    ).isEmpty == false
+    specs.filter(spec => { 
+                   val specParts = spec.split(" ")
+                   specParts(0) == argParts(0) && 
+                   specParts.length == argParts.length
+                 }).
+          isEmpty == false
 }
 
