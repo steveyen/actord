@@ -118,8 +118,8 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
     def read(bytes: Array[Byte]): Unit = buf.get(bytes)
     def readString(num: Int): String = {
       val a = new Array[Byte](num)
-      buf.get(a)
-      new String(a)
+      buf.get(a, 0, num)
+      new String(a, 0, num, "US-ASCII")
     }
   }
   
