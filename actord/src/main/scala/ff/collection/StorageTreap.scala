@@ -73,10 +73,7 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
   override def mkNode(basis: TreapFullNode[A, B], 
                       left:  TreapNode[A, B], 
                       right: TreapNode[A, B]): TreapNode[A, B] = basis match {
-    case StorageTreapNode(t, k, sv, oldSelf, oldLeft, oldRight) =>
-      if (t.io != this.io)
-        throw new RuntimeException("treap io mismatch")
-
+    case StorageTreapNode(k, sv, oldSelf, oldLeft, oldRight) =>
       val nodeSwizzle = new StorageSwizzle[TreapNode[A, B]]
       val node        = mkNode(k, sv, 
                                nodeSwizzle,
@@ -91,11 +88,11 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
              swizzleSelf:  StorageSwizzle[TreapNode[A, B]],
              swizzleLeft:  StorageSwizzle[TreapNode[A, B]],
              swizzleRight: StorageSwizzle[TreapNode[A, B]]) = // Easy for subclass override.
-    StorageTreapNode(this, key, 
-                           swizzleValue, 
-                           swizzleSelf, 
-                           swizzleLeft,
-                           swizzleRight)  
+    StorageTreapNode(key, 
+                     swizzleValue, 
+                     swizzleSelf, 
+                     swizzleLeft,
+                     swizzleRight)  
   
   def mkNodeSwizzle(next: TreapNode[A, B], 
                     prev: StorageSwizzle[TreapNode[A, B]]): StorageSwizzle[TreapNode[A, B]] = 
@@ -185,8 +182,7 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
 
         val swizzleSelf = swizzleSelfOpt.getOrElse(new StorageSwizzle[TreapNode[A, B]])
         
-        val result = StorageTreapNode[A, B](this, 
-                                            key, 
+        val result = StorageTreapNode[A, B](key, 
                                             swizzleValue,
                                             swizzleSelf,
                                             swizzleLeft,
@@ -314,7 +310,6 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
  * storage.  So, it's evictable from memory.
  */
 case class StorageTreapNode[A <% Ordered[A], B <: AnyRef](
-  t: StorageTreap[A, B],
   key: A,
   swizzleValue: StorageSwizzle[B],
   swizzleSelf:  StorageSwizzle[TreapNode[A, B]],
@@ -322,10 +317,12 @@ case class StorageTreapNode[A <% Ordered[A], B <: AnyRef](
   swizzleRight: StorageSwizzle[TreapNode[A, B]])
   extends TreapFullNode[A, B] 
 {
-  def left  = t.swizzleLoadNode(swizzleLeft)
-  def right = t.swizzleLoadNode(swizzleRight)
-  def value = t.swizzleLoadValue(swizzleValue)
+  def storageTreap(t: T): StorageTreap[A, B] = t.asInstanceOf[StorageTreap[A, B]]
+
+  def left(t: T)  = storageTreap(t).swizzleLoadNode(swizzleLeft)
+  def right(t: T) = storageTreap(t).swizzleLoadNode(swizzleRight)
+  def value(t: T) = storageTreap(t).swizzleLoadValue(swizzleValue)
   
-  override def priority = t.priority(this) // Forward to an easier place for overriding. 
+  override def priority(t: T) = storageTreap(t).priority(this) // Forward to an easier place for overriding. 
 }
 

@@ -51,8 +51,8 @@ object TreapSpec extends Specification {
                           e)
       
       t = t1.union(t2).union(t2).union(t1_1)
-      t.root.firstKey must_== 1
-      t.root.lastKey must_== 2
+      t.root.firstKey(t) must_== 1
+      t.root.lastKey(t) must_== 2
       t.root must_== TreapMemNode(2, "200", 
                        TreapMemNode(1, "101", e, e), 
                        e)
@@ -69,9 +69,9 @@ object TreapSpec extends Specification {
       val t3 = new Treap[Int, String](TreapMemNode(3, "300", e, e))
 
       t = t1.union(t2).union(t3)
-      t.root.count must_== 3L
-      t.root.firstKey must_== 1
-      t.root.lastKey must_== 3
+      t.root.count(t) must_== 3L
+      t.root.firstKey(t) must_== 1
+      t.root.lastKey(t) must_== 3
       TreapMemNode(3, "300", 
                      TreapMemNode(2, "200", 
                        TreapMemNode(1, "100", e, e), 
@@ -79,39 +79,39 @@ object TreapSpec extends Specification {
                      e) must_== t.root
       
       t = t1.union(t2).union(t3).intersect(t1.union(t2))
-      2L must_== t.root.count
-      1  must_== t.root.firstKey
-      2  must_== t.root.lastKey
+      2L must_== t.root.count(t)
+      1  must_== t.root.firstKey(t)
+      2  must_== t.root.lastKey(t)
       TreapMemNode(2, "200", 
                      TreapMemNode(1, "100", e, e), 
                      e) must_== t.root
       
       t = t1.union(t2).union(t3).diff(t1.union(t2))
-      1L must_== t.root.count
-      3  must_== t.root.firstKey
-      3  must_== t.root.lastKey
+      1L must_== t.root.count(t)
+      3  must_== t.root.firstKey(t)
+      3  must_== t.root.lastKey(t)
       TreapMemNode(3, "300", e, e) must_== t.root
       
       t = t1.union(t2).union(t3).diff(t2)
-      2L must_== t.root.count
-      1  must_== t.root.firstKey
-      3  must_== t.root.lastKey
+      2L must_== t.root.count(t)
+      1  must_== t.root.firstKey(t)
+      3  must_== t.root.lastKey(t)
       TreapMemNode(3, "300", 
                      TreapMemNode(1, "100", e, e), 
                      e) must_== t.root
 
       t = t1.union(t2).union(t3).-(2).asInstanceOf[t1.type]
-      2L must_== t.root.count
-      1  must_== t.root.firstKey
-      3  must_== t.root.lastKey
+      2L must_== t.root.count(t)
+      1  must_== t.root.firstKey(t)
+      3  must_== t.root.lastKey(t)
       TreapMemNode(3, "300", 
                      TreapMemNode(1, "100", e, e), 
                      e) must_== t.root
 
       t = t1.update(2, "200").update(3, "300").-(2).asInstanceOf[t1.type]
-      2L must_== t.root.count
-      1  must_== t.root.firstKey
-      3  must_== t.root.lastKey
+      2L must_== t.root.count(t)
+      1  must_== t.root.firstKey(t)
+      3  must_== t.root.lastKey(t)
       TreapMemNode(3, "300",
                      TreapMemNode(1, "100", e, e), 
                      e) must_== t.root

@@ -237,13 +237,13 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
             treap.swizzleSaveNode(x.swizzleSelf)          
 
         val lLoaded = x.swizzleLeft.value != null
-        walk(treap, minFileId, x.left)
+        walk(treap, minFileId, x.left(treap))
         if (lLoaded == false &&
             x.swizzleLeft.loc != emptyNodeLoc)
             x.swizzleLeft.value_!!(null) // TODO: Possible concurrent error here?
 
         val rLoaded = x.swizzleRight.value != null
-        walk(treap, minFileId, x.right)
+        walk(treap, minFileId, x.right(treap))
         if (rLoaded == false &&
             x.swizzleRight.loc != emptyNodeLoc)
             x.swizzleRight.value_!!(null) // TODO: Possible concurrent error here?

@@ -50,7 +50,7 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   def intersect(that: TreapNode[A, B]): Treap[A, B] = mkTreap(root.intersect(this, that))
   def diff(that: TreapNode[A, B]): Treap[A, B]      = mkTreap(root.diff(this, that))
   
-  lazy val count = root.count // TODO: Revisit treap size/count. 
+  lazy val count = root.count(this) // TODO: Revisit treap size/count. 
 
   def size: Int = count.toInt
 
@@ -59,7 +59,7 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   
   override def get(key: A): Option[B] = 
     root.lookup(this, key) match {
-      case n: TreapFullNode[A, B] => Some(n.value)
+      case n: TreapFullNode[A, B] => Some(n.value(this))
       case _ => None
     }
     
@@ -83,8 +83,8 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   def del(key: A): Treap[A, B] = 
     mkTreap(root.del(this, key))
   
-  override def firstKey: A = root.firstKey
-  override def lastKey: A  = root.lastKey
+  override def firstKey: A = root.firstKey(this)
+  override def lastKey: A  = root.lastKey(this)
   
   override def compare(k0: A, k1: A): Int = k0.compare(k1)
     
@@ -111,11 +111,11 @@ abstract class TreapNode[A <% Ordered[A], B <: AnyRef]
   type Empty = TreapEmptyNode[A, B]
   
   def isEmpty: Boolean
-  def isLeaf: Boolean
+  def isLeaf(t: T): Boolean
   
-  def count: Long
-  def firstKey: A
-  def lastKey: A
+  def count(t: T): Long
+  def firstKey(t: T): A
+  def lastKey(t: T): A
   
   def lookup(t: T, s: A): Node
 
@@ -163,11 +163,11 @@ abstract class TreapNode[A <% Ordered[A], B <: AnyRef]
 case class TreapEmptyNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, B] 
 { 
   def isEmpty: Boolean = true
-  def isLeaf: Boolean  = throw new RuntimeException("isLeaf on empty treap node")
+  def isLeaf(t: T): Boolean  = throw new RuntimeException("isLeaf on empty treap node")
 
-  def count = 0L
-  def firstKey = throw new NoSuchElementException("empty treap")
-  def lastKey  = throw new NoSuchElementException("empty treap")
+  def count(t: T)    = 0L
+  def firstKey(t: T) = throw new NoSuchElementException("empty treap")
+  def lastKey(t: T)  = throw new NoSuchElementException("empty treap")
   
   def lookup(t: T, s: A): Node          = this
   def split(t: T, s: A)                 = (this, null, this)
@@ -191,9 +191,9 @@ case class TreapEmptyNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, B]
 abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, B] 
 {
   def key: A  
-  def left: Node
-  def right: Node
-  def value: B
+  def left(t: T): Node
+  def right(t: T): Node
+  def value(t: T): B
   
   /**
    * Subclasses will definitely want to consider overriding this
@@ -201,45 +201,45 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
    * the treap's heap-like ability to shuffle high-priority 
    * nodes to the top of the heap for faster access.
    */
-  def priority = {
+  def priority(t: T) = {
     val h = key.hashCode
     ((h << 16) & 0xffff0000) | ((h >> 16) & 0x0000ffff)
   }
 
   def isEmpty: Boolean = false
-  def isLeaf: Boolean  = left.isEmpty && right.isEmpty
+  def isLeaf(t: T): Boolean  = left(t).isEmpty && right(t).isEmpty
   
-  def count = 1L + left.count + right.count
-  def firstKey = if (left.isEmpty)  key else left.firstKey
-  def lastKey  = if (right.isEmpty) key else right.lastKey
+  def count(t: T)    = 1L + left(t).count(t) + right(t).count(t)
+  def firstKey(t: T) = if (left(t).isEmpty)  key else left(t).firstKey(t)
+  def lastKey(t: T)  = if (right(t).isEmpty) key else right(t).lastKey(t)
 
   def lookup(t: T, s: A): Node = 
     if (s == key)
       this
     else {
       if (s < key)
-        left.lookup(t, s)
+        left(t).lookup(t, s)
       else
-        right.lookup(t, s)
+        right(t).lookup(t, s)
     }    
 
   def split(t: T, s: A) = {
     if (s == key) {
-      (left, this, right)
+      (left(t), this, right(t))
     } else {
       if (s < key) {
-        if (isLeaf)
-          (left, null, this) // Optimization when isLeaf.
+        if (isLeaf(t))
+          (left(t), null, this) // Optimization when isLeaf.
         else {
-          val (l1, m, r1) = left.split(t, s)
-          (l1, m, t.mkNode(this, r1, right))
+          val (l1, m, r1) = left(t).split(t, s)
+          (l1, m, t.mkNode(this, r1, right(t)))
         }
       } else {
-        if (isLeaf)
-          (this, null, right) // Optimization when isLeaf.
+        if (isLeaf(t))
+          (this, null, right(t)) // Optimization when isLeaf.
         else {
-          val (l1, m, r1) = right.split(t, s)
-          (t.mkNode(this, left, l1), m, r1)
+          val (l1, m, r1) = right(t).split(t, s)
+          (t.mkNode(this, left(t), l1), m, r1)
         }
       }
     }
@@ -248,45 +248,45 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def join(t: T, that: Node): Node = that match {
     case e: Empty => this
     case b: Full =>
-      if (priority > b.priority)
-        t.mkNode(this, left, right.join(t, b))
+      if (priority(t) > b.priority(t))
+        t.mkNode(this, left(t), right(t).join(t, b))
       else
-        t.mkNode(b, this.join(t, b.left), b.right)
+        t.mkNode(b, this.join(t, b.left(t)), b.right(t))
   }
 
   def union(t: T, that: Node): Node = that match {
     case e: Empty => this
     case b: Full =>
-      if (priority > b.priority) {
+      if (priority(t) > b.priority(t)) {
         val (l, m, r) = b.split(t, key)
         if (m == null)
-          t.mkNode(this, left.union(t, l), right.union(t, r))
+          t.mkNode(this, left(t).union(t, l), right(t).union(t, r))
         else
-          t.mkNode(m, left.union(t, l), right.union(t, r))
+          t.mkNode(m, left(t).union(t, l), right(t).union(t, r))
       } else {
         val (l, m, r) = this.split(t, b.key)
         
         // Note we don't use m because b (that) has precendence over this when union'ed.
         //
-        t.mkNode(b, l.union(t, b.left), r.union(t, b.right))
+        t.mkNode(b, l.union(t, b.left(t)), r.union(t, b.right(t)))
       }
   }
 
   def intersect(t: T, that: Node): Node = that match {
     case e: Empty => e
     case b: Full =>
-      if (priority > b.priority) {
+      if (priority(t) > b.priority(t)) {
         val (l, m, r) = b.split(t, key)
-        val nl = left.intersect(t, l)
-        val nr = right.intersect(t, r)
+        val nl = left(t).intersect(t, l)
+        val nr = right(t).intersect(t, r)
         if (m == null)
           nl.join(t, nr)
         else
           t.mkNode(m, nl, nr)
       } else {
         val (l, m, r) = this.split(t, b.key)
-        val nl = l.intersect(t, b.left)
-        val nr = r.intersect(t, b.right)
+        val nl = l.intersect(t, b.left(t))
+        val nr = r.intersect(t, b.right(t))
         if (m == null)
           nl.join(t, nr)
         else
@@ -301,8 +301,8 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
       //       http://www.cs.cmu.edu/~scandal/treaps/src/treap.sml
       //
       val (l2, m, r2) = b.split(t, key)
-      val l = left.diff(t, l2)
-      val r = right.diff(t, r2)
+      val l = left(t).diff(t, l2)
+      val r = right(t).diff(t, r2)
       if (m == null)
         t.mkNode(this, l, r)
       else
@@ -310,17 +310,17 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   }
 
   def elements(t: T): immutable.ImmutableIterator[Pair[A, B]] = 
-    left.elements(t).append(Pair(key, value), () => right.elements(t))
+    left(t).elements(t).append(Pair(key, value(t)), () => right(t).elements(t))
 
   def range(t: T, from: Option[A], until: Option[A]): TreapNode[A, B] = {
     if (from  == None && until == None)    return this
-    if (from  != None && key < from.get)   return right.range(t, from, until)
-    if (until != None && key >= until.get) return left.range(t, from, until)
+    if (from  != None && key < from.get)   return right(t).range(t, from, until)
+    if (until != None && key >= until.get) return left(t).range(t, from, until)
     
-    val (l1, m1, r1) = from.map(s => left.split(t, s)).
-                            getOrElse(null, null, left)
-    val (l2, m2, r2) = until.map(s => right.split(t, s)).
-                             getOrElse(right, null, null)
+    val (l1, m1, r1) = from.map(s => left(t).split(t, s)).
+                            getOrElse(null, null, left(t))
+    val (l2, m2, r2) = until.map(s => right(t).split(t, s)).
+                             getOrElse(right(t), null, null)
     if (m1 == null)
       t.mkNode(this, r1, l2)
     else
@@ -337,6 +337,11 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
 
 // ---------------------------------------------------------
 
-case class TreapMemNode[A <% Ordered[A], B <: AnyRef](key: A, value: B, left: TreapNode[A, B], right: TreapNode[A, B]) 
-   extends TreapFullNode[A, B] 
+case class TreapMemNode[A <% Ordered[A], B <: AnyRef](key: A, v: B, nl: TreapNode[A, B], nr: TreapNode[A, B]) 
+   extends TreapFullNode[A, B] {
+  def left(t: T)  = nl
+  def right(t: T) = nr
+  def value(t: T) = v
+}
+
 
