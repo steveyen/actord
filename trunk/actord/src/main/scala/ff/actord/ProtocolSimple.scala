@@ -15,10 +15,7 @@
  */
 package ff.actord
 
-import java.io._
 import java.net._
-
-import org.slf4j._
 
 import ff.actord.Util._
 
