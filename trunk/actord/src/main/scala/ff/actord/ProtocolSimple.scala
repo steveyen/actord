@@ -19,7 +19,8 @@ import java.net._
 
 import ff.actord.Util._
 
-class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int) extends Thread {
+class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int) 
+  extends Thread {
   override def run = {
     var idGen = 0L
     val ss    = new ServerSocket(port)
@@ -115,7 +116,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
     if (readPos + num > available)
       throw new RuntimeException("reading more string than available: " + available)
       
-    val r = new String(buf, readPos, num, "UTF-8")
+    val r = new String(buf, readPos, num, "US-ASCII")
     readPos = readPos + num
     r
   } 
