@@ -41,15 +41,26 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
   
   val MIN_CMD_SIZE = "quit\r\n".length
   
-  private var waitingFor = MIN_CMD_SIZE
-  private var available  = 0
-  private var readPos    = 0
+  private var waitingFor    = MIN_CMD_SIZE
+  private var availablePrev = 0
+  private var available     = 0
+  private var readPos       = 0
 
-  private var buf = new Array[Byte](waitingFor)
+  private var buf = new Array[Byte](8000)
   private val is = s.getInputStream
   private val os = s.getOutputStream
   
   private var numMessages = 0L
+
+  def bufIndexOf(buf: Array[Byte], offset: Int, n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
+    var i = offset
+    while (i < n) {
+      if (buf(i) == x)
+        return i
+      i += 1
+    }
+    -1
+  }
 
   override def run = {
     while (s.isClosed == false) {
@@ -58,15 +69,23 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
       val lastRead = is.read(buf, available, buf.length - available)
       if (lastRead <= -1)
         s.close
-        
-      available = available + lastRead
+      
+      availablePrev = available
+      available     = available + lastRead
       if (available > buf.length) {
         s.close
         throw new RuntimeException("available larger than buf somehow")
       }
 
       if (available >= waitingFor) {
-        val indexCR = buf.indexOf(CR)
+        val indexCR: Int = if (available >= 2 &&
+                               available == availablePrev + 1) {
+                             if (buf(available - 2) == CR) {
+                               available - 2
+                             } else
+                               -1
+                           } else
+                             bufIndexOf(buf, 0, available, CR)
         if (indexCR < 0 ||
             indexCR + CRNL.length > available) {
           waitingFor = waitingFor + 1
@@ -90,8 +109,9 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
               if (available > readPos)
                 Array.copy(buf, readPos, buf, 0, available - readPos)
             
-              waitingFor = MIN_CMD_SIZE
-              available  = available - readPos
+              waitingFor    = MIN_CMD_SIZE
+              availablePrev = 0
+              available     = available - readPos
             } else {
               waitingFor = bytesNeeded
               if (waitingFor > buf.length)
