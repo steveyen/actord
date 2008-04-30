@@ -114,10 +114,12 @@
                 <pathelement path="${runtime_classpath}"/>
               </classpath>
               <jvmarg value="-server"/>
-              <!-- for profiling/performance...
               <jvmarg value="-verbosegc"/>
+              <!-- for profiling/performance...
               <jvmarg value="-javaagent:tmp/shiftone-jrat.jar"/>
               <jvmarg value="-agentlib:hprof=heap=sites"/>
+              <jvmarg value="-agentlib:hprof=cpu=samples"/>
+              <jvmarg value="-agentlib:hprof=cpu=times"/>
                 -->
               <!-- for persistence...
               <arg value="-s_path tmp/data"/>

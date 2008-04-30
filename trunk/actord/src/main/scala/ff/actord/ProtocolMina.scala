@@ -58,7 +58,7 @@ class MMinaHandler(server: MServer) extends IoHandlerAdapter {
  *       CummulativeProtocolDecoder, for more performance.
  */
 class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder {
-  val charsetDecoder     = Charset.forName("UTF-8").newDecoder
+  val charsetDecoder     = Charset.forName("US-ASCII").newDecoder
   val MIN_CMD_SIZE       = "quit\r\n".length
   val WAITING_FOR        = new AttributeKey(getClass, "waiting_for")  
   val STATS              = new AttributeKey(getClass, "stats")  
