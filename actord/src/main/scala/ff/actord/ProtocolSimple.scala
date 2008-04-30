@@ -73,12 +73,17 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
           if (waitingFor > buf.length)
             bufGrow(waitingFor)
         } else {
-          val line = readString(indexCR + CRNL.length)
-          if (line.endsWith(CRNL) == false) {
+          val nLine = indexCR + CRNL.length
+          val aLine = new Array[Byte](nLine)
+
+          read(aLine)
+
+          if (aLine(nLine - 2) != CR ||
+              aLine(nLine - 1) != NL) {
             s.close
             throw new RuntimeException("missing CRNL")
           } else {
-            val bytesNeeded = protocol.process(server, this, line, this, available)
+            val bytesNeeded = protocol.process(server, this, aLine, this, available)
             if (bytesNeeded == 0) {
               numMessages = numMessages + 1              
 
@@ -103,11 +108,18 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
     buf = new Array[Byte](size)
     Array.copy(bufPrev, 0, buf, 0, bufPrev.length)
   }
+
+  def read: Byte = {
+    if (readPos >= available)
+      throw new RuntimeException("reading more than available: " + available)
+    val b = buf(readPos)
+    readPos = readPos + 1
+    b
+  }
      
   def read(bytes: Array[Byte]): Unit = {
     if (readPos + bytes.length > available)
       throw new RuntimeException("reading more bytes than available: " + available)
-
     Array.copy(buf, readPos, bytes, 0, bytes.length)
     readPos = readPos + bytes.length
   }
@@ -115,7 +127,6 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
   def readString(num: Int): String = {
     if (readPos + num > available)
       throw new RuntimeException("reading more string than available: " + available)
-      
     val r = new String(buf, readPos, num, "US-ASCII")
     readPos = readPos + num
     r

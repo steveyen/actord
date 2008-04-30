@@ -21,6 +21,7 @@ package ff.actord
 object Util {
   final val ZERO      = java.lang.Integer.valueOf(0)
   final val CR        = '\r'.asInstanceOf[Byte]
+  final val NL        = '\n'.asInstanceOf[Byte]
   final val CRNL      = "\r\n"
   final val CRNLBytes = CRNL.getBytes
 
