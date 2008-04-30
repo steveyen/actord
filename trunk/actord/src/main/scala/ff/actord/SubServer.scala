@@ -359,10 +359,8 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           // TODO: The data.size method is slow / walks all nodes!
           //
           reply(MServerStats(data.size, usedMemory, evictions, 
-                             cmd_gets, 
-                             cmd_sets,
-                             get_hits,
-                             get_misses,     
+                             cmd_gets, cmd_sets,
+                             get_hits, get_misses,
                              lruSize))
       }
     }
