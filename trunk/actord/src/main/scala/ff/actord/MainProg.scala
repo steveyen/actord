@@ -20,11 +20,6 @@ import scala.collection._
 import java.io._
 import java.net._
 
-import org.slf4j._
-
-import ff.actord.Util._
-import ff.collection._
-
 abstract class MainProg {
   var storePath: String = null
   
