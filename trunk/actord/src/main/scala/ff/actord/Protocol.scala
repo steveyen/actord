@@ -156,7 +156,7 @@ class MProtocol {
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply))),
+              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply) + CRNL)),
 
       // Extensions to basic protocol.
       //
