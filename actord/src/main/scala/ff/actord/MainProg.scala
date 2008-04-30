@@ -129,11 +129,6 @@ abstract class MainProg {
    * Subclasses might override this method to add/remove entries to the list.
    */
   def flags = List(
-//  Flag("ipAddr", 
-//           "-l <ip_addr>" :: Nil,
-//           "Listen on <ip_addr>; default to INDRR_ANY.\n" +
-//             "This is an important option to consider for security.\n" +
-//             "Binding to an internal or firewalled network interface is suggested."),
     Flag("limitMem", 
              "-m <num>" :: Nil,
              "Use <num> MB memory max for data; default is " + default_limitMem + "."),
@@ -158,6 +153,11 @@ abstract class MainProg {
     Flag("veryVerbose", 
              "-vv" :: Nil,
              "Be even more verbose; for example, also print client requests and responses.")
+//  Flag("ipAddr", 
+//           "-l <ip_addr>" :: Nil,
+//           "Listen on <ip_addr>; default to INDRR_ANY.\n" +
+//             "This is an important option to consider for security.\n" +
+//             "Binding to an internal or firewalled network interface is suggested."),
 //  Flag("noExpire", 
 //           "-M" :: Nil,
 //           "Instead of expiring items when max memory is reached, throw an error."),
