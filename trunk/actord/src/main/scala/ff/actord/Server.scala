@@ -120,7 +120,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
    */  
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
     if (subServerNum <= 1) 
-       subServers(0).getMulti(keys)
+        subServers(0).getMulti(keys)
     else {
       // First group the keys for each subServer, for better 
       // cache locality and synchronization avoidance.
