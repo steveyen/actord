@@ -15,10 +15,6 @@
  */
 package ff.actord
 
-import java.net._
-import java.nio._
-import java.nio.charset._
-
 import ff.actord.Util._
 
 trait MBufferIn {
