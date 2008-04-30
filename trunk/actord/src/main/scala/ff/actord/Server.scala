@@ -173,10 +173,8 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   
   def flushAll(expTime: Long) = subServers.foreach(_.flushAll(expTime))
   
-  def stats = {
-    val empty = MServerStats(0L, 0L, 0L, 0L)
-    subServers.foldLeft(empty)((accum, subServer) => accum + subServer.stats)
-  }
+  def stats = 
+    subServers.foldLeft(new MServerStats)((accum, subServer) => accum + subServer.stats)
 
   /**
    * The keyFrom is the range's lower-bound, inclusive.
@@ -196,11 +194,20 @@ case class MServerStatsRequest
 case class MServerStats(numEntries: Long,
                         usedMemory: Long,
                         evictions: Long,
+                        cmd_gets: Long, 
+                        cmd_sets: Long,
+                        get_hits: Long,
+                        get_misses: Long,
                         lruSize: Long) {
+  def this() = this(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
   def +(that: MServerStats) =
     MServerStats(numEntries + that.numEntries, 
                  usedMemory + that.usedMemory, 
                  evictions  + that.evictions,
+                 cmd_gets   + that.cmd_gets, 
+                 cmd_sets   + that.cmd_sets,
+                 get_hits   + that.get_hits,
+                 get_misses + that.get_misses,
                  lruSize    + that.lruSize)
 }
 

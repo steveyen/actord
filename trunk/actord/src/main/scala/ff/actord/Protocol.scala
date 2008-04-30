@@ -309,10 +309,10 @@ class MProtocol {
 
       statLine("version", svr.version)
 
-//    statLine("cmd_gets",   String.valueOf(get_cmds))
-//    statLine("cmd_sets",   String.valueOf(set_cmds))
-//    statLine("get_hits",   String.valueOf(get_hits))
-//    statLine("get_misses", String.valueOf(get_misses))
+      statLine("cmd_gets",   String.valueOf(svrStats.cmd_gets))
+      statLine("cmd_sets",   String.valueOf(svrStats.cmd_sets))
+      statLine("get_hits",   String.valueOf(svrStats.get_hits))
+      statLine("get_misses", String.valueOf(svrStats.get_misses))
 
 //    statLine("curr_connections",  String.valueOf(curr_conns))
 //    statLine("total_connections", String.valueOf(total_conns))
