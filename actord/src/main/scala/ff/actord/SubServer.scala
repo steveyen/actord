@@ -69,8 +69,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     val d = data     
     val r = keys.flatMap(key => getUnexpired(key, d, true))
 
-    if (!r.isEmpty)
-      mod ! ModTouch(r.elements, true)
+    mod ! ModTouch(r.elements, keys.length, true)
       
     r.elements
   }
@@ -134,7 +133,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 
   def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
     var r = data.range(keyFrom, keyTo)
-    mod ! ModTouch(r.values, true)
+    mod ! ModTouch(r.values, 0, true)
     r.values
   }
   
@@ -167,6 +166,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     //
     var usedMemory = 0L // In bytes.
     var evictions  = 0L // Number of valid entries that were evicted since server start.
+    var cmd_gets   = 0L
+    var cmd_sets   = 0L
+    var get_hits   = 0L
+    var get_misses = 0L
 
     /**
      * Runs eviction if memory is over limits.
@@ -234,13 +237,23 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     
     loop {
       receive {
-        case ModTouch(els, noReply) => {
+        case ModTouch(els, numGetMultiKeys, noReply) => {
+          var numHits = 0
           for (el <- els) {
             if (el.lru != null &&
                 el.lru.next != null && // The entry might have been deleted already
                 el.lru.prev != null)   // so don't put it back.
               touch(el)
+            numHits = numHits + 1
           }
+          
+          get_hits = get_hits + numHits // TODO: How to account for range hits?
+
+          if (numGetMultiKeys > 0)
+            cmd_gets = cmd_gets + 1L    // TODO: How does memcached count get-multi?
+          
+          if (numGetMultiKeys > numHits)
+            get_misses = get_misses + (numGetMultiKeys - numHits)
           
           if (!noReply) 
               reply(true)
@@ -251,6 +264,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           if (!noReply) 
               reply(true)
           evictCheck
+          cmd_sets = cmd_sets + 1L
         }
 
         case ModDelete(key, el, expTime, noReply) => {
@@ -344,7 +358,12 @@ class MSubServer(val id: Int, val limitMemory: Long) {
         case MServerStatsRequest =>
           // TODO: The data.size method is slow / walks all nodes!
           //
-          reply(MServerStats(data.size, usedMemory, evictions, lruSize))
+          reply(MServerStats(data.size, usedMemory, evictions, 
+                             cmd_gets, 
+                             cmd_sets,
+                             get_hits,
+                             get_misses,     
+                             lruSize))
       }
     }
   }
@@ -353,7 +372,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (key: String, el: MEntry, expTime: Long, noReply: Boolean)
-  case class ModTouch  (els: Iterator[MEntry],       noReply: Boolean)
+  case class ModTouch  (els: Iterator[MEntry], numKeys: Int, noReply: Boolean)
   case class ModDelta  (key: String, delta: Long,    noReply: Boolean)
   case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean) // For append/prepend.
   case class ModCAS    (el: MEntry, cidPrev: Long,   noReply: Boolean)
