@@ -94,19 +94,12 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       }
     ).getOrElse(false)
     
-  def add(el: MEntry, async: Boolean) = 
+  def addRep(isAdd: Boolean, el: MEntry, async: Boolean) = 
     if (async) {
-      mod ! ModAdd(el, true, async)
+      mod ! ModAddRep(el, isAdd, async)
       true
     } else
-      (mod !? ModAdd(el, true, async)).asInstanceOf[Boolean]
-
-  def replace(el: MEntry, async: Boolean) = 
-    if (async) {
-      mod ! ModAdd(el, false, async)
-      true
-    } else
-      (mod !? ModAdd(el, false, async)).asInstanceOf[Boolean]
+      (mod !? ModAddRep(el, isAdd, async)).asInstanceOf[Boolean]
 
   def delta(key: String, v: Long, async: Boolean): Long =
     if (async) {
@@ -148,7 +141,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   // --------------------------------------------
   
   /**
-   * Only the "mod" actor is allowed to update the data_i root. 
+   * Only this mod (or modification) actor is allowed to update the data_i root. 
    * Also, the mod actor manages the LRU list and evicts entries when necessary.
    * This design serializes modifications, which is why we usually create one 
    * MSubServer (and a matching mod actor) per processor core, to increase
@@ -298,10 +291,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
           }
         }
 
-        case ModAdd(el, add, noReply) => {
+        case ModAddRep(el, isAdd, noReply) => {
           val result = (getUnexpired(el.key) match {
-            case Some(_) => if (add) false else setEntry(el)
-            case None    => if (add) setEntry(el) else false
+            case Some(_) => if (isAdd) false else setEntry(el)
+            case None    => if (isAdd) setEntry(el) else false
           })
           if (!noReply) 
               reply(result)
@@ -364,6 +357,6 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModDelta  (key: String, delta: Long,    noReply: Boolean)
   case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean) // For append/prepend.
   case class ModCAS    (el: MEntry, cidPrev: Long,   noReply: Boolean)
-  case class ModAdd    (el: MEntry, add: Boolean,    noReply: Boolean) // For add/replace.
+  case class ModAddRep (el: MEntry, isAdd: Boolean,  noReply: Boolean) // For add/replace.
 }
 
