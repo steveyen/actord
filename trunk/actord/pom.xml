@@ -110,15 +110,18 @@
 
             <java classname="ff.actord.Main" 
                   fork="true">
+              <jvmarg value="-server"/>
               <jvmarg value="-verbosegc"/>
-              <!--
+              <!-- for profiling/performance...
               <jvmarg value="-javaagent:tmp/shiftone-jrat.jar"/>
+              <jvmarg value="-agentlib:hprof=heap=sites"/>
                 -->
               <classpath>
                 <pathelement path="${runtime_classpath}"/>
               </classpath>
-              <!--
+              <!-- for persistence...
               <arg value="-s_path tmp/data"/>
+              <arg value="-s_interval 5000"/>
               <arg value="-s_log_file_size 1000000"/>
                 -->
             </java>
