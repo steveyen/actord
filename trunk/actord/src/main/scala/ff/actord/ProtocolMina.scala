@@ -95,12 +95,14 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
     if (indexCR + CRNL.length > remaining) 
         return MessageDecoderResult.NEED_DATA
 
-    val wrap = WrapIoBufferIn(in)
-    val line = wrap.readString(indexCR + CRNL.length)
-    if (line.endsWith(CRNL) == false)
+    val nLine = indexCR + CRNL.length
+    val aLine = new Array[Byte](nLine)
+    in.get(aLine, 0, nLine)
+    if (aLine(nLine - 2) != CR ||
+        aLine(nLine - 1) != NL)
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
-        
-    val bytesNeeded = protocol.process(server, WrapIoSession(session), line, wrap, remaining)
+
+    val bytesNeeded = protocol.process(server, WrapIoSession(session), aLine, WrapIoBufferIn(in), remaining)
     if (bytesNeeded == 0) {
       MessageDecoderResult.OK
     } else {
@@ -115,6 +117,7 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
   }
   
   case class WrapIoBufferIn(buf: IoBuffer) extends MBufferIn {
+    def read: Byte = buf.get
     def read(bytes: Array[Byte]): Unit = buf.get(bytes)
     def readString(num: Int): String = {
       val a = new Array[Byte](num)

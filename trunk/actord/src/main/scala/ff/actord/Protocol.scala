@@ -18,6 +18,7 @@ package ff.actord
 import ff.actord.Util._
 
 trait MBufferIn {
+  def read: Byte
   def read(bytes: Array[Byte]): Unit
   def readString(num: Int): String
 }
@@ -214,10 +215,11 @@ class MProtocol {
    */
   def process(server: MServer,
               session: MSession, 
-              cmdLine: String,   
+              cmdArr: Array[Byte],
               cmdData: MBufferIn,
               readyCount: Int): Int = {
-    val cmdArgs = cmdLine.trim.split(" ")             
+    val cmdLine = new String(cmdArr, 0, cmdArr.length - 2, "US-ASCII")
+    val cmdArgs = cmdLine.split(" ")
     val cmdName = cmdArgs(0)
 
     lineOnlyCommands.get(cmdName).map(
@@ -240,10 +242,10 @@ class MProtocol {
         //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
         //
         if (spec.checkArgs(cmdArgs)) {
-          var dataSize    = cmdArgs(4).trim.toInt
-          val totalNeeded = cmdLine.length + dataSize + CRNL.length
+          var dataSize    = cmdArgs(4).toInt
+          val totalNeeded = cmdArr.length + dataSize + CRNL.length
           if (totalNeeded <= readyCount) {
-            val expTime = cmdArgs(3).trim.toLong
+            val expTime = cmdArgs(3).toLong
             
             // TODO: Handle this better when dataSize is huge.
             //       Perhaps use mmap, or did mina read it entirely 
@@ -253,7 +255,8 @@ class MProtocol {
             
             cmdData.read(data)
             
-            if (cmdData.readString(CRNL.length) == CRNL) {
+            if (cmdData.read == CR &&
+                cmdData.read == NL) {
               val cmd = MCommand(cmdArgs,
                                  MEntry(cmdArgs(1),
                                         cmdArgs(2).toLong,
