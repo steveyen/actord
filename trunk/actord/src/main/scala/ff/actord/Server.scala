@@ -223,7 +223,7 @@ case class MEntry(key: String,
       isExpired(nowInSeconds)
   
   def isExpired(now: Long): Boolean = 
-    (key.length <= 0) || // An empty key means an error entry, possibly from unreadable files.
+    (key == null) || // A null key means an error entry, possibly from unreadable files.
     (expTime != 0L &&
      expTime < now)
 

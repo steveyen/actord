@@ -272,7 +272,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
 
           dataMod.get(key) match {
             case Some(current) =>
-              val isErrorEntry = el.key.length <= 0
+              val isErrorEntry = el.key == null
               if (isErrorEntry ||          // Always delete error entries.
                   current.cid == el.cid) { // Or, must have the same CAS value.
                 if (isErrorEntry ||
