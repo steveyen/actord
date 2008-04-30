@@ -15,8 +15,6 @@
  */
 package ff.actord
 
-import scala.collection._
-
 object Main
 {
   def main(args: Array[String]) {
