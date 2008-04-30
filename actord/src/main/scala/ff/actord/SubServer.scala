@@ -94,7 +94,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       }
     ).getOrElse(false)
     
-  def addRep(isAdd: Boolean, el: MEntry, async: Boolean) = 
+  def addRep(isAdd: Boolean, el: MEntry, async: Boolean) = // For add or replace.
     if (async) {
       mod ! ModAddRep(el, isAdd, async)
       true
