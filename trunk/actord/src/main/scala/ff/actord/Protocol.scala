@@ -204,10 +204,11 @@ class MProtocol {
 
   def splitArr(a: Array[Byte], len: Int): Seq[String] = { // Avoiding String.split() because it uses regexps.
     val r = new mutable.ArrayBuffer[String]
+    val x = SPACE
     var s = 0
     var i = 0
     while (i < len) {
-      if (a(i) == SPACE) {
+      if (a(i) == x) {
         if (s < i)
           r += (new String(a, s, i - s, "US-ASCII"))
         s = i + 1
@@ -420,7 +421,7 @@ class MProtocol {
  * Represents an incoming command or request from a (remote) client.
  */
 case class MCommand(args: Seq[String], entry: MEntry) {
-  def noReply = args.last == "noreply"
+  val noReply = args.last == "noreply"
   
   def argToLong(at: Int) = itemToLong(args, at)
   
