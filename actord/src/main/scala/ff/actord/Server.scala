@@ -103,8 +103,8 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
 
   val defaultGet     = getMulti _
   val defaultSet     = (el: MEntry, async: Boolean) => subServerForKey(el.key).set(el, async)
-  val defaultAdd     = (el: MEntry, async: Boolean) => subServerForKey(el.key).add(el, async)
-  val defaultReplace = (el: MEntry, async: Boolean) => subServerForKey(el.key).replace(el, async)
+  val defaultAdd     = (el: MEntry, async: Boolean) => subServerForKey(el.key).addRep(true,  el, async)
+  val defaultReplace = (el: MEntry, async: Boolean) => subServerForKey(el.key).addRep(false, el, async)
   val defaultAct     = (el: MEntry, async: Boolean) => Iterator.empty
   val defaultDelete  = (k: String, time: Long, async: Boolean) => subServerForKey(k).delete(k, time, async)
 
