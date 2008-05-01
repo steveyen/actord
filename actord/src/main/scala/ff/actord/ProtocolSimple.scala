@@ -32,7 +32,7 @@ class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: 
   }
 }
 
-class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long) 
+class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Long) 
   extends Thread 
      with MBufferIn
      with MBufferOut
@@ -152,7 +152,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
     r
   } 
 
-  def ident: Long = id  
+  def ident: Long = sessionIdent  
   def close: Unit = s.close
 
   def write(res: MResponse): Unit = res.put(this)
