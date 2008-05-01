@@ -30,10 +30,10 @@ trait MBufferOut {
 }
 
 trait MSession {
-  def getId: Long
+  def ident: Long
   def close: Unit
   def write(r: MResponse): Unit
-  def getReadMessages: Long
+  def numMessages: Long
 }
 
 /**
@@ -283,8 +283,8 @@ class MProtocol {
                                             expTime,
                                         dataSize,
                                         data,
-                                        (session.getId << 32) + 
-                                        (session.getReadMessages & 0xFFFFFFFFL)))
+                                        (session.ident << 32) + 
+                                        (session.numMessages & 0xFFFFFFFFL)))
               val res = spec.process(server, cmd, session)
               if (cmd.noReply == false)
                 session.write(res)
