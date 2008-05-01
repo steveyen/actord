@@ -50,7 +50,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
   private val is = s.getInputStream
   private val os = s.getOutputStream
   
-  private var numMessages = 0L
+  private var nMessages = 0L
 
   def bufIndexOf(buf: Array[Byte], offset: Int, n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
     var i = offset
@@ -104,7 +104,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
           } else {
             val bytesNeeded = protocol.process(server, this, aLine, this, available)
             if (bytesNeeded == 0) {
-              numMessages = numMessages + 1              
+              nMessages = nMessages + 1              
 
               if (available > readPos)
                 Array.copy(buf, readPos, buf, 0, available - readPos)
@@ -151,12 +151,13 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, id: Long)
     readPos = readPos + num
     r
   } 
-  
+
+  def ident: Long = id  
   def close: Unit = s.close
 
   def write(res: MResponse): Unit = res.put(this)
   
-  def getReadMessages: Long = numMessages
+  def numMessages: Long = nMessages
 
   def put(bytes: Array[Byte]): Unit = os.write(bytes)
 }

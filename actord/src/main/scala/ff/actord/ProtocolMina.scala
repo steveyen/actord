@@ -127,11 +127,11 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
   }
   
   case class WrapIoSession(sess: IoSession) extends MSession {
-    def getId: Long               = sess.getId
+    def ident: Long               = sess.getId
     def close: Unit               = sess.close
     def write(r: MResponse): Unit = sess.write(r)
   
-    def getReadMessages: Long = sess.getReadMessages
+    def numMessages: Long = sess.getReadMessages
   }
 }
 
