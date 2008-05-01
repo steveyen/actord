@@ -190,6 +190,13 @@ class MainProgSimple extends MainProg {
 
 // ------------------------------------------------------
 
+class MainProgGrizzly extends MainProg {
+  def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
+    (new GAcceptor(server, createProtocol, numProcessors, port)).start
+}
+
+// ------------------------------------------------------
+
 class MainProgMina extends MainProg {
   import org.apache.mina.common._
   import org.apache.mina.filter.codec._
