@@ -67,17 +67,21 @@ println("gpf e 1")
         bb.flip
         if (bb.hasRemaining) {
 println("gpf e 2")
+          var s: GSession = null
           val h = ctx.getAttributeHolderByScope(Context.AttributeScope.CONNECTION)
-          if (h != null) {
-println("gpf e 3")
-            var s = h.getAttribute("s").asInstanceOf[GSession]
-            if (s == null) {
+          if (h != null) 
+              s = h.getAttribute("s").asInstanceOf[GSession]
+          if (s == null) {
 println("gpf e 4")
-                s = new GSession(server, protocol, ctx.getSelectionKey.channel, idNext)
-                h.setAttribute("s", s)
-            }
-            s.incoming(bb, ctx)
+              s = ctx.getAttribute("s").asInstanceOf[GSession]
+              if (s == null)
+                  s = new GSession(server, protocol, ctx.getSelectionKey.channel, idNext)
           }
+          ctx.setAttribute("s", s)
+          if (h != null) 
+              h.setAttribute("s", s)
+          
+          s.incoming(bb, ctx)
         }
         bb.clear
     }
