@@ -60,14 +60,19 @@ class GProtocolFilter(server: MServer, protocol: MProtocol) extends ProtocolFilt
   }
 
   def execute(ctx: Context): Boolean = {
+println("gpf e 0 " + ctx.getCurrentOpType)  
     val bb = Thread.currentThread.asInstanceOf[WorkerThread].getByteBuffer
     if (bb != null) {
+println("gpf e 1")
         bb.flip
         if (bb.hasRemaining) {
+println("gpf e 2")
           val h = ctx.getAttributeHolderByScope(Context.AttributeScope.CONNECTION)
           if (h != null) {
+println("gpf e 3")
             var s = h.getAttribute("s").asInstanceOf[GSession]
             if (s == null) {
+println("gpf e 4")
                 s = new GSession(server, protocol, ctx.getSelectionKey.channel, idNext)
                 h.setAttribute("s", s)
             }
@@ -82,8 +87,7 @@ class GProtocolFilter(server: MServer, protocol: MProtocol) extends ProtocolFilt
   def postExecute(ctx: Context): Boolean = true
 }
 
-class GSession(server: MServer, protocol: MProtocol, s: Closeable, id: Long) 
-  extends MBufferIn {
+class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent: Long) {
   val MIN_CMD_SIZE = "quit\r\n".length
   
   private var waitingFor    = MIN_CMD_SIZE
@@ -106,10 +110,14 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, id: Long)
   }
   
   def incoming(in: ByteBuffer, ctx: Context): Unit = {
+println("incoming 0")
+
     readPos = 0
     
     val inCount = in.remaining
     
+println("incoming x " + inCount)
+
     if (available + inCount > buf.length)
        bufGrow(available + inCount)
     
@@ -143,18 +151,9 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, id: Long)
           s.close
           throw new RuntimeException("missing CRNL")
         } else {
-          class Adapter extends MSession with MBufferOut {
-            def ident: Long = id
-            def close: Unit = s.close
-            def write(res: MResponse): Unit = res.put(this)
-            def numMessages: Long = nMessages
-            def put(bytes: Array[Byte]): Unit = 
-              ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes))
-          }
+          val adapter = new GAdapter(ctx)
           
-          val adapter = new Adapter
-          
-          val bytesNeeded = protocol.process(server, adapter, aLine, this, available)
+          val bytesNeeded = protocol.process(server, adapter, aLine, adapter, available)
           if (bytesNeeded == 0) {
             nMessages = nMessages + 1              
 
@@ -201,6 +200,19 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, id: Long)
     val r = new String(buf, readPos, num, "US-ASCII")
     readPos = readPos + num
     r
+  }
+
+  class GAdapter(ctx: Context) extends MSession with MBufferIn with MBufferOut {
+    def ident: Long = sessionIdent
+    def close: Unit = s.close
+    def write(res: MResponse): Unit = res.put(this)
+    def numMessages: Long = nMessages
+    def put(bytes: Array[Byte]): Unit = 
+      ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes))
+          
+    def read: Byte                     = GSession.this.read
+    def read(bytes: Array[Byte]): Unit = GSession.this.read(bytes)
+    def readString(num: Int): String   = GSession.this.readString(num)
   }
 }
 
