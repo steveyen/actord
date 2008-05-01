@@ -28,8 +28,9 @@ import ff.actord.Util._
 /**
  * Sun Grizzly / NIO based acceptor/protocol implementation.
  */
-class GAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int) {
-  def start {
+class GAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int)
+  extends Thread {
+  override def run = {
     // See: http://weblogs.java.net/blog/jfarcand/archive/2008/02/writing_a_tcpud_1.html
     //      http://gallemore.blogspot.com/2007/07/using-grizzly-to-read-tcp-packets.html
     //

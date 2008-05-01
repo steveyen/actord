@@ -18,14 +18,12 @@ package ff.actord
 object Main
 {
   def main(args: Array[String]) {
-    main_using_simple(args)
-  }
-  
-  def main_using_simple(args: Array[String]) { // Uses simple blocking i/o implementation.
-    new MainProgSimple().start(args)
-  }
-  
-  def main_using_mina(args: Array[String]) { // Uses mina/NIO implementation.
+    // Implementations include simple blocking i/o, or grizzly/NIO, or mina/NIO...
+    //
+    // new MainProgSimple().start(args)
+    // new MainProgGrizzly().start(args)
+    // new MainProgMina().start(args)
+    
     new MainProgMina().start(args)
   }
   
