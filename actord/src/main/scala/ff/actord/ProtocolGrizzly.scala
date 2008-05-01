@@ -60,26 +60,16 @@ class GProtocolFilter(server: MServer, protocol: MProtocol) extends ProtocolFilt
   }
 
   def execute(ctx: Context): Boolean = {
-println("gpf e 0 " + ctx.getCurrentOpType)  
     val bb = Thread.currentThread.asInstanceOf[WorkerThread].getByteBuffer
     if (bb != null) {
-println("gpf e 1")
         bb.flip
         if (bb.hasRemaining) {
-println("gpf e 2")
-          var s: GSession = null
-          val h = ctx.getAttributeHolderByScope(Context.AttributeScope.CONNECTION)
-          if (h != null) 
-              s = h.getAttribute("s").asInstanceOf[GSession]
+          val k = ctx.getSelectionKey
+          var s = k.attachment.asInstanceOf[GSession]
           if (s == null) {
-println("gpf e 4")
-              s = ctx.getAttribute("s").asInstanceOf[GSession]
-              if (s == null)
-                  s = new GSession(server, protocol, ctx.getSelectionKey.channel, idNext)
+              s = new GSession(server, protocol, k.channel, idNext)
+              k.attach(s)
           }
-          ctx.setAttribute("s", s)
-          if (h != null) 
-              h.setAttribute("s", s)
           
           s.incoming(bb, ctx)
         }
@@ -114,14 +104,10 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent:
   }
   
   def incoming(in: ByteBuffer, ctx: Context): Unit = {
-println("incoming 0")
-
     readPos = 0
     
     val inCount = in.remaining
     
-println("incoming x " + inCount)
-
     if (available + inCount > buf.length)
        bufGrow(available + inCount)
     
