@@ -236,7 +236,7 @@ val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
     lineOnlyCommands.get(cmdName).map(
       spec => {
         if (spec.checkArgs(cmdArgs)) {
-          val res = spec.process(server, MCommand(session, cmdArgs, null))
+          spec.process(server, MCommand(session, cmdArgs, null))
           GOOD
         } else {
           session.write(("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL).getBytes)
