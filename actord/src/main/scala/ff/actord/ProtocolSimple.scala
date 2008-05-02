@@ -15,6 +15,7 @@
  */
 package ff.actord
 
+import java.io._
 import java.net._
 
 import ff.actord.Util._
@@ -47,8 +48,9 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
   private var readPos       = 0
 
   private var buf = new Array[Byte](8000)
-  private val is = s.getInputStream
-  private val os = s.getOutputStream
+  private val is  = s.getInputStream
+  private val os  = s.getOutputStream
+  private val bos = new BufferedOutputStream(os, 4000)
   
   private var nMessages = 0L
 
@@ -104,6 +106,8 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
           } else {
             val bytesNeeded = protocol.process(server, this, aLine, this, available)
             if (bytesNeeded == 0) {
+              bos.flush
+              
               nMessages = nMessages + 1              
 
               if (available > readPos)
@@ -159,6 +163,6 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
   
   def numMessages: Long = nMessages
 
-  def put(bytes: Array[Byte]): Unit = os.write(bytes)
+  def put(bytes: Array[Byte]): Unit = bos.write(bytes)
 }
 
