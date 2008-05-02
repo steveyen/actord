@@ -138,7 +138,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
   
   def act(el: MEntry, async: Boolean) = Iterator.empty  
   
-  def subServerList = List(this)
+  def subServerList = List(this) // The only subServer we know about is self.
   
   // --------------------------------------------
   
