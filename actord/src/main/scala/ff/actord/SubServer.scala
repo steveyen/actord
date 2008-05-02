@@ -21,7 +21,8 @@ import scala.actors.Actor._
 
 import ff.actord.Util._
 
-class MSubServer(val id: Int, val limitMemory: Long) {
+class MSubServer(val id: Int, val limitMemory: Long)
+  extends MServer {
   /**
    * Override to pass in other implementations, such as for persistence.
    */
@@ -63,7 +64,7 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       case None => None
     }
 
-  def getMulti(keys: Seq[String]): Iterator[MEntry] = {
+  def get(keys: Seq[String]): Iterator[MEntry] = {
     // Grab the data snapshot just once, outside the loop.
     //
     val d = data     
@@ -93,13 +94,6 @@ class MSubServer(val id: Int, val limitMemory: Long) {
       }
     ).getOrElse(false)
     
-  def addRep(isAdd: Boolean, el: MEntry, async: Boolean) = // For add or replace.
-    if (async) {
-      mod ! ModAddRep(el, isAdd, async)
-      true
-    } else
-      (mod !? ModAddRep(el, isAdd, async)).asInstanceOf[Boolean]
-
   def delta(key: String, v: Long, async: Boolean): Long =
     if (async) {
       mod ! ModDelta(key, v, async)
@@ -107,7 +101,14 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     } else
       (mod !? ModDelta(key, v, async)).asInstanceOf[Long]
     
-  def xpend(el: MEntry, append: Boolean, async: Boolean) =
+  def addRep(el: MEntry, isAdd: Boolean, async: Boolean) = // For add or replace.
+    if (async) {
+      mod ! ModAddRep(el, isAdd, async)
+      true
+    } else
+      (mod !? ModAddRep(el, isAdd, async)).asInstanceOf[Boolean]
+
+  def xpend(el: MEntry, append: Boolean, async: Boolean) = // For append or prepend.
     if (async) {
       mod ! ModXPend(el, append, async)
       true
@@ -136,6 +137,10 @@ class MSubServer(val id: Int, val limitMemory: Long) {
     mod ! ModTouch(r.values, 0, true)
     r.values
   }
+  
+  def act(el: MEntry, async: Boolean) = Iterator.empty  
+  
+  def subServerList = List(this)
   
   // --------------------------------------------
   
@@ -372,8 +377,8 @@ class MSubServer(val id: Int, val limitMemory: Long) {
   case class ModDelete (key: String, el: MEntry, expTime: Long, noReply: Boolean)
   case class ModTouch  (els: Iterator[MEntry], numKeys: Int, noReply: Boolean)
   case class ModDelta  (key: String, delta: Long,    noReply: Boolean)
+  case class ModAddRep (el: MEntry, isAdd: Boolean,  noReply: Boolean) // For add/replace.
   case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean) // For append/prepend.
   case class ModCAS    (el: MEntry, cidPrev: Long,   noReply: Boolean)
-  case class ModAddRep (el: MEntry, isAdd: Boolean,  noReply: Boolean) // For add/replace.
 }
 

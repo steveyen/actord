@@ -35,7 +35,7 @@ object Main
     //
     (new MainProgMina() {
       override def createServer(numProcessors: Int, limitMem: Long): MServer = {
-        val server = super.createServer(numProcessors, limitMem)
+        val server = super.createServer(numProcessors, limitMem).asInstanceOf[MMainServer]
         server.getPf = myCustomGetPf orElse server.defaultGetPf
         server.setPf = myCustomSetPf orElse server.defaultSetPf
         server

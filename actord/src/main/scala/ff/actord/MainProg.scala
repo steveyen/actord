@@ -96,12 +96,12 @@ abstract class MainProg {
 
   // ------------------------------------------------------
   
-  def createServer(numProcessors: Int, limitMem: Long) = {
+  def createServer(numProcessors: Int, limitMem: Long): MServer = {
     if (storePath == null) {
-      new MServer(numProcessors, limitMem) // Just an in-memory only server.
+      new MMainServer(numProcessors, limitMem) // Just an in-memory only server.
     } else {
       val store: MServerStorage = new MServerStorage(new File(storePath), numProcessors)
-      new MServer(numProcessors, limitMem) {
+      new MMainServer(numProcessors, limitMem) {
         override def createSubServer(id: Int): MSubServer = 
           new MPersistentSubServer(id, limitMem / subServerNum, store.subStorages(id))
       }
