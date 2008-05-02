@@ -78,14 +78,14 @@ class MProtocol {
       Spec("get <key>*",
            (svr, cmd, sess) => { 
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => sess.write(MResponseLineEntry(asValueLine(el), el)))
+                 foreach(el => sess.write(MResponseLineEntry(el.key, el, false)))
              reply(END)
            }),
 
       Spec("gets <key>*",
            (svr, cmd, sess) => {
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => sess.write(MResponseLineEntry(asValueLineCAS(el), el)))
+                 foreach(el => sess.write(MResponseLineEntry(el.key, el, true)))
              reply(END)
            }),
 
@@ -124,7 +124,7 @@ class MProtocol {
       Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
            (svr, cmd, sess) => { 
              svr.range(cmd.args(1), cmd.args(2)).
-                 foreach(el => sess.write(MResponseLineEntry(asValueLine(el), el)))
+                 foreach(el => sess.write(MResponseLineEntry(el.key, el, false)))
              reply(END)
            }))
            
@@ -168,7 +168,7 @@ class MProtocol {
       Spec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
            (svr, cmd, sess) => {
               svr.act(cmd.entry, cmd.noReply).
-                  foreach(el => sess.write(MResponseLineEntry(asValueLine(el), el)))
+                  foreach(el => sess.write(MResponseLineEntry(el.key, el, false)))
               reply(END)
            }))
       
@@ -178,14 +178,6 @@ class MProtocol {
   val lineWithDataCommands = 
       immutable.HashMap[String, Spec](lineWithDataSpecs.map(s => Pair(s.name, s)):_*)
                           
-  // ----------------------------------------
-
-  def asValueLine(e: MEntry) =
-      "VALUE " + e.key + " " + e.flags + " " + e.dataSize + CRNL
-  
-  def asValueLineCAS(e: MEntry) =
-      "VALUE " + e.key + " " + e.flags + " " + e.dataSize + " " + e.cid + CRNL
-  
   // ----------------------------------------
 
   def reply(s: String): MResponse = MResponseLine(s)
@@ -444,7 +436,7 @@ case class MCommand(args: Seq[String], entry: MEntry) {
  * One MCommand can result in a List of MResponse.
  */
 abstract class MResponse {
-  def size: Int
+  def sizeHint: Int
   def put(buf: MBufferOut): Unit
 }
 
@@ -452,7 +444,7 @@ abstract class MResponse {
  * A response of a String of a single line.
  */
 case class MResponseLine(line: String) extends MResponse {
-  def size = line.length // The line includes CRNL already.
+  def sizeHint = line.length // The line includes CRNL already.
 
   def put(buf: MBufferOut) {
     buf.put(line.toString.getBytes) // TODO: Need a charset here?
@@ -462,13 +454,33 @@ case class MResponseLine(line: String) extends MResponse {
 /**
  * A response of a String of a single line, followed by a single MEntry data bytes.
  */
-case class MResponseLineEntry(line: String, entry: MEntry) extends MResponse {
-  def size = line.length + entry.dataSize + CRNL.length // The line includes CRNL already.
+case class MResponseLineEntry(key: String, entry: MEntry, withCAS: Boolean) extends MResponse {
+  // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + CRNL
+  // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + " " + e.cid + CRNL
+
+  def sizeHint = 300 + key.length + entry.dataSize
 
   def put(buf: MBufferOut) {
-    buf.put(line.toString.getBytes) // TODO: Need a charset here?
+    import MResponseLineEntry._
+
+    buf.put(VALUE_PREFIX)
+    buf.put(key.getBytes)
+    buf.put(SPACEBytes)
+    buf.put(entry.flags.toString.getBytes)
+    buf.put(SPACEBytes)
+    buf.put(entry.dataSize.toString.getBytes)
+    if (withCAS) {
+      buf.put(SPACEBytes)
+      buf.put(entry.cid.toString.getBytes)
+    }
+    buf.put(CRNLBytes)
     buf.put(entry.data)
     buf.put(CRNLBytes)
   }
 }
+
+object MResponseLineEntry {
+  val VALUE_PREFIX = "VALUE ".getBytes
+}  
+
 
