@@ -47,30 +47,28 @@ class MSubServer(val id: Int, val limitMemory: Long)
   // --------------------------------------------
 
   def getUnexpired(key: String): Option[MEntry] =
-      getUnexpired(key, data, true)
+      getUnexpired(key, data)
     
   def getUnexpired(key: String, 
-                   dataMap: immutable.SortedMap[String, MEntry],
-                   queueExpired: Boolean): Option[MEntry] =
-    dataMap.get(key) match {
+                   map: immutable.SortedMap[String, MEntry]): Option[MEntry] =
+    map.get(key) match {
       case s @ Some(el) => {
         if (el.isExpired) {
-          if (queueExpired)
-            mod ! ModDelete(key, el, 0L, true) // TODO: Many readers of expired entries means redundant ModDelete messages.
+          mod ! ModDelete(key, el, 0L, true) // TODO: Many readers of expired entries means redundant ModDelete messages.
           None 
         } else 
           s
       }
-      case None => None
+      case _ => None
     }
 
   def get(keys: Seq[String]): Iterator[MEntry] = {
     // Grab the data snapshot just once, outside the loop.
     //
     val d = data     
-    val r = keys.flatMap(key => getUnexpired(key, d, true))
+    val r = keys.flatMap(key => getUnexpired(key, d))
 
-    mod ! ModTouch(r.elements, keys.length, true)
+    mod ! ModTouch(r.elements, keys.length)
       
     r.elements
   }
@@ -134,7 +132,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
 
   def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
     var r = data.range(keyFrom, keyTo)
-    mod ! ModTouch(r.values, 0, true)
+    mod ! ModTouch(r.values, 0)
     r.values
   }
   
@@ -242,7 +240,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
     
     loop {
       receive {
-        case ModTouch(els, numGetMultiKeys, noReply) => {
+        case ModTouch(els, numGetMultiKeys) => {
           var numHits = 0
           for (el <- els) {
             if (el.lru != null &&
@@ -259,9 +257,6 @@ class MSubServer(val id: Int, val limitMemory: Long)
           
           if (numGetMultiKeys > numHits)
             get_misses = get_misses + (numGetMultiKeys - numHits)
-          
-          if (!noReply) 
-              reply(true)
         }
         
         case ModSet(el, noReply) => {
@@ -375,7 +370,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
   
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (key: String, el: MEntry, expTime: Long, noReply: Boolean)
-  case class ModTouch  (els: Iterator[MEntry], numKeys: Int, noReply: Boolean)
+  case class ModTouch  (els: Iterator[MEntry], numKeys: Int)
   case class ModDelta  (key: String, delta: Long,    noReply: Boolean)
   case class ModAddRep (el: MEntry, isAdd: Boolean,  noReply: Boolean) // For add/replace.
   case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean) // For append/prepend.
