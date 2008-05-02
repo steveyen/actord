@@ -10,7 +10,7 @@ class AskName(initInfo: CometActorInitInfo) extends CometActor(initInfo) {
   def defaultPrefix = "ask_name"
 
   def render = ajaxForm(
-    <div>What is your username?</div> ++ 
+    <div>Hello, what's your nickname?</div> ++ 
     text("", name => answer(name.trim)) ++
     <input type="submit" value="Enter"/>)
 }

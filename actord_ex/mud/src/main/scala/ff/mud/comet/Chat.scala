@@ -54,7 +54,8 @@ class Chat(initInfo: CometActorInitInfo) extends CometActor(initInfo) {
     if (userName.length == 0) {
       ask(new AskName(CometActorInitInfo(theSession, name, defaultXml, attributes)), 
           "what's your username") {
-        case s: String if (s.trim.length > 2) => userName = s.trim; reRender(true)
+        case s: String if (s.trim.length > 2) => 
+          userName = s.trim; reRender(true)
         case s => localSetup; reRender(false)
       }
     }
