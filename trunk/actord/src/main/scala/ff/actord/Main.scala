@@ -24,7 +24,7 @@ object Main
     // new MainProgGrizzly().start(args)
     // new MainProgMina().start(args)
     
-    new MainProgMina().start(args)
+    new MainProgSimple().start(args)
   }
 }
 
