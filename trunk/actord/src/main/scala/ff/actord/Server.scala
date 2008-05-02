@@ -21,11 +21,6 @@ import ff.actord.Util._
 
 object MServer {
   def version = "actord-0.1.0"
-
-  type MGetPf    = PartialFunction[Seq[String], Seq[String] => Iterator[MEntry]]
-  type MSetPf    = PartialFunction[(String, MEntry, Boolean), (MEntry, Boolean) => Boolean]
-  type MDeletePf = PartialFunction[(String, Long, Boolean), (String, Long, Boolean) => Boolean]
-  type MActPf    = PartialFunction[(MEntry, Boolean), (MEntry, Boolean) => Iterator[MEntry]]
 }
 
 // --------------------------------------------
@@ -131,37 +126,12 @@ class MMainServer(val subServerNum: Int, // Number of internal "shards" for this
   
   // --------------------------------------------------
 
-  // Subclases can prepend to these partial functions during initialization
-  // to flexibly hook into message processing.  Alternatively, subclasses 
-  // may also just using classic method overrides of the main 
-  // get/set/delete/... methods, too.
-  //  
-  var getPf:    MServer.MGetPf    = defaultGetPf
-  var setPf:    MServer.MSetPf    = defaultSetPf
-  var actPf:    MServer.MActPf    = defaultActPf
-  var deletePf: MServer.MDeletePf = defaultDeletePf
-  
-  def defaultGetPf: MServer.MGetPf       = { case _ => defaultGet }
-  def defaultSetPf: MServer.MSetPf       = { case _ => defaultSet }
-  def defaultActPf: MServer.MActPf       = { case _ => defaultAct }
-  def defaultDeletePf: MServer.MDeletePf = { case _ => defaultDelete }
-
-  val defaultGet     = getMulti _
-  val defaultSet     = (el: MEntry, async: Boolean) => subServerForKey(el.key).set(el, async)
-  val defaultAct     = (el: MEntry, async: Boolean) => Iterator.empty
-  val defaultDelete  = (k: String, time: Long, async: Boolean) => subServerForKey(k).delete(k, time, async)
-
-  // --------------------------------------------------
-
-  def get(keys: Seq[String]): Iterator[MEntry] = getPf(keys)(keys)
-
   /**
-   * This is the default implementation of get (see the defaultGetPf partial function)
-   * that groups the keys into the buckets to efficiently send to the right subServer.
+   * Group the keys into the buckets to efficiently send to the right subServer.
    * Note that the ordering of the result Iterator[MEntry] will not follow the 
    * ordering of the input keys.
    */  
-  def getMulti(keys: Seq[String]): Iterator[MEntry] = {
+  def get(keys: Seq[String]): Iterator[MEntry] = {
     if (subServerNum <= 1) 
         subServers(0).get(keys)
     else {
@@ -184,10 +154,11 @@ class MMainServer(val subServerNum: Int, // Number of internal "shards" for this
     }
   }
 
-  def set(el: MEntry, async: Boolean) = setPf("set", el, async)(el, async)
+  def set(el: MEntry, async: Boolean) = 
+    subServerForKey(el.key).set(el, async)
 
   def delete(key: String, time: Long, async: Boolean) = 
-    deletePf(key, time, async)(key, time, async)
+    subServerForKey(key).delete(key, time, async)
 
   def delta(key: String, mod: Long, async: Boolean): Long =
     subServerForKey(key).delta(key, mod, async)
@@ -223,7 +194,7 @@ class MMainServer(val subServerNum: Int, // Number of internal "shards" for this
     subServers.foldLeft(empty)((result, s) => result.append(s.range(keyFrom, keyTo)))
   }
 
-  def act(el: MEntry, async: Boolean) = actPf(el, async)(el, async)
+  def act(el: MEntry, async: Boolean) = Iterator.empty
 }
 
 // --------------------------------------------
