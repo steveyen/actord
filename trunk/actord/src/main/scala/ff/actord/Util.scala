@@ -19,12 +19,13 @@ package ff.actord
  * Utilities that are independent of server or client.
  */
 object Util {
-  final val ZERO      = java.lang.Integer.valueOf(0)
-  final val SPACE     = ' '.asInstanceOf[Byte]
-  final val CR        = '\r'.asInstanceOf[Byte]
-  final val NL        = '\n'.asInstanceOf[Byte]
-  final val CRNL      = "\r\n"
-  final val CRNLBytes = CRNL.getBytes
+  final val ZERO       = java.lang.Integer.valueOf(0)
+  final val SPACE      = ' '.asInstanceOf[Byte]
+  final val SPACEBytes = " ".getBytes
+  final val CR         = '\r'.asInstanceOf[Byte]
+  final val NL         = '\n'.asInstanceOf[Byte]
+  final val CRNL       = "\r\n"
+  final val CRNLBytes  = CRNL.getBytes
 
   def nowInSeconds: Long = System.currentTimeMillis / 1000
   

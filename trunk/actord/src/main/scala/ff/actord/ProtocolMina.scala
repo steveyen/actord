@@ -143,7 +143,8 @@ class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[
   }
   
   def encode(session: IoSession, message: MResponse, out: ProtocolEncoderOutput) {
-    val buf = IoBuffer.allocate(message.size)
+    val buf = IoBuffer.allocate(message.sizeHint)
+    buf.setAutoExpand(true)
 
     message.put(WrapIoBufferOut(buf))
 
