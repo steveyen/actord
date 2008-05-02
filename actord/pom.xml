@@ -125,6 +125,8 @@
                 <pathelement path="${runtime_classpath}"/>
               </classpath>
               <jvmarg value="-server"/>
+              <jvmarg value="-Xms256M"/>
+              <jvmarg value="-Xmx256M"/>
               <!-- for profiling/performance...
               <jvmarg value="-verbosegc"/>
               <jvmarg value="-javaagent:tmp/shiftone-jrat.jar"/>
