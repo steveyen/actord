@@ -102,7 +102,7 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
         aLine(nLine - 1) != NL)
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
 
-    val bytesNeeded = protocol.process(server, WrapIoSession(session), aLine, WrapIoBufferIn(in), remaining)
+    val bytesNeeded = protocol.process(server, WrapIoSession(session, in), aLine, remaining)
     if (bytesNeeded == 0) {
       MessageDecoderResult.OK
     } else {
@@ -116,20 +116,14 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
     // TODO: Do we need to do something here?  Or just drop the message on the floor?
   }
   
-  case class WrapIoBufferIn(buf: IoBuffer) extends MBufferIn {
-    def read: Byte = buf.get
+  case class WrapIoSession(sess: IoSession, buf: IoBuffer) extends MSession {
+    def ident: Long  = sess.getId
+    def close: Unit = sess.close
+
+    def read: Byte                     = buf.get
     def read(bytes: Array[Byte]): Unit = buf.get(bytes)
-    def readString(num: Int): String = {
-      val a = new Array[Byte](num)
-      buf.get(a, 0, num)
-      new String(a, 0, num, "US-ASCII")
-    }
-  }
   
-  case class WrapIoSession(sess: IoSession) extends MSession {
-    def ident: Long               = sess.getId
-    def close: Unit               = sess.close
-    def write(r: MResponse): Unit = sess.write(r)
+    def write(bytes: Array[Byte]): Unit = sess.write(bytes)
   
     def numMessages: Long = sess.getReadMessages
   }
@@ -137,19 +131,8 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
 
 // -------------------------------------------------------
 
-class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[MResponse] {
-  case class WrapIoBufferOut(buf: IoBuffer) extends MBufferOut {
-    def put(bytes: Array[Byte]): Unit = buf.put(bytes)
-  }
-  
-  def encode(session: IoSession, message: MResponse, out: ProtocolEncoderOutput) {
-    val buf = IoBuffer.allocate(message.sizeHint)
-    buf.setAutoExpand(true)
-
-    message.put(WrapIoBufferOut(buf))
-
-    buf.flip
-    out.write(buf)
-  }
+class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[Array[Byte]] {
+  def encode(session: IoSession, message: Array[Byte], out: ProtocolEncoderOutput): Unit =
+    out.write(IoBuffer.wrap(message))
 }
 

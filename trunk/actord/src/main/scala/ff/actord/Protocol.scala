@@ -18,21 +18,16 @@ package ff.actord
 import scala.collection._
 
 import ff.actord.Util._
-
-trait MBufferIn {
-  def read: Byte
-  def read(bytes: Array[Byte]): Unit
-  def readString(num: Int): String
-}
-
-trait MBufferOut {
-  def put(bytes: Array[Byte]): Unit
-}
+import ff.actord.MProtocol._
 
 trait MSession {
   def ident: Long
   def close: Unit
-  def write(r: MResponse): Unit
+
+  def read: Byte
+  def read(bytes: Array[Byte]): Unit
+  def write(bytes: Array[Byte]): Unit
+
   def numMessages: Long
 }
 
@@ -44,7 +39,7 @@ trait MSession {
  * TODO: Is there an equivalent of writev/readv in mina?
  */
 case class Spec(line: String,
-                process: (MServer, MCommand, MSession) => MResponse) {
+                process: (MServer, MCommand) => Unit) {
   val args = line.split(" ")
   val name = args(0)
   
@@ -58,16 +53,29 @@ case class Spec(line: String,
 /**
  * Protocol is defined at:
  * http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt
+ *
+ * This class should be networking implementation independent.  You
+ * should not find any java IO or NIO or mina or grizzly words here.
  */
+object MProtocol {
+  val OK           = ("OK"         + CRNL).getBytes
+  val END          = ("END"        + CRNL).getBytes
+  val DELETED      = ("DELETED"    + CRNL).getBytes
+  val NOT_FOUND    = ("NOT_FOUND"  + CRNL).getBytes
+  val NOT_STORED   = ("NOT_STORED" + CRNL).getBytes
+  val STORED       = ("STORED"     + CRNL).getBytes
+  val VALUE_PREFIX = "VALUE ".getBytes
+}  
+
 class MProtocol {
-  val OK         = "OK"         + CRNL
-  val END        = "END"        + CRNL
-  val DELETED    = "DELETED"    + CRNL
-  val NOT_FOUND  = "NOT_FOUND"  + CRNL
-  val NOT_STORED = "NOT_STORED" + CRNL
-  val STORED     = "STORED"     + CRNL
-  
   val createdAt = System.currentTimeMillis
+
+///////////////////////////////////////////////// For FAKE FAST GET.
+val manyBytes = new Array[Byte](400)
+for (i <- 0 until 400)
+  manyBytes(i) = 'a'.asInstanceOf[Byte]
+val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
+/////////////////////////////////////////////////
 
   /**
    * Commands defined with a single line.
@@ -75,57 +83,62 @@ class MProtocol {
    * Subclasses might override this list to add custom commands.
    */
   def lineOnlySpecs = List( 
+      Spec("FAKE_FAST_get <key>*",
+           (svr, cmd) => { 
+             val key = cmd.args(1)
+             val line = "VALUE " + cmd.args(1) + " 0 400\r\n"
+             cmd.write(key, someEntry, false)
+             cmd.reply(END)
+           }),
+
       Spec("get <key>*",
-           (svr, cmd, sess) => { 
+           (svr, cmd) => { 
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => sess.write(MResponseLineEntry(el.key, el, false)))
-             reply(END)
+                 foreach(el => cmd.write(el.key, el, false))
+             cmd.reply(END)
            }),
 
       Spec("gets <key>*",
-           (svr, cmd, sess) => {
+           (svr, cmd) => {
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => sess.write(MResponseLineEntry(el.key, el, true)))
-             reply(END)
+                 foreach(el => cmd.write(el.key, el, true))
+             cmd.reply(END)
            }),
 
       Spec("delete <key> [<time>] [noreply]",
-           (svr, cmd, sess) => 
-             reply(svr.delete(cmd.args(1), cmd.argToLong(2), cmd.noReply), 
-                   DELETED, NOT_FOUND)),
+           (svr, cmd) => 
+             cmd.reply(svr.delete(cmd.args(1), cmd.argToLong(2), cmd.noReply), 
+                       DELETED, NOT_FOUND)),
 
       Spec("incr <key> <value> [noreply]",
-           (svr, cmd, sess) => reply(svr.delta(cmd.args(1),  cmd.argToLong(2), cmd.noReply))),
+           (svr, cmd) => cmd.reply(svr.delta(cmd.args(1),  cmd.argToLong(2), cmd.noReply))),
       Spec("decr <key> <value> [noreply]",
-           (svr, cmd, sess) => reply(svr.delta(cmd.args(1), -cmd.argToLong(2), cmd.noReply))),
+           (svr, cmd) => cmd.reply(svr.delta(cmd.args(1), -cmd.argToLong(2), cmd.noReply))),
            
       Spec("stats [<arg>]",
-           (svr, cmd, sess) => 
-             reply(stats(svr, cmd.argOrElse(1, null)))),
+           (svr, cmd) => 
+             cmd.reply(stats(svr, cmd.argOrElse(1, null)))),
 
       Spec("flush_all [<delay>] [noreply]",
-           (svr, cmd, sess) => {
+           (svr, cmd) => {
               svr.flushAll(cmd.argToLong(1))
-              reply(OK)
+              cmd.reply(OK)
             }),
 
       Spec("version",
-           (svr, cmd, sess) => reply("VERSION " + MServer.version + CRNL)),
+           (svr, cmd) => cmd.reply(("VERSION " + MServer.version + CRNL).getBytes)),
       Spec("verbosity",
-           (svr, cmd, sess) => reply(OK)),
+           (svr, cmd) => cmd.reply(OK)),
       Spec("quit",
-           (svr, cmd, sess) => {
-             sess.close
-             reply("")
-           }),
+           (svr, cmd) => cmd.session.close),
 
       // Extensions to basic protocol.
       //
       Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
-           (svr, cmd, sess) => { 
+           (svr, cmd) => { 
              svr.range(cmd.args(1), cmd.args(2)).
-                 foreach(el => sess.write(MResponseLineEntry(el.key, el, false)))
-             reply(END)
+                 foreach(el => cmd.write(el.key, el, false))
+             cmd.reply(END)
            }))
            
   /**
@@ -135,41 +148,41 @@ class MProtocol {
    */
   def lineWithDataSpecs = List( 
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => 
-              reply(svr.set(cmd.entry, cmd.noReply), 
-                    STORED, NOT_STORED)),
+           (svr, cmd) => 
+              cmd.reply(svr.set(cmd.entry, cmd.noReply), 
+                        STORED, NOT_STORED)),
 
       Spec("add <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => 
-              reply(svr.addRep(cmd.entry, true, cmd.noReply), 
-                    STORED, NOT_STORED)),
+           (svr, cmd) => 
+              cmd.reply(svr.addRep(cmd.entry, true, cmd.noReply), 
+                        STORED, NOT_STORED)),
 
       Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => 
-              reply(svr.addRep(cmd.entry, false, cmd.noReply), 
-                    STORED, NOT_STORED)),
+           (svr, cmd) => 
+              cmd.reply(svr.addRep(cmd.entry, false, cmd.noReply), 
+                        STORED, NOT_STORED)),
 
       Spec("append <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => 
-              reply(svr.xpend(cmd.entry, true, cmd.noReply), 
-                    STORED, NOT_STORED)),
+           (svr, cmd) => 
+              cmd.reply(svr.xpend(cmd.entry, true, cmd.noReply), 
+                        STORED, NOT_STORED)),
 
       Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd, sess) => 
-              reply(svr.xpend(cmd.entry, false, cmd.noReply), 
-                    STORED, NOT_STORED)),
+           (svr, cmd) => 
+              cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
+                        STORED, NOT_STORED)),
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
-           (svr, cmd, sess) => 
-              reply(svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply) + CRNL)),
+           (svr, cmd) => 
+              cmd.reply((svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply) + CRNL).getBytes)),
 
       // Extensions to basic protocol.
       //
       Spec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
-           (svr, cmd, sess) => {
+           (svr, cmd) => {
               svr.act(cmd.entry, cmd.noReply).
-                  foreach(el => sess.write(MResponseLineEntry(el.key, el, false)))
-              reply(END)
+                  foreach(el => cmd.write(el.key, el, false))
+              cmd.reply(END)
            }))
       
   val lineOnlyCommands = 
@@ -177,19 +190,6 @@ class MProtocol {
 
   val lineWithDataCommands = 
       immutable.HashMap[String, Spec](lineWithDataSpecs.map(s => Pair(s.name, s)):_*)
-                          
-  // ----------------------------------------
-
-  def reply(s: String): MResponse = MResponseLine(s)
-           
-  def reply(v: Boolean, t: String, f: String): MResponse =
-      reply(if (v) t else f)
-      
-  def reply(v: Long): MResponse = // Used by incr/decr processing.
-      reply(if (v < 0)
-              NOT_FOUND
-            else
-              (v.toString + CRNL))
                           
   // ----------------------------------------
 
@@ -215,19 +215,20 @@ class MProtocol {
   }
 
   /**
+   * This function is called by the networking implementation
+   * when there is incoming data/message that needs to be processed.
+   *
    * Returns how many bytes more need to be read before
    * the message can be processed successfully.  Or, just
    * returns 0 (or OK) to mean we've processed the message.
    *
    * cmdArr     - the incoming message command line bytes, including CRNL. 
-   * cmdData    - the secondary data/value part of the message, if any.
-   * readyCount - number of bytes from message start (including cmdLine) 
+   * readyCount - number of bytes from message start (including cmdArr)
    *              plus remaining data, available to be read.
    */
   def process(server: MServer,
               session: MSession, 
               cmdArr: Array[Byte],
-              cmdData: MBufferIn,
               readyCount: Int): Int = {
     val cmdArgs = splitArr(cmdArr, cmdArr.length - CRNL.length)
     val cmdName = cmdArgs(0)
@@ -235,13 +236,10 @@ class MProtocol {
     lineOnlyCommands.get(cmdName).map(
       spec => {
         if (spec.checkArgs(cmdArgs)) {
-          val cmd = MCommand(cmdArgs, null)
-          val res = spec.process(server, cmd, session)
-          if (cmd.noReply == false)
-            session.write(res)
+          val res = spec.process(server, MCommand(session, cmdArgs, null))
           GOOD
         } else {
-          session.write(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL))
+          session.write(("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL).getBytes)
           GOOD
         }
       }
@@ -263,41 +261,39 @@ class MProtocol {
             //
             val data = new Array[Byte](dataSize)
             
-            cmdData.read(data)
+            session.read(data)
             
-            if (cmdData.read == CR &&
-                cmdData.read == NL) {
-              val cmd = MCommand(cmdArgs,
-                                 MEntry(cmdArgs(1),
-                                        cmdArgs(2).toLong,
-                                        if (expTime != 0 &&
-                                            expTime <= SECONDS_IN_30_DAYS)
-                                            expTime + nowInSeconds
-                                        else
-                                            expTime,
-                                        dataSize,
-                                        data,
-                                        (session.ident << 32) + 
-                                        (session.numMessages & 0xFFFFFFFFL)))
-              val res = spec.process(server, cmd, session)
-              if (cmd.noReply == false)
-                session.write(res)
+            if (session.read == CR &&
+                session.read == NL) {
+              spec.process(server, 
+                           MCommand(session, cmdArgs,
+                                    MEntry(cmdArgs(1),
+                                           cmdArgs(2).toLong,
+                                           if (expTime != 0 &&
+                                               expTime <= SECONDS_IN_30_DAYS)
+                                               expTime + nowInSeconds
+                                           else
+                                               expTime,
+                                           dataSize,
+                                           data,
+                                           (session.ident << 32) + 
+                                           (session.numMessages & 0xFFFFFFFFL))))
               GOOD
             } else {
-              session.write(MResponseLine("CLIENT_ERROR missing CRNL after data" + CRNL))
+              session.write(("CLIENT_ERROR missing CRNL after data" + CRNL).getBytes)
               GOOD
             }
           } else {
             totalNeeded
           }
         } else {
-          session.write(MResponseLine("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL))
+          session.write(("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL).getBytes)
           GOOD
         }
       }
     ) getOrElse {
-      session.write(MResponseLine("ERROR " + cmdName + CRNL)) // Saw an unknown command, but keep
-      GOOD                                                    // going and process the next command.
+      session.write(("ERROR " + cmdName + CRNL).getBytes) // Saw an unknown command, but keep
+      GOOD                                                // going and process the next command.
     }
   }
 
@@ -353,8 +349,8 @@ class MProtocol {
 //    statLine("connection_structures", 0.toString)
     }
 
-    sb.append(END)
-    sb.toString
+    sb.append("END\r\n")
+    sb.toString.getBytes
   }
 
 /*
@@ -414,7 +410,7 @@ class MProtocol {
 /**
  * Represents an incoming command or request from a (remote) client.
  */
-case class MCommand(args: Seq[String], entry: MEntry) {
+case class MCommand(session: MSession, args: Seq[String], entry: MEntry) {
   val noReply = args.last == "noreply"
   
   def argToLong(at: Int) = itemToLong(args, at)
@@ -427,60 +423,44 @@ case class MCommand(args: Seq[String], entry: MEntry) {
       
   override def toString = 
     args.mkString(" ") + (if (entry != null) (" " + entry.toString) else "")
-}
 
-// -------------------------------------------------------
+  // ----------------------------------------
 
-/**
- * Abstract base class that represents a reply or response to processing a MCommand.
- * One MCommand can result in a List of MResponse.
- */
-abstract class MResponse {
-  def sizeHint: Int
-  def put(buf: MBufferOut): Unit
-}
+  def reply(x: Array[Byte]): Unit = 
+   if (!noReply) 
+     session.write(x)
+           
+  def reply(v: Boolean, t: Array[Byte], f: Array[Byte]): Unit =
+    reply(if (v) t else f)
+      
+  def reply(v: Long): Unit = // Used by incr/decr processing.
+    if (!noReply)
+      reply(if (v < 0)
+              NOT_FOUND
+            else
+              (v.toString + CRNL).getBytes)
 
-/**
- * A response of a String of a single line.
- */
-case class MResponseLine(line: String) extends MResponse {
-  def sizeHint = line.length // The line includes CRNL already.
+  /**
+   * A VALUE response of a String of a single line, followed by a single MEntry data bytes.
+   */
+  def write(key: String, entry: MEntry, withCAS: Boolean): Unit =
+    if (noReply == false) {
+      // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + CRNL
+      // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + " " + e.cid + CRNL
 
-  def put(buf: MBufferOut) {
-    buf.put(line.toString.getBytes) // TODO: Need a charset here?
-  }
-}
-
-/**
- * A response of a String of a single line, followed by a single MEntry data bytes.
- */
-case class MResponseLineEntry(key: String, entry: MEntry, withCAS: Boolean) extends MResponse {
-  // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + CRNL
-  // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + " " + e.cid + CRNL
-
-  def sizeHint = 300 + key.length + entry.dataSize
-
-  def put(buf: MBufferOut) {
-    import MResponseLineEntry._
-
-    buf.put(VALUE_PREFIX)
-    buf.put(key.getBytes)
-    buf.put(SPACEBytes)
-    buf.put(entry.flags.toString.getBytes)
-    buf.put(SPACEBytes)
-    buf.put(entry.dataSize.toString.getBytes)
-    if (withCAS) {
-      buf.put(SPACEBytes)
-      buf.put(entry.cid.toString.getBytes)
+      session.write(VALUE_PREFIX)
+      session.write(key.getBytes)
+      session.write(SPACEBytes)
+      session.write(entry.flags.toString.getBytes)
+      session.write(SPACEBytes)
+      session.write(entry.dataSize.toString.getBytes)
+      if (withCAS) {
+        session.write(SPACEBytes)
+        session.write(entry.cid.toString.getBytes)
+      }
+      session.write(CRNLBytes)
+      session.write(entry.data)
+      session.write(CRNLBytes)
     }
-    buf.put(CRNLBytes)
-    buf.put(entry.data)
-    buf.put(CRNLBytes)
-  }
 }
-
-object MResponseLineEntry {
-  val VALUE_PREFIX = "VALUE ".getBytes
-}  
-
 
