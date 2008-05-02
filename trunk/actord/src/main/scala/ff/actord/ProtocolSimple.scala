@@ -28,7 +28,7 @@ class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: 
     
     while (true) {
       (new SSession(server, protocol, ss.accept, idGen)).start
-      idGen = idGen + 1L
+      idGen += 1L
     }
   }
 }
@@ -73,7 +73,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
         s.close
       
       availablePrev = available
-      available     = available + lastRead
+      available += lastRead
       if (available > buf.length) {
         s.close
         throw new RuntimeException("available larger than buf somehow")
@@ -90,7 +90,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
                              bufIndexOf(buf, 0, available, CR)
         if (indexCR < 0 ||
             indexCR + CRNL.length > available) {
-          waitingFor = waitingFor + 1
+          waitingFor += 1
           if (waitingFor > buf.length)
             bufGrow(waitingFor)
         } else {
@@ -106,16 +106,16 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
           } else {
             val bytesNeeded = protocol.process(server, this, aLine, this, available)
             if (bytesNeeded == 0) {
-              bos.flush
-              
-              nMessages = nMessages + 1              
-
               if (available > readPos)
                 Array.copy(buf, readPos, buf, 0, available - readPos)
+              else
+                bos.flush // Only force flush when there's no more input.
             
-              waitingFor    = MIN_CMD_SIZE
+              available -= readPos
               availablePrev = 0
-              available     = available - readPos
+              waitingFor = MIN_CMD_SIZE
+
+              nMessages += 1L
             } else {
               waitingFor = bytesNeeded
               if (waitingFor > buf.length)
@@ -137,7 +137,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
     if (readPos >= available)
       throw new RuntimeException("reading more than available: " + available)
     val b = buf(readPos)
-    readPos = readPos + 1
+    readPos += 1
     b
   }
      
@@ -145,14 +145,14 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
     if (readPos + bytes.length > available)
       throw new RuntimeException("reading more bytes than available: " + available)
     Array.copy(buf, readPos, bytes, 0, bytes.length)
-    readPos = readPos + bytes.length
+    readPos += bytes.length
   }
   
   def readString(num: Int): String = {
     if (readPos + num > available)
       throw new RuntimeException("reading more string than available: " + available)
     val r = new String(buf, readPos, num, "US-ASCII")
-    readPos = readPos + num
+    readPos += num
     r
   } 
 
