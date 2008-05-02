@@ -66,6 +66,8 @@ class MProtocol {
   val NOT_FOUND  = "NOT_FOUND"  + CRNL
   val NOT_STORED = "NOT_STORED" + CRNL
   val STORED     = "STORED"     + CRNL
+  
+  val createdAt = System.currentTimeMillis
 
   /**
    * Commands defined with a single line.
@@ -108,7 +110,7 @@ class MProtocol {
             }),
 
       Spec("version",
-           (svr, cmd, sess) => reply("VERSION " + svr.version + CRNL)),
+           (svr, cmd, sess) => reply("VERSION " + MServer.version + CRNL)),
       Spec("verbosity",
            (svr, cmd, sess) => reply(OK)),
       Spec("quit",
@@ -139,12 +141,12 @@ class MProtocol {
 
       Spec("add <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.add(cmd.entry, cmd.noReply), 
+              reply(svr.addRep(cmd.entry, true, cmd.noReply), 
                     STORED, NOT_STORED)),
 
       Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd, sess) => 
-              reply(svr.replace(cmd.entry, cmd.noReply), 
+              reply(svr.addRep(cmd.entry, false, cmd.noReply), 
                     STORED, NOT_STORED)),
 
       Spec("append <key> <flags> <expTime> <bytes> [noreply]",
@@ -326,7 +328,7 @@ class MProtocol {
     } else {
       val svrStats = svr.stats
 
-      statLine("version", svr.version)
+      statLine("version", MServer.version)
 
       statLine("cmd_gets",   String.valueOf(svrStats.cmd_gets))
       statLine("cmd_sets",   String.valueOf(svrStats.cmd_sets))
@@ -341,12 +343,12 @@ class MProtocol {
       val ctm = System.currentTimeMillis
 
       statLine("time",   (new java.util.Date()) + " " + ctm.toString)
-      statLine("uptime", (ctm - svr.createdAt).toString)
+      statLine("uptime", (ctm - createdAt).toString)
 
       statLine("curr_items",     svrStats.numEntries.toString)
       statLine("evictions",      svrStats.evictions.toString)
       statLine("bytes",          svrStats.usedMemory.toString)
-      statLine("limit_maxbytes", svr.limitMemory.toString)
+//    statLine("limit_maxbytes", svr.limitMemory.toString)
       statLine("current_bytes",  Runtime.getRuntime.totalMemory.toString)
       statLine("free_bytes",     Runtime.getRuntime.freeMemory.toString)
       statLine("lru_size",       svrStats.lruSize.toString)

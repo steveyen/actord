@@ -28,6 +28,55 @@ object MServer {
   type MActPf    = PartialFunction[(MEntry, Boolean), (MEntry, Boolean) => Iterator[MEntry]]
 }
 
+// --------------------------------------------
+
+trait MServer {
+  def subServerList: List[MSubServer]
+  
+  def get(keys: Seq[String]): Iterator[MEntry]
+  def set(el: MEntry, async: Boolean): Boolean
+  def delete(key: String, time: Long, async: Boolean): Boolean
+
+  /**
+   * A transport protocol can convert incoming incr/decr messages to delta calls.
+   */
+  def delta(key: String, mod: Long, async: Boolean): Long
+    
+  /**
+   * For add or replace.
+   */
+  def addRep(el: MEntry, isAdd: Boolean, async: Boolean): Boolean
+
+  /**
+   * A transport protocol can convert incoming append/prepend messages to xpend calls.
+   */
+  def xpend(el: MEntry, append: Boolean, async: Boolean): Boolean
+
+  /**
+   * For CAS mutation.
+   */  
+  def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean): String
+
+  /**
+   * The keys in the returned Iterator are unsorted.
+   */
+  def keys: Iterator[String]
+  
+  def flushAll(expTime: Long): Unit
+  
+  def stats: MServerStats
+
+  /**
+   * The keyFrom is the range's lower-bound, inclusive.
+   * The keyTo is the range's upper-bound, exclusive.
+   */
+  def range(keyFrom: String, keyTo: String): Iterator[MEntry]
+
+  def act(el: MEntry, async: Boolean): Iterator[MEntry]
+}
+
+// --------------------------------------------
+
 /**
  * Tracks key/value entries and their LRU (least-recently-used) history.
  *
@@ -46,12 +95,12 @@ object MServer {
  * independent of transport or wire protocol.  So grep'ing this 
  * file should produce zero transport/wire dependencies.
  */
-class MServer(val subServerNum: Int,   // Number of internal "shards" for this server.
-              val limitMemory: Long) { // Measured in bytes.
+class MMainServer(val subServerNum: Int, // Number of internal "shards" for this server.
+                  val limitMemory: Long) // Measured in bytes.
+  extends MServer {
   def this() = this(Runtime.getRuntime.availableProcessors, 0L)
   
   val createdAt = System.currentTimeMillis
-  def version   = MServer.version
 
   /**
    * Track an array of MSubServers, meant to locally "shard" the 
@@ -92,19 +141,13 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
   var actPf:    MServer.MActPf    = defaultActPf
   var deletePf: MServer.MDeletePf = defaultDeletePf
   
-  def defaultGetPf: MServer.MGetPf = { case _ => defaultGet }
-  def defaultSetPf: MServer.MSetPf = { 
-    case ("set", _, _)     => defaultSet
-    case ("add", _, _)     => defaultAdd
-    case ("replace", _, _) => defaultReplace
-  }
+  def defaultGetPf: MServer.MGetPf       = { case _ => defaultGet }
+  def defaultSetPf: MServer.MSetPf       = { case _ => defaultSet }
   def defaultActPf: MServer.MActPf       = { case _ => defaultAct }
   def defaultDeletePf: MServer.MDeletePf = { case _ => defaultDelete }
 
   val defaultGet     = getMulti _
   val defaultSet     = (el: MEntry, async: Boolean) => subServerForKey(el.key).set(el, async)
-  val defaultAdd     = (el: MEntry, async: Boolean) => subServerForKey(el.key).addRep(true,  el, async)
-  val defaultReplace = (el: MEntry, async: Boolean) => subServerForKey(el.key).addRep(false, el, async)
   val defaultAct     = (el: MEntry, async: Boolean) => Iterator.empty
   val defaultDelete  = (k: String, time: Long, async: Boolean) => subServerForKey(k).delete(k, time, async)
 
@@ -120,7 +163,7 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
    */  
   def getMulti(keys: Seq[String]): Iterator[MEntry] = {
     if (subServerNum <= 1) 
-        subServers(0).getMulti(keys)
+        subServers(0).get(keys)
     else {
       // First group the keys for each subServer, for better 
       // cache locality and synchronization avoidance.
@@ -137,26 +180,21 @@ class MServer(val subServerNum: Int,   // Number of internal "shards" for this s
       val empty: Iterator[MEntry] = Iterator.empty
     
       (0 until subServerNum).
-        foldLeft(empty)((result, i) => result.append(subServers(i).getMulti(groupedKeys(i))))
+        foldLeft(empty)((result, i) => result.append(subServers(i).get(groupedKeys(i))))
     }
   }
 
-  def set(el: MEntry, async: Boolean)     = setPf("set",     el, async)(el, async)
-  def add(el: MEntry, async: Boolean)     = setPf("add",     el, async)(el, async)
-  def replace(el: MEntry, async: Boolean) = setPf("replace", el, async)(el, async)
+  def set(el: MEntry, async: Boolean) = setPf("set", el, async)(el, async)
 
   def delete(key: String, time: Long, async: Boolean) = 
     deletePf(key, time, async)(key, time, async)
 
-  /**
-   * A transport protocol can convert incoming incr/decr messages to delta calls.
-   */
   def delta(key: String, mod: Long, async: Boolean): Long =
     subServerForKey(key).delta(key, mod, async)
     
-  /**
-   * A transport protocol can convert incoming append/prepend messages to xpend calls.
-   */
+  def addRep(el: MEntry, isAdd: Boolean, async: Boolean) = 
+    subServerForKey(el.key).addRep(el, isAdd, async)
+
   def xpend(el: MEntry, append: Boolean, async: Boolean) =
     subServerForKey(el.key).xpend(el, append, async)
   

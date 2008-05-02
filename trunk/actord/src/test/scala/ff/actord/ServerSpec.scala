@@ -24,7 +24,7 @@ class  MServerSpecTest   extends JUnit3(MServerSpec)
 object MServerSpecRunner extends ConsoleRunner(MServerSpec)
 object MServerSpec extends Specification with MTestUtil {
   def prep = {
-    val m: MServer = new MServer
+    val m: MServer = new MMainServer
     val ea  = MEntry("a", 0L, 0L, 0, new Array[Byte](0), 0L)
     val ea2 = MEntry("a", 1L, 0L, 0, new Array[Byte](0), 0L)
     (m, ea, ea2)
@@ -44,7 +44,7 @@ object MServerSpec extends Specification with MTestUtil {
       m.get(List("a")).toList   must beEmpty
       m.delete("a", 1L, false)  must be(false)
       m.get(List("a")).toList   must beEmpty
-      m.replace(ea, false)      must be(false)
+      m.addRep(ea, false, false) must be(false)
       m.get(List("a")).toList   must beEmpty
       m.xpend(ea, true, false)  must be(false)
       m.get(List("a")).toList   must beEmpty
@@ -63,7 +63,7 @@ object MServerSpec extends Specification with MTestUtil {
       assertEquals("set 1", true, m.set(ea, false))
       assertEquals("get 1", true, entrySame(m.get(List("a")), ea))
       assertEquals("get 1", true, entrySame(m.get(List("a")), ea))
-      assertEquals("add x", false, m.add(ea, false))
+      assertEquals("add x", false, m.addRep(ea, true, false))
     }
 
     "set values on the same key" in {
@@ -82,15 +82,15 @@ object MServerSpec extends Specification with MTestUtil {
       val (m, ea, ea2) = prep
 
       assertEquals("get 0", true,  m.get(List("a")).toList.isEmpty)
-      assertEquals("rep x", false, m.replace(ea2, false))
+      assertEquals("rep x", false, m.addRep(ea2, false, false))
       assertEquals("get 0", true,  m.get(List("a")).toList.isEmpty)
-      assertEquals("add 1", true,  m.add(ea, false))
+      assertEquals("add 1", true,  m.addRep(ea, true, false))
       assertEquals("get 1", true,  entrySame(m.get(List("a")), ea))
-      assertEquals("add x", false, m.add(ea2, false))
+      assertEquals("add x", false, m.addRep(ea2, true, false))
       assertEquals("get 1", true,  entrySame(m.get(List("a")), ea))
-      assertEquals("rep 1", true,  m.replace(ea, false))
+      assertEquals("rep 1", true,  m.addRep(ea, false, false))
       assertEquals("get 1", true,  entrySame(m.get(List("a")), ea))
-      assertEquals("rep 2", true,  m.replace(ea2, false))
+      assertEquals("rep 2", true,  m.addRep(ea2, false, false))
       assertEquals("get 2", true,  entrySame(m.get(List("a")), ea2))
     }
 
@@ -174,18 +174,18 @@ object MServerSpec extends Specification with MTestUtil {
       assertEquals("get 00", true, m.get(List("c1")).toList.isEmpty)
       assertEquals("get 00", true, m.get(List("c2")).toList.isEmpty)
       
-      assertEquals("getMulti 00", true, m.getMulti(List("c0", "c1", "c2")).toList.isEmpty)
+      assertEquals("getMulti 00", true, m.get(List("c0", "c1", "c2")).toList.isEmpty)
       
       assertEquals("set c0", true, m.set(c0, false))
-      assertEquals("getMulti 01", true, m.getMulti(List("c0", "c1", "c2")).
+      assertEquals("getMulti 01", true, m.get(List("c0", "c1", "c2")).
                                           toList.map(_.key).sort(_ < _) == List("c0"))
 
       assertEquals("set c1", true, m.set(c1, false))
-      assertEquals("getMulti 02", true, m.getMulti(List("c0", "c1", "c2")).
+      assertEquals("getMulti 02", true, m.get(List("c0", "c1", "c2")).
                                           toList.map(_.key).sort(_ < _) == List("c0", "c1"))
 
       assertEquals("del c0", true, m.delete("c0", 0L, false))
-      assertEquals("getMulti 03", true, m.getMulti(List("c0", "c1", "c2")).
+      assertEquals("getMulti 03", true, m.get(List("c0", "c1", "c2")).
                                           toList.map(_.key).sort(_ < _) == List("c1"))
     }
 
