@@ -193,21 +193,21 @@ class MSubServer(val id: Int, val limitMemory: Long)
              current != null) {
         val n = current.next
         current.remove
-        lruSize = lruSize - 1L
+        lruSize -= 1L
         dataMod.get(current.key).foreach(
           existing => {
             dataMod   = dataMod - current.key
             reclaimed = reclaimed + existing.dataSize
 
             if (!existing.isExpired(now))
-              evictions = evictions + 1L
+              evictions += 1L
           }
         )
         current = n
       }
       
       data_i_!!(dataMod)
-      usedMemory = usedMemory - reclaimed
+      usedMemory -= reclaimed
     }
     
     def setEntry(el: MEntry): Boolean = {
@@ -220,20 +220,20 @@ class MSubServer(val id: Int, val limitMemory: Long)
               
               // Keep stats correct on update/set to existing key.
               //
-              usedMemory = usedMemory - existing.dataSize
+              usedMemory -= existing.dataSize
             }
           )
 
           if (el.lru == null) {
               el.lru = new LRUList(el.key, null, null)
-              lruSize = lruSize + 1L
+              lruSize += 1L
           }
       }
       
       touch(el)
 
       data_i_!!(dataMod + (el.key -> el))
-      usedMemory = usedMemory + el.dataSize
+      usedMemory += el.dataSize
       
       true
     }
@@ -247,16 +247,16 @@ class MSubServer(val id: Int, val limitMemory: Long)
                 el.lru.next != null && // The entry might have been deleted already
                 el.lru.prev != null)   // so don't put it back.
               touch(el)
-            numHits = numHits + 1
+            numHits += 1
           }
           
-          get_hits = get_hits + numHits // TODO: How to account for range hits?
+          get_hits += numHits      // TODO: How to account for range hits?
 
-          if (numGetMultiKeys > 0)
-            cmd_gets = cmd_gets + 1L    // TODO: How does memcached count get-multi?
+          if (numGetMultiKeys > 0) // TODO: How does memcached count get-multi?
+            cmd_gets += 1L         
           
           if (numGetMultiKeys > numHits)
-            get_misses = get_misses + (numGetMultiKeys - numHits)
+            get_misses += (numGetMultiKeys - numHits)
         }
         
         case ModSet(el, noReply) => {
@@ -264,7 +264,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
           if (!noReply) 
               reply(true)
           evictCheck
-          cmd_sets = cmd_sets + 1L
+          cmd_sets += 1L
         }
 
         case ModDelete(key, el, expTime, noReply) => {
@@ -279,11 +279,11 @@ class MSubServer(val id: Int, val limitMemory: Long)
                     expTime == 0L) {
                   if (el.lru != null) {
                       el.lru.remove
-                      lruSize = lruSize - 1L
+                      lruSize -= 1L
                   }
                   
                   data_i_!!(dataMod - key)
-                  usedMemory = usedMemory - el.dataSize
+                  usedMemory -= el.dataSize
                   
                   if (!noReply) 
                       reply(true)
