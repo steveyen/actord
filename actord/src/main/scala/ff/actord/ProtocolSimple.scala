@@ -23,12 +23,12 @@ import ff.actord.Util._
 class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int) 
   extends Thread {
   override def run = {
-    var idGen = 0L
-    val ss    = new ServerSocket(port)
-    
+    var id = 0L
+    val ss = new ServerSocket(port)
+
     while (true) {
-      (new SSession(server, protocol, ss.accept, idGen)).start
-      idGen += 1L
+      (new SSession(server, protocol, ss.accept, id)).start
+      id += 1L
     }
   }
 }
