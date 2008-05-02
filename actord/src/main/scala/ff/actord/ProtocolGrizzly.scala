@@ -40,7 +40,7 @@ class GAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: 
 
     val p: ProtocolChain = new DefaultProtocolChain
     p.addFilter(new ReadFilter)
-    p.addFilter(new GProtocolFilter(server, protocol))
+    p.addFilter(new GProtocolFilter(server, protocol)) // TODO: Collapse ReadFilter into our GProtocolFilter.
 
     val c = new Controller
     c.addSelectorHandler(t)
@@ -141,9 +141,7 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent:
           s.close
           throw new RuntimeException("missing CRNL")
         } else {
-          val adapter = new GAdapter(ctx)
-          
-          val bytesNeeded = protocol.process(server, adapter, aLine, adapter, available)
+          val bytesNeeded = protocol.process(server, new GSessionContext(ctx), aLine, available)
           if (bytesNeeded == 0) {
             nMessages = nMessages + 1              
 
@@ -184,25 +182,16 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent:
     readPos = readPos + bytes.length
   }
   
-  def readString(num: Int): String = {
-    if (readPos + num > available)
-      throw new RuntimeException("reading more string than available: " + available)
-    val r = new String(buf, readPos, num, "US-ASCII")
-    readPos = readPos + num
-    r
-  }
-
-  class GAdapter(ctx: Context) extends MSession with MBufferIn with MBufferOut {
+  class GSessionContext(ctx: Context) extends MSession {
     def ident: Long = sessionIdent
     def close: Unit = s.close
-    def write(res: MResponse): Unit = res.put(this)
-    def numMessages: Long = nMessages
-    def put(bytes: Array[Byte]): Unit = 
-      ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes))
-          
+
     def read: Byte                     = GSession.this.read
     def read(bytes: Array[Byte]): Unit = GSession.this.read(bytes)
-    def readString(num: Int): String   = GSession.this.readString(num)
+    def write(bytes: Array[Byte]): Unit = 
+      ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes))
+
+    def numMessages: Long = nMessages
   }
 }
 

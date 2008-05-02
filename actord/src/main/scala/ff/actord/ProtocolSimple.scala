@@ -35,8 +35,6 @@ class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: 
 
 class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Long) 
   extends Thread 
-     with MBufferIn
-     with MBufferOut
      with MSession {
   s.setTcpNoDelay(true)
   
@@ -104,7 +102,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
             s.close
             throw new RuntimeException("missing CRNL")
           } else {
-            val bytesNeeded = protocol.process(server, this, aLine, this, available)
+            val bytesNeeded = protocol.process(server, this, aLine, available)
             if (bytesNeeded == 0) {
               if (available > readPos)
                 Array.copy(buf, readPos, buf, 0, available - readPos)
@@ -148,21 +146,11 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
     readPos += bytes.length
   }
   
-  def readString(num: Int): String = {
-    if (readPos + num > available)
-      throw new RuntimeException("reading more string than available: " + available)
-    val r = new String(buf, readPos, num, "US-ASCII")
-    readPos += num
-    r
-  } 
+  def write(bytes: Array[Byte]): Unit = bos.write(bytes)
 
   def ident: Long = sessionIdent  
   def close: Unit = s.close
 
-  def write(res: MResponse): Unit = res.put(this)
-  
   def numMessages: Long = nMessages
-
-  def put(bytes: Array[Byte]): Unit = bos.write(bytes)
 }
 
