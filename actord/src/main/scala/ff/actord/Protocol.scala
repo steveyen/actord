@@ -132,11 +132,9 @@ class MProtocol {
    */
   def lineWithDataSpecs = List( 
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd) => {
-              cmd.entry.comm_!(("VALUE " + cmd.entry.key + " " + cmd.entry.flags + " " + cmd.entry.dataSize + CRNL).getBytes)
+           (svr, cmd) => 
               cmd.reply(svr.set(cmd.entry, cmd.noReply), 
-                        STORED, NOT_STORED)
-           }),
+                        STORED, NOT_STORED)),
 
       Spec("add <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd) => 
@@ -435,20 +433,20 @@ case class MCommand(session: MSession, args: Seq[String], entry: MEntry) {
    */
   def write(key: String, entry: MEntry, withCAS: Boolean): Unit =
     if (!noReply) {
-      val line: Array[Byte] = (
-        if (withCAS)
-          ("VALUE " + entry.key + " " + entry.flags + " " + entry.dataSize + " " + entry.cid + CRNL).getBytes
-        else {
-          val x = entry.comm.asInstanceOf[Array[Byte]]
-          if (x != null)
-              x
-          else
-              entry.comm_!(("VALUE " + entry.key + " " + entry.flags + " " + entry.dataSize + CRNL).getBytes).
-                    asInstanceOf[Array[Byte]]
-        }
-      )
-
+      val line: Array[Byte] = {
+        val x = entry.comm.asInstanceOf[Array[Byte]]
+        if (x != null)
+            x
+        else
+            entry.comm_!(("VALUE " + entry.key + " " + entry.flags + " " + entry.dataSize).getBytes).
+                  asInstanceOf[Array[Byte]]
+      }
       session.write(line)
+      if (withCAS) {
+        session.write(SPACEBytes)
+        session.write(entry.cid.toString.getBytes)
+      }
+      session.write(CRNLBytes)
       session.write(entry.data)
       session.write(CRNLBytes)
     }
