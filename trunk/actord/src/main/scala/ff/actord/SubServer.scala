@@ -68,7 +68,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
     val d = data     
     val r = keys.flatMap(key => getUnexpired(key, d))
 
-    mod ! ModTouch(r.elements, keys.length)
+//    mod ! ModTouch(r.elements, keys.length)
       
     r.elements
   }
