@@ -271,6 +271,14 @@ case class MEntry(key: String,
    * so that the mod actor can do proper stats accounting.
    */  
   var lru: LRUList = null
+
+  /**
+   * Networking/communication layers can squirrel away memeoized data here.
+   */
+  private var commObj: AnyRef = null
+
+  def comm                      = synchronized { commObj }
+  def comm_!(a: AnyRef): AnyRef = synchronized { commObj = a; a }
 }
 
 // -------------------------------------------------------

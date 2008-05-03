@@ -64,18 +64,10 @@ object MProtocol {
   val NOT_FOUND    = ("NOT_FOUND"  + CRNL).getBytes
   val NOT_STORED   = ("NOT_STORED" + CRNL).getBytes
   val STORED       = ("STORED"     + CRNL).getBytes
-  val VALUE_PREFIX = "VALUE ".getBytes
-}  
+}
 
 class MProtocol {
   val createdAt = System.currentTimeMillis
-
-///////////////////////////////////////////////// For FAKE FAST GET.
-val manyBytes = new Array[Byte](400)
-for (i <- 0 until 400)
-  manyBytes(i) = 'a'.asInstanceOf[Byte]
-val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
-/////////////////////////////////////////////////
 
   /**
    * Commands defined with a single line.
@@ -83,14 +75,6 @@ val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
    * Subclasses might override this list to add custom commands.
    */
   def lineOnlySpecs = List( 
-      Spec("FAKE_FAST_get <key>*",
-           (svr, cmd) => { 
-             val key = cmd.args(1)
-             val line = "VALUE " + cmd.args(1) + " 0 400\r\n"
-             cmd.write(key, someEntry, false)
-             cmd.reply(END)
-           }),
-
       Spec("get <key>*",
            (svr, cmd) => { 
              svr.get(cmd.args.slice(1, cmd.args.length)).
@@ -148,9 +132,11 @@ val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
    */
   def lineWithDataSpecs = List( 
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd) => 
+           (svr, cmd) => {
+              cmd.entry.comm_!(("VALUE " + cmd.entry.key + " " + cmd.entry.flags + " " + cmd.entry.dataSize + CRNL).getBytes)
               cmd.reply(svr.set(cmd.entry, cmd.noReply), 
-                        STORED, NOT_STORED)),
+                        STORED, NOT_STORED)
+           }),
 
       Spec("add <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd) => 
@@ -231,6 +217,10 @@ val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
               cmdArr: Array[Byte],
               readyCount: Int): Int = {
     val cmdArgs = splitArr(cmdArr, cmdArr.length - CRNL.length)
+
+if (FAKE_FAST_GET.ffg(session, cmdArgs))
+  return GOOD
+
     val cmdName = cmdArgs(0)
 
     lineOnlyCommands.get(cmdName).map(
@@ -444,23 +434,42 @@ case class MCommand(session: MSession, args: Seq[String], entry: MEntry) {
    * A VALUE response of a String of a single line, followed by a single MEntry data bytes.
    */
   def write(key: String, entry: MEntry, withCAS: Boolean): Unit =
-    if (noReply == false) {
-      // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + CRNL
-      // "VALUE " + e.key + " " + e.flags + " " + e.dataSize + " " + e.cid + CRNL
+    if (!noReply) {
+      val line: Array[Byte] = (
+        if (withCAS)
+          ("VALUE " + entry.key + " " + entry.flags + " " + entry.dataSize + " " + entry.cid + CRNL).getBytes
+        else {
+          val x = entry.comm.asInstanceOf[Array[Byte]]
+          if (x != null)
+              x
+          else
+              entry.comm_!(("VALUE " + entry.key + " " + entry.flags + " " + entry.dataSize + CRNL).getBytes).
+                    asInstanceOf[Array[Byte]]
+        }
+      )
 
-      session.write(VALUE_PREFIX)
-      session.write(key.getBytes)
-      session.write(SPACEBytes)
-      session.write(entry.flags.toString.getBytes)
-      session.write(SPACEBytes)
-      session.write(entry.dataSize.toString.getBytes)
-      if (withCAS) {
-        session.write(SPACEBytes)
-        session.write(entry.cid.toString.getBytes)
-      }
-      session.write(CRNLBytes)
+      session.write(line)
       session.write(entry.data)
       session.write(CRNLBytes)
     }
 }
+
+///////////////////////////////////////////////// For FAKE FAST GET.
+object FAKE_FAST_GET {
+  val manyBytes = new Array[Byte](400) // 400 matchs mslap length.
+  for (i <- 0 until 400)
+    manyBytes(i) = 'a'.asInstanceOf[Byte]
+  val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
+  val GByte = 'g'.asInstanceOf[Byte]
+
+  def ffg(session: MSession, cmdArgs: Seq[String]): Boolean = {
+    return false
+    val key = cmdArgs(1)
+    val cmd = MCommand(session, cmdArgs, null)
+    cmd.write(key, someEntry, false)
+    cmd.reply(END)
+    true
+  }
+}
+/////////////////////////////////////////////////
 
