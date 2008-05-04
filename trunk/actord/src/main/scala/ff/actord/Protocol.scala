@@ -74,7 +74,7 @@ class MProtocol {
    *
    * Subclasses might override this list to add custom commands.
    */
-  def lineOnlySpecs = List( 
+  def singleLineSpecs = List( 
       Spec("get <key>*",
            (svr, cmd) => { 
              svr.get(cmd.args.slice(1, cmd.args.length)).
@@ -126,11 +126,11 @@ class MProtocol {
            }))
            
   /**
-   * Commands that use a line followed by byte data.
+   * Commands that use a multiple lines, such as a line followed by byte data.
    *
    * Subclasses might override this list to add custom commands.
    */
-  def lineWithDataSpecs = List( 
+  def multiLineSpecs = List( 
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
            (svr, cmd) => 
               cmd.reply(svr.set(cmd.entry, cmd.noReply), 
@@ -169,12 +169,25 @@ class MProtocol {
               cmd.reply(END)
            }))
       
-  val lineOnlyCommands = 
-      immutable.HashMap[String, Spec](lineOnlySpecs.map(s => Pair(s.name, s)):_*)
-
-  val lineWithDataCommands = 
-      immutable.HashMap[String, Spec](lineWithDataSpecs.map(s => Pair(s.name, s)):_*)
+  val singleLineSpecLookup = indexSpecs(singleLineSpecs)
+  val multiLineSpecLookup  = indexSpecs(multiLineSpecs)
                           
+  // ----------------------------------------
+
+  def indexSpecs(specs: List[Spec]): Array[List[Spec]] = {
+    val lookup = new Array[List[Spec]](26) // A perfect hash lookup table, by first character of spec.name.
+    for (i <- 0 until lookup.length)
+      lookup(i) = Nil
+    specs.map(spec => {
+      val index = spec.name(0) - 'a'
+      lookup(index) = lookup(index) ::: List(spec) // Concat so that more popular commands come first.
+    })
+    lookup
+  }
+
+  def findSpec(name: String, lookup: Array[List[Spec]]): Option[Spec] = 
+    lookup(name(0) - 'a').find(_.name == name)
+
   // ----------------------------------------
 
   final val GOOD               = 0
@@ -220,7 +233,7 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArgs)) return GOOD
 
     val cmdName = cmdArgs(0)
 
-    lineOnlyCommands.get(cmdName).map(
+    findSpec(cmdName, singleLineSpecLookup).map(
       spec => {
         if (spec.checkArgs(cmdArgs)) {
           spec.process(server, MCommand(session, cmdArgs, null))
@@ -230,7 +243,7 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArgs)) return GOOD
           GOOD
         }
       }
-    ) orElse lineWithDataCommands.get(cmdName).map(
+    ) orElse findSpec(cmdName, multiLineSpecLookup).map(
       spec => {
         // Handle mutator command: 
         //   <cmdName> <key> <flags> <expTime> <bytes> [noreply]\r\n
