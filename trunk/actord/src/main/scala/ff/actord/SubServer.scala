@@ -68,64 +68,41 @@ class MSubServer(val id: Int, val limitMemory: Long)
     val d = data     
     val r = keys.flatMap(key => getUnexpired(key, d))
 
-//    mod ! ModTouch(r.elements, keys.length)
+    mod ! ModTouch(r.elements, keys.length)
       
     r.elements
   }
 
   def set(el: MEntry, async: Boolean) = {
-    if (async)
-      mod ! ModSet(el, async)
-    else
-      mod !? ModSet(el, async)
+    modify(ModSet(el, async), async, true)
     true
   }
 
   def delete(key: String, time: Long, async: Boolean) = 
     getUnexpired(key).map(
-      el => {
-        if (async)
-          mod ! ModDelete(key, el, time, async)
-        else
-          mod !? ModDelete(key, el, time, async)
+      el => { 
+        modify(ModDelete(key, el, time, async), async, true)
         true
       }
     ).getOrElse(false)
     
   def delta(key: String, v: Long, async: Boolean): Long =
-    if (async) {
-      mod ! ModDelta(key, v, async)
-      0L
-    } else
-      (mod !? ModDelta(key, v, async)).asInstanceOf[Long]
+    modify(ModDelta(key, v, async), async, 0L)
     
   def addRep(el: MEntry, isAdd: Boolean, async: Boolean) = // For add or replace.
-    if (async) {
-      mod ! ModAddRep(el, isAdd, async)
-      true
-    } else
-      (mod !? ModAddRep(el, isAdd, async)).asInstanceOf[Boolean]
+    modify(ModAddRep(el, isAdd, async), async, true)
 
   def xpend(el: MEntry, append: Boolean, async: Boolean) = // For append or prepend.
-    if (async) {
-      mod ! ModXPend(el, append, async)
-      true
-    } else
-      (mod !? ModXPend(el, append, async)).asInstanceOf[Boolean]
+    modify(ModXPend(el, append, async), async, true)
 
   def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
-    if (async) {
-      mod ! ModCAS(el, cidPrev, async)
-      "N/A"
-    } else
-      (mod !? ModCAS(el, cidPrev, async)).asInstanceOf[String]
+    modify(ModCAS(el, cidPrev, async), async, "N/A")
 
   def keys = data.keys
   
-  def flushAll(expTime: Long) {
+  def flushAll(expTime: Long): Unit =
     for ((key, el) <- data)
       mod ! ModDelete(key, el, expTime, true)
-  }
   
   def stats: MServerStats = 
     (mod !? MServerStatsRequest).asInstanceOf[MServerStats]
@@ -141,7 +118,14 @@ class MSubServer(val id: Int, val limitMemory: Long)
   def subServerList = List(this) // The only subServer we know about is self.
   
   // --------------------------------------------
-  
+
+  def modify[T](msg: Object, async: Boolean, valWhenAsync: T): T = 
+    if (async) {
+      mod ! msg
+      valWhenAsync
+    } else 
+      (mod !? msg).asInstanceOf[T]
+
   /**
    * Only this mod (or modification) actor is allowed to update the data_i root. 
    * Also, the mod actor manages the LRU list and evicts entries when necessary.
