@@ -73,18 +73,12 @@ class MSubServer(val id: Int, val limitMemory: Long)
     r.elements
   }
 
-  def set(el: MEntry, async: Boolean) = {
+  def set(el: MEntry, async: Boolean) =
     modify(ModSet(el, async), async, true)
-    true
-  }
 
   def delete(key: String, time: Long, async: Boolean) = 
-    getUnexpired(key).map(
-      el => { 
-        modify(ModDelete(key, el, time, async), async, true)
-        true
-      }
-    ).getOrElse(false)
+    getUnexpired(key).map(el => modify(ModDelete(key, el, time, async), async, true)).
+                      getOrElse(false)
     
   def delta(key: String, v: Long, async: Boolean): Long =
     modify(ModDelta(key, v, async), async, 0L)
