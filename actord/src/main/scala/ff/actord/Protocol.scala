@@ -109,10 +109,10 @@ class MProtocol {
               cmd.reply(OK)
             }),
 
-      Spec("version",
+      Spec("version", 
            (svr, cmd) => cmd.reply(("VERSION " + MServer.version + CRNL).getBytes)),
       Spec("verbosity",
-           (svr, cmd) => cmd.reply(OK)),
+           (svr, cmd) => cmd.reply(OK)), // TODO: verbosity command.
       Spec("quit",
            (svr, cmd) => cmd.session.close),
 
@@ -216,8 +216,7 @@ class MProtocol {
               readyCount: Int): Int = {
     val cmdArgs = splitArr(cmdArr, cmdArr.length - CRNL.length)
 
-if (FAKE_FAST_GET.ffg(session, cmdArgs))
-  return GOOD
+if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArgs)) return GOOD
 
     val cmdName = cmdArgs(0)
 
@@ -347,14 +346,11 @@ if (FAKE_FAST_GET.ffg(session, cmdArgs))
     Name              Type     Meaning
     ----------------------------------
     n/a or unknown...
-      connection_structures 32u  Number of connection structures allocated 
-                                 by the server
-    o.s. or not available in pure java...
+      connection_structures 32u  Number of connection structures allocated by the server
+    o.s. or not available in pure scala/java...
       pid               32u      Process id of this server process
-      pointer_size      32       Default size of pointers on the host OS
-                                 (generally 32 or 64)
-      rusage_user       32u:32u  Accumulated user time for this process 
-                                 (seconds:microseconds)
+      pointer_size      32       Default size of pointers on the host OS (generally 32 or 64)
+      rusage_user       32u:32u  Accumulated user time for this process (seconds:microseconds)
       rusage_system     32u:32u  Accumulated system time for this process 
                                  (seconds:microseconds) ever since it started
     global...
@@ -363,33 +359,26 @@ if (FAKE_FAST_GET.ffg(session, cmdArgs))
       curr_connections  32u      Number of open connections
       total_connections 32u      Total number of connections opened since 
                                  the server started running
-      bytes_read        64u      Total number of bytes read by this server 
-                                 from network
-      bytes_written     64u      Total number of bytes sent by this server to 
-                                 network
+      bytes_read        64u      Total number of bytes read by this server from network
+      bytes_written     64u      Total number of bytes sent by this server to network
       threads           32u      Number of worker threads requested.
                                  (see doc/threads.txt)
     session...
       cmd_get           64u      Cumulative number of retrieval requests
       cmd_set           64u      Cumulative number of storage requests
-      get_hits          64u      Number of keys that have been requested and 
-                                 found present
-      get_misses        64u      Number of items that have been requested 
-                                 and not found
+      get_hits          64u      Number of keys that have been requested and found present
+      get_misses        64u      Number of items that have been requested and not found
     subServer...                           
       curr_items        32u      Current number of items stored by the server
       total_items       32u      Total number of items stored by this server 
-        note: not sure what's the difference between total_items and cmd_set
-        
-      bytes             64u      Current number of bytes used by this server 
-                                 to store items
+        note: not sure what's the difference between total_items and cmd_set        
+      bytes             64u      Current number of bytes used by this server to store items
       evictions         64u      Number of valid items removed from cache
                                  to free memory for new items
     server...
       version           string   Version string of this server
       uptime            32u      Number of seconds this server has been running
-      limit_maxbytes    32u      Number of bytes this server is allowed to
-                                 use for storage. 
+      limit_maxbytes    32u      Number of bytes this server is allowed to use for storage
 */
 }
 
@@ -452,19 +441,24 @@ case class MCommand(session: MSession, args: Seq[String], entry: MEntry) {
     }
 }
 
-///////////////////////////////////////////////// For FAKE FAST GET.
-object FAKE_FAST_GET {
-  val manyBytes = new Array[Byte](400) // 400 matchs mslap length.
+///////////////////////////////////////////////// 
+object BENCHMARK_NETWORK_ONLY { 
+  val manyBytes = new Array[Byte](400) // 400 matches memslap default data length.
   for (i <- 0 until 400)
     manyBytes(i) = 'a'.asInstanceOf[Byte]
   val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
   val GByte = 'g'.asInstanceOf[Byte]
 
-  def ffg(session: MSession, cmdArgs: Seq[String]): Boolean = {
+  def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArgs: Seq[String]): Boolean = { 
+    // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
     return false
+
+    if (cmdArr(0) != GByte) // Do a short circuit only for 'get' messages.
+      return false
+
     val key = cmdArgs(1)
     val cmd = MCommand(session, cmdArgs, null)
-    cmd.write(key, someEntry, false)
+    cmd.write(key, someEntry, false) // Return the same entry every time, because memslap doesn't care.
     cmd.reply(END)
     true
   }
