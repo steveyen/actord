@@ -262,16 +262,13 @@ class MSubServer(val id: Int, val limitMemory: Long)
                   
                   data_i_!!(dataMod - key)
                   usedMemory -= el.dataSize
-                  
-                  if (!noReply) 
-                      reply(true)
                 } else {
                   if (el.expTime == 0L || 
                       el.expTime > (nowInSeconds + expTime)) 
                     setEntry(el.updateExpTime(nowInSeconds + expTime))
-                  if (!noReply)
-                    reply(true)
                 }
+                if (!noReply) 
+                    reply(true)
               } else {
                 if (!noReply) 
                     reply(false)
