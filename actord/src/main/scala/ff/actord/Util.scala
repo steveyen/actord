@@ -41,32 +41,46 @@ object Util {
     case _ => defaultVal
   }
 
-  def splitArray(a: Array[Byte], len: Int): Seq[String] = { // Faster than regexp-based String.split() method.
+  def splitArray(a: Array[Byte], offset: Int, len: Int): Seq[String] = { 
     val r = new scala.collection.mutable.ArrayBuffer[String]
     val x = SPACE
-    var s = 0
-    var i = 0
-    while (i < len) {
-      if (a(i) == x) {
+    var s = offset
+    var i = offset
+    val j = offset + len
+    while (i < j) { 
+      if (a(i) == x) { // Faster than regexp-based String.split() method.
         if (s < i)
           r += (new String(a, s, i - s, "US-ASCII"))
         s = i + 1
       }
       i += 1
     }
-    if (s < len)
-      r += (new String(a, s, len - s, "US-ASCII"))
+    if (s < i)
+      r += (new String(a, s, i - s, "US-ASCII"))
     r
   }
 
   def indexOfByte(buf: Array[Byte], offset: Int, length: Int, s: Byte): Int = { 
     var i = offset
-    while (i < length) { // Faster than scala's iterator-based indexOf() implementation.
+    val j = offset + length
+    while (i < j) { // Faster than scala's iterator-based indexOf() implementation.
       if (buf(i) == s)
         return i
       i += 1
     }
     -1
+  }
+
+  def arrayCompare(a: Array[Byte], aLength: Int, b: Array[Byte], bLength: Int): Int = { // Like memcmp.
+    val len = Math.min(aLength, bLength)
+    var i = 0
+    while (i < len) {
+      val c = b(i) - a(i)
+      if (c != 0)
+         return c
+      i += 1
+    }
+    bLength - aLength
   }
 }
 

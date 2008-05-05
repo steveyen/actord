@@ -40,9 +40,10 @@ trait MSession {
  * TODO: Is there an equivalent of writev/readv in mina?
  */
 case class Spec(line: String, process: (MServer, MCommand) => Unit) {
-  val args    = line.split(" ")
-  val name    = args(0)
-  val minArgs = 1 + args.filter(_.startsWith("<")).length
+  val args      = line.split(" ")
+  val name      = args(0)
+  val nameBytes = name.getBytes
+  val minArgs   = args.filter(_.startsWith("<")).length
 
   def checkArgs(a: Seq[String]) = a.length >= minArgs
 }
@@ -76,35 +77,35 @@ class MProtocol {
   def singleLineSpecs = List( 
       Spec("get <key>*",
            (svr, cmd) => { 
-             svr.get(cmd.args.slice(1, cmd.args.length)).
+             svr.get(cmd.args).
                  foreach(el => cmd.write(el, false))
              cmd.reply(END)
            }),
 
       Spec("gets <key>*",
            (svr, cmd) => {
-             svr.get(cmd.args.slice(1, cmd.args.length)).
+             svr.get(cmd.args).
                  foreach(el => cmd.write(el, true))
              cmd.reply(END)
            }),
 
       Spec("delete <key> [<time>] [noreply]",
            (svr, cmd) => 
-             cmd.reply(svr.delete(cmd.args(1), cmd.argToLong(2), cmd.noReply), 
+             cmd.reply(svr.delete(cmd.args(0), cmd.argToLong(1), cmd.noReply), 
                        DELETED, NOT_FOUND)),
 
       Spec("incr <key> <value> [noreply]",
-           (svr, cmd) => cmd.reply(svr.delta(cmd.args(1),  cmd.argToLong(2), cmd.noReply))),
+           (svr, cmd) => cmd.reply(svr.delta(cmd.args(0),  cmd.argToLong(1), cmd.noReply))),
       Spec("decr <key> <value> [noreply]",
-           (svr, cmd) => cmd.reply(svr.delta(cmd.args(1), -cmd.argToLong(2), cmd.noReply))),
+           (svr, cmd) => cmd.reply(svr.delta(cmd.args(0), -cmd.argToLong(1), cmd.noReply))),
            
       Spec("stats [<arg>]",
            (svr, cmd) => 
-             cmd.reply(stats(svr, cmd.argOrElse(1, null)))),
+             cmd.reply(stats(svr, cmd.argOrElse(0, null)))),
 
       Spec("flush_all [<delay>] [noreply]",
            (svr, cmd) => {
-              svr.flushAll(cmd.argToLong(1))
+              svr.flushAll(cmd.argToLong(0))
               cmd.reply(OK)
             }),
 
@@ -119,7 +120,7 @@ class MProtocol {
       //
       Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
            (svr, cmd) => { 
-             svr.range(cmd.args(1), cmd.args(2)).
+             svr.range(cmd.args(0), cmd.args(1)).
                  foreach(el => cmd.write(el, false))
              cmd.reply(END)
            }))
@@ -157,7 +158,7 @@ class MProtocol {
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
            (svr, cmd) => 
-              cmd.reply((svr.checkAndSet(cmd.entry, cmd.argToLong(5), cmd.noReply) + CRNL).getBytes)),
+              cmd.reply((svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL).getBytes)),
 
       // Extensions to basic protocol.
       //
@@ -184,8 +185,8 @@ class MProtocol {
     lookup
   }
 
-  def findSpec(name: String, lookup: Array[List[Spec]]): Option[Spec] = 
-    lookup(name(0) - 'a').find(_.name == name)
+  def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[Spec]]): Option[Spec] = 
+    lookup(x(0) - 'a').find(spec => arrayCompare(spec.nameBytes, spec.nameBytes.length, x, xLen) == 0)
 
   // ----------------------------------------
 
@@ -212,30 +213,33 @@ class MProtocol {
               readyCount: Int): Int = {
 if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
 
-    val cmdArgs = splitArray(cmdArr, cmdArrLen - CRNL.length)
-    val cmdName = cmdArgs(0)
+    val length     = cmdArrLen - CRNL.length
+    val spcPos     = indexOfByte(cmdArr, 0, length, SPACE)
+    val cmdLen     = if (spcPos > 0) spcPos else length
+    val cmdArgsLen = Math.max(length - (cmdLen + 1), 0)
+    val cmdArgs    = splitArray(cmdArr, cmdLen + 1, cmdArgsLen)
 
-    findSpec(cmdName, singleLineSpecLookup).map(
+    findSpec(cmdArr, cmdLen, singleLineSpecLookup).map(
       spec => {
         if (spec.checkArgs(cmdArgs)) {
-          spec.process(server, MCommand(session, cmdArgs, null))
+          spec.process(server, MCommand(session, cmdArr, cmdLen, cmdArgs, null))
           GOOD
         } else {
-          session.write(("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL).getBytes)
+          session.write(("CLIENT_ERROR args: " + (new String(cmdArr, 0, length)) + CRNL).getBytes)
           GOOD
         }
       }
-    ) orElse findSpec(cmdName, multiLineSpecLookup).map(
+    ) orElse findSpec(cmdArr, cmdLen, multiLineSpecLookup).map(
       spec => {
         // Handle mutator command: 
         //   <cmdName> <key> <flags> <expTime> <bytes> [noreply]\r\n
         //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
         //
         if (spec.checkArgs(cmdArgs)) {
-          var dataSize    = cmdArgs(4).toInt
+          var dataSize    = cmdArgs(3).toInt
           val totalNeeded = cmdArrLen + dataSize + CRNL.length
           if (totalNeeded <= readyCount) {
-            val expTime = cmdArgs(3).toLong
+            val expTime = cmdArgs(2).toLong
             
             // TODO: Handle this better when dataSize is huge.
             //       Perhaps use mmap, or did mina read it entirely 
@@ -248,9 +252,9 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
             if (session.read == CR &&
                 session.read == NL) {
               spec.process(server, 
-                           MCommand(session, cmdArgs,
-                                    MEntry(cmdArgs(1),
-                                           cmdArgs(2).toLong,
+                           MCommand(session, cmdArr, cmdLen, cmdArgs,
+                                    MEntry(cmdArgs(0),
+                                           cmdArgs(1).toLong,
                                            if (expTime != 0 &&
                                                expTime <= SECONDS_IN_30_DAYS)
                                                expTime + nowInSeconds
@@ -268,13 +272,13 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
             totalNeeded
           }
         } else {
-          session.write(("CLIENT_ERROR args: " + cmdArgs.mkString(" ") + CRNL).getBytes)
+          session.write(("CLIENT_ERROR args: " + (new String(cmdArr, 0, length)) + CRNL).getBytes)
           GOOD
         }
       }
     ) getOrElse {
-      session.write(("ERROR " + cmdName + CRNL).getBytes) // Saw an unknown command, but keep
-      GOOD                                                // going and process the next command.
+      session.write(("ERROR " + (new String(cmdArr, 0, cmdLen)) + CRNL).getBytes) 
+      GOOD // Saw an unknown command, but keep going and process the next command.
     }
   }
 
@@ -380,8 +384,8 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
 /**
  * Represents an incoming command or request from a (remote) client.
  */
-case class MCommand(session: MSession, args: Seq[String], entry: MEntry) {
-  val noReply = args.last == "noreply"
+case class MCommand(session: MSession, cmdArr: Array[Byte], cmdLen: Int, args: Seq[String], entry: MEntry) {
+  val noReply = args.length > 0 && args.last == "noreply"
   
   def argToLong(at: Int) = itemToLong(args, at)
   
