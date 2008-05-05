@@ -274,7 +274,6 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArgs)) return GOOD
                                                expTime + nowInSeconds
                                            else
                                                expTime,
-                                           dataSize,
                                            data,
                                            (session.ident << 32) + 
                                            (session.numMessages & 0xFFFFFFFFL))))
@@ -440,7 +439,7 @@ case class MCommand(session: MSession, args: Seq[String], entry: MEntry) {
         if (x != null)
             x
         else
-            entry.comm_!(("VALUE " + entry.key + " " + entry.flags + " " + entry.dataSize).getBytes).
+            entry.comm_!(("VALUE " + entry.key + " " + entry.flags + " " + entry.data.size).getBytes).
                   asInstanceOf[Array[Byte]]
       }
       session.write(line)
@@ -459,7 +458,7 @@ object BENCHMARK_NETWORK_ONLY {
   val manyBytes = new Array[Byte](400) // 400 matches memslap default data length.
   for (i <- 0 until 400)
     manyBytes(i) = 'a'.asInstanceOf[Byte]
-  val someEntry = MEntry(null, 0, 0, manyBytes.length, manyBytes, 0L)
+  val someEntry = MEntry(null, 0, 0, manyBytes, 0L)
   val GByte = 'g'.asInstanceOf[Byte]
 
   def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArgs: Seq[String]): Boolean = { 

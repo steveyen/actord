@@ -135,7 +135,7 @@ class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
     val expTime = reader.readLong
     val data    = reader.readArray
     val cid     = reader.readLong
-    MEntry(key, flags, expTime, data.size, data, cid)
+    MEntry(key, flags, expTime, data, cid)
   }
 
   def errorValue(loc: StorageLoc, error: Object) = MEntryStorageTreap.errorEntry
@@ -147,7 +147,7 @@ class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
 }
 
 object MEntryStorageTreap {
-  val errorEntry = MEntry(null, 0L, 0L, 0, new Array[Byte](0), 0L)
+  val errorEntry = MEntry(null, 0L, 0L, new Array[Byte](0), 0L)
 }
 
 // ------------------------------------------------

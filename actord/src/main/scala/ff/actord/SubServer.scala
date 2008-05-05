@@ -175,7 +175,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
         dataMod.get(current.key).foreach(
           existing => {
             dataMod   = dataMod - current.key
-            reclaimed = reclaimed + existing.dataSize
+            reclaimed = reclaimed + existing.data.size
 
             if (!existing.isExpired(now))
               evictions += 1L
@@ -198,7 +198,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
               
               // Keep stats correct on update/set to existing key.
               //
-              usedMemory -= existing.dataSize
+              usedMemory -= existing.data.size
             }
           )
 
@@ -211,7 +211,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
       touch(el)
 
       data_i_!!(dataMod + (el.key -> el))
-      usedMemory += el.dataSize
+      usedMemory += el.data.size
       
       true
     }
@@ -261,7 +261,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
                   }
                   
                   data_i_!!(dataMod - key)
-                  usedMemory -= el.dataSize
+                  usedMemory -= el.data.size
                 } else {
                   if (el.expTime == 0L || 
                       el.expTime > (nowInSeconds + expTime)) 
