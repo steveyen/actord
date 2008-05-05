@@ -102,7 +102,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
             s.close
             throw new RuntimeException("missing CRNL")
           } else {
-            val bytesNeeded = protocol.process(server, this, aLine, available)
+            val bytesNeeded = protocol.process(server, this, aLine, aLine.length, available)
             if (bytesNeeded == 0) {
               if (available > readPos)
                 Array.copy(buf, readPos, buf, 0, available - readPos)

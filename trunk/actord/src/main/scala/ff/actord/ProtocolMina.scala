@@ -102,7 +102,7 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
         aLine(nLine - 1) != NL)
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
 
-    val bytesNeeded = protocol.process(server, WrapIoSession(session, in), aLine, remaining)
+    val bytesNeeded = protocol.process(server, WrapIoSession(session, in), aLine, aLine.length, remaining)
     if (bytesNeeded == 0) {
       MessageDecoderResult.OK
     } else {

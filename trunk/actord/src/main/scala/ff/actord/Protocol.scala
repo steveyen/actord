@@ -206,11 +206,12 @@ class MProtocol {
    */
   def process(server: MServer,
               session: MSession, 
-              cmdArr: Array[Byte],
+              cmdArr: Array[Byte], // We do not own the input cmdArr.
+              cmdArrLength: Int,   // Number of command line bytes in cmdArr, including CRNL.
               readyCount: Int): Int = {
-if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr)) return GOOD
+if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLength)) return GOOD
 
-    val cmdArgs = splitArr(cmdArr, cmdArr.length - CRNL.length)
+    val cmdArgs = splitArr(cmdArr, cmdArrLength - CRNL.length)
     val cmdName = cmdArgs(0)
 
     findSpec(cmdName, singleLineSpecLookup).map(
@@ -460,7 +461,7 @@ object BENCHMARK_NETWORK_ONLY {
   val valBeg = "VALUE ".getBytes
   val valEnd = " 0 400\r\n".getBytes
 
-  def shortCircuit(session: MSession, cmdArr: Array[Byte]): Boolean = { 
+  def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArrLength: Int): Boolean = { 
     // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
     return false
 
@@ -469,18 +470,19 @@ object BENCHMARK_NETWORK_ONLY {
 
     // val k = cmdArr.indexOf(SPACE) + 1 // TOO SLOW
     //
+    val s = SPACE
     var i = 0
-    var k = -1
-    var len = cmdArr.length
-    while (k == -1 && i < cmdArr.length) {
-      if (cmdArr(i) == SPACE) {
+    var k = -1 // Index of the key's first byte.
+    val len = cmdArrLength - CRNL.length
+    while (k == -1 && i < len) {
+      if (cmdArr(i) == s) {
         k = i + 1
       }
       i += 1
     }
 
     session.write(valBeg)
-    session.write(cmdArr, k, cmdArr.length - k - 2) // 2 == CRNL.length
+    session.write(cmdArr, k, len - k)
     session.write(valEnd)
     session.write(entry.data)
     session.write(CRNLBytes)

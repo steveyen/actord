@@ -141,7 +141,7 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent:
           s.close
           throw new RuntimeException("missing CRNL")
         } else {
-          val bytesNeeded = protocol.process(server, new GSessionContext(ctx), aLine, available)
+          val bytesNeeded = protocol.process(server, new GSessionContext(ctx), aLine, aLine.length, available)
           if (bytesNeeded == 0) {
             nMessages = nMessages + 1              
 
