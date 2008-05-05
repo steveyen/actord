@@ -206,9 +206,8 @@ case class MServerStats(numEntries: Long,
                         cmd_gets: Long, 
                         cmd_sets: Long,
                         get_hits: Long,
-                        get_misses: Long,
-                        lruSize: Long) {
-  def this() = this(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+                        get_misses: Long) {
+  def this() = this(0L, 0L, 0L, 0L, 0L, 0L, 0L)
   def +(that: MServerStats) =
     MServerStats(numEntries + that.numEntries, 
                  usedMemory + that.usedMemory, 
@@ -216,8 +215,7 @@ case class MServerStats(numEntries: Long,
                  cmd_gets   + that.cmd_gets, 
                  cmd_sets   + that.cmd_sets,
                  get_hits   + that.get_hits,
-                 get_misses + that.get_misses,
-                 lruSize    + that.lruSize)
+                 get_misses + that.get_misses)
 }
 
 // -------------------------------------------------------

@@ -132,7 +132,6 @@ class MSubServer(val id: Int, val limitMemory: Long)
   val mod = actor {
     val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
     val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
-    var lruSize = 0L
 
     lruHead.append(lruTail)
     
@@ -171,7 +170,6 @@ class MSubServer(val id: Int, val limitMemory: Long)
              current != null) {
         val n = current.next
         current.remove
-        lruSize -= 1L
         dataMod.get(current.key).foreach(
           existing => {
             dataMod   = dataMod - current.key
@@ -202,10 +200,8 @@ class MSubServer(val id: Int, val limitMemory: Long)
             }
           )
 
-          if (el.lru == null) {
+          if (el.lru == null)
               el.lru = new LRUList(el.key, null, null)
-              lruSize += 1L
-          }
       }
       
       touch(el)
@@ -255,10 +251,8 @@ class MSubServer(val id: Int, val limitMemory: Long)
                   current.cid == el.cid) { // Or, must have the same CAS value.
                 if (isErrorEntry ||
                     expTime == 0L) {
-                  if (el.lru != null) {
+                  if (el.lru != null)
                       el.lru.remove
-                      lruSize -= 1L
-                  }
                   
                   data_i_!!(dataMod - key)
                   usedMemory -= el.data.size
@@ -335,8 +329,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
           //
           reply(MServerStats(data.size, usedMemory, evictions, 
                              cmd_gets, cmd_sets,
-                             get_hits, get_misses,
-                             lruSize))
+                             get_hits, get_misses))
       }
     }
   }
