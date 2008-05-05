@@ -280,6 +280,11 @@ object MServerSpec extends Specification with MTestUtil {
                    benchMarkAvgMillis(10, 
                      for (i <- 0 until n)
                        m.get(List(genKey(i))))))
+      Thread.sleep(1000) // Maybe hotspot will compile stuff right here.
+      println(calc(n, "get",
+                   benchMarkAvgMillis(50, 
+                     for (i <- 0 until n)
+                       m.get(List(genKey(i))))))
     }
 
     "simple multithreaded benchmark" in {
