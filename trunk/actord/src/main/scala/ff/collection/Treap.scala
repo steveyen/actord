@@ -100,7 +100,7 @@ abstract class TreapNodeFactory[A <% Ordered[A], B <: AnyRef]  {
              left:  TreapNode[A, B], 
              right: TreapNode[A, B]): TreapNode[A, B]
 
-  def compare(x: A, y: A) = x compare y
+  def compare(x: A, y: A): Int
 }
 
 // ---------------------------------------------------------
