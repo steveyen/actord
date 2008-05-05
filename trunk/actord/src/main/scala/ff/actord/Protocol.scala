@@ -76,14 +76,14 @@ class MProtocol {
       Spec("get <key>*",
            (svr, cmd) => { 
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => cmd.write(el.key, el, false))
+                 foreach(el => cmd.write(el, false))
              cmd.reply(END)
            }),
 
       Spec("gets <key>*",
            (svr, cmd) => {
              svr.get(cmd.args.slice(1, cmd.args.length)).
-                 foreach(el => cmd.write(el.key, el, true))
+                 foreach(el => cmd.write(el, true))
              cmd.reply(END)
            }),
 
@@ -119,7 +119,7 @@ class MProtocol {
       Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
            (svr, cmd) => { 
              svr.range(cmd.args(1), cmd.args(2)).
-                 foreach(el => cmd.write(el.key, el, false))
+                 foreach(el => cmd.write(el, false))
              cmd.reply(END)
            }))
            
@@ -163,7 +163,7 @@ class MProtocol {
       Spec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
            (svr, cmd) => {
               svr.act(cmd.entry, cmd.noReply).
-                  foreach(el => cmd.write(el.key, el, false))
+                  foreach(el => cmd.write(el, false))
               cmd.reply(END)
            }))
       
@@ -207,10 +207,9 @@ class MProtocol {
               session: MSession, 
               cmdArr: Array[Byte],
               readyCount: Int): Int = {
+if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr)) return GOOD
+
     val cmdArgs = splitArr(cmdArr, cmdArr.length - CRNL.length)
-
-if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArgs)) return GOOD
-
     val cmdName = cmdArgs(0)
 
     findSpec(cmdName, singleLineSpecLookup).map(
@@ -429,7 +428,7 @@ case class MCommand(session: MSession, args: Seq[String], entry: MEntry) {
   /**
    * A VALUE response of a String of a single line, followed by a single MEntry data bytes.
    */
-  def write(key: String, entry: MEntry, withCAS: Boolean): Unit =
+  def write(entry: MEntry, withCAS: Boolean): Unit =
     if (!noReply) {
       val line: Array[Byte] = {
         val x = entry.comm.asInstanceOf[Array[Byte]]
@@ -455,20 +454,27 @@ object BENCHMARK_NETWORK_ONLY {
   val manyBytes = new Array[Byte](400) // 400 matches memslap default data length.
   for (i <- 0 until 400)
     manyBytes(i) = 'a'.asInstanceOf[Byte]
-  val someEntry = MEntry(null, 0, 0, manyBytes, 0L)
+  val entry = MEntry(null, 0, 0, manyBytes, 0L)
   val GByte = 'g'.asInstanceOf[Byte]
+  val valBeg = "VALUE ".getBytes
+  val valEnd = " 0 400\r\n".getBytes
 
-  def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArgs: Seq[String]): Boolean = { 
+  def shortCircuit(session: MSession, cmdArr: Array[Byte]): Boolean = { 
     // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
     return false
 
     if (cmdArr(0) != GByte) // Do a short circuit only for 'get' messages.
       return false
 
-    val key = cmdArgs(1)
-    val cmd = MCommand(session, cmdArgs, null)
-    cmd.write(key, someEntry, false) // Return the same entry every time, because memslap doesn't care.
-    cmd.reply(END)
+    val k   = cmdArr.indexOf(SPACE) + 1
+    val key = cmdArr.slice(k, cmdArr.length - k)
+
+    session.write(valBeg)
+    session.write(key)
+    session.write(valEnd)
+    session.write(entry.data)
+    session.write(CRNLBytes)
+    session.write(END)
     true
   }
 }
