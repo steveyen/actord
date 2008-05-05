@@ -28,7 +28,7 @@ trait MSession {
   def read(bytes: Array[Byte]): Unit
   def write(bytes: Array[Byte]): Unit
 
-  def numMessages: Long
+  def numMessages: Long // Number of messages on this session so far.
 }
 
 /**
@@ -38,11 +38,9 @@ trait MSession {
  * TODO: Research how mina allows request and response streaming.
  * TODO: Is there an equivalent of writev/readv in mina?
  */
-case class Spec(line: String,
-                process: (MServer, MCommand) => Unit) {
-  val args = line.split(" ")
-  val name = args(0)
-  
+case class Spec(line: String, process: (MServer, MCommand) => Unit) {
+  val args    = line.split(" ")
+  val name    = args(0)
   val minArgs = 1 + args.filter(_.startsWith("<")).length
 
   def checkArgs(a: Seq[String]) = a.length >= minArgs
@@ -193,24 +191,6 @@ class MProtocol {
   final val GOOD               = 0
   final val SECONDS_IN_30_DAYS = 60*60*24*30
 
-  def splitArr(a: Array[Byte], len: Int): Seq[String] = { // Avoiding String.split() because it uses regexps.
-    val r = new mutable.ArrayBuffer[String]
-    val x = SPACE
-    var s = 0
-    var i = 0
-    while (i < len) {
-      if (a(i) == x) {
-        if (s < i)
-          r += (new String(a, s, i - s, "US-ASCII"))
-        s = i + 1
-      }
-      i += 1
-    }
-    if (s < len)
-      r += (new String(a, s, len - s, "US-ASCII"))
-    r
-  }
-
   /**
    * This function is called by the networking implementation
    * when there is incoming data/message that needs to be processed.
@@ -294,6 +274,24 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArgs)) return GOOD
       session.write(("ERROR " + cmdName + CRNL).getBytes) // Saw an unknown command, but keep
       GOOD                                                // going and process the next command.
     }
+  }
+
+  def splitArr(a: Array[Byte], len: Int): Seq[String] = { // Avoiding String.split() because it uses regexps.
+    val r = new mutable.ArrayBuffer[String]
+    val x = SPACE
+    var s = 0
+    var i = 0
+    while (i < len) {
+      if (a(i) == x) {
+        if (s < i)
+          r += (new String(a, s, i - s, "US-ASCII"))
+        s = i + 1
+      }
+      i += 1
+    }
+    if (s < len)
+      r += (new String(a, s, len - s, "US-ASCII"))
+    r
   }
 
   // ----------------------------------------
