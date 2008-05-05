@@ -68,7 +68,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
     val d = data     
     val r = keys.flatMap(key => getUnexpired(key, d))
 
-    mod ! ModTouch(r.elements, keys.length)
+    lruTouchMulti(r.elements)
       
     r.elements
   }
@@ -103,7 +103,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
 
   def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
     var r = data.range(keyFrom, keyTo)
-    mod ! ModTouch(r.values, 0)
+    lruTouchMulti(r.values)
     r.values
   }
   
@@ -111,6 +111,36 @@ class MSubServer(val id: Int, val limitMemory: Long)
   
   def subServerList = List(this) // The only subServer we know about is self.
   
+  // --------------------------------------------
+
+  val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
+  val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
+
+  lruHead.append(lruTail) // The lruHead is also used for synchronization.
+
+  def lruTouchMulti(els: Iterator[MEntry]): Int = lruHead.synchronized {
+    var n = 0
+    for (el <- els) {
+      if (el.lru != null &&
+          el.lru.next != null && // The entry might have been deleted already
+          el.lru.prev != null)   // so don't put it back.
+        lruTouch(el)
+      n += 1
+    }
+    n
+  }
+  
+  def lruTouch(el: MEntry): Unit = lruHead.synchronized {
+    if (el.lru != null) {
+        el.lru.remove
+        lruTail.insert(el.lru)
+    }
+  }
+
+  def lruRemove(x: LRUList): Unit = 
+    if (x != null)
+      lruHead.synchronized { x.remove }
+
   // --------------------------------------------
 
   def modify[T](msg: Object, async: Boolean, valWhenAsync: T): T = 
@@ -122,7 +152,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
 
   /**
    * Only this mod (or modification) actor is allowed to update the data_i root. 
-   * Also, the mod actor manages the LRU list and evicts entries when necessary.
+   * Also, the mod actor works with the LRU list and evicts entries when necessary.
    * This design serializes modifications, which is why we usually create one 
    * MSubServer (and a matching mod actor) per processor core, to increase
    * writer concurrency.
@@ -130,17 +160,6 @@ class MSubServer(val id: Int, val limitMemory: Long)
    * Note: The receive-based loop is mysteriously much faster than a react-based loop.
    */
   val mod = actor {
-    val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
-    val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
-
-    lruHead.append(lruTail)
-    
-    def touch(el: MEntry) =
-      if (el.lru != null) {
-          el.lru.remove
-          lruTail.insert(el.lru)
-      }
-
     // TODO: When using persistence, these stats are not updated as
     //       data is transparently swizzled in from storage.
     //
@@ -163,23 +182,26 @@ class MSubServer(val id: Int, val limitMemory: Long)
       val now       = nowInSeconds
       var dataMod   = data         // Snapshot data outside of loop.
       var reclaimed = 0L           // Total number of bytes reclaimed in this call.
-      var current   = lruHead.next // Start from least recently used.
-      
-      while (reclaimed < numBytes &&
-             current != lruTail &&
-             current != null) {
-        val n = current.next
-        current.remove
-        dataMod.get(current.key).foreach(
-          existing => {
-            dataMod   = dataMod - current.key
-            reclaimed = reclaimed + existing.data.size
 
-            if (!existing.isExpired(now))
-              evictions += 1L
-          }
-        )
-        current = n
+      lruHead.synchronized {
+        var current = lruHead.next // Start from least recently used.
+        
+        while (reclaimed < numBytes &&
+               current != lruTail &&
+               current != null) {
+          val n = current.next
+          current.remove
+          dataMod.get(current.key).foreach(
+            existing => {
+              dataMod   = dataMod - current.key
+              reclaimed = reclaimed + existing.data.size
+  
+              if (!existing.isExpired(now))
+                evictions += 1L
+            }
+          )
+          current = n
+        }
       }
       
       data_i_!!(dataMod)
@@ -204,7 +226,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
               el.lru = new LRUList(el.key, null, null)
       }
       
-      touch(el)
+      lruTouch(el)
 
       data_i_!!(dataMod + (el.key -> el))
       usedMemory += el.data.size
@@ -215,15 +237,8 @@ class MSubServer(val id: Int, val limitMemory: Long)
     loop {
       receive {
         case ModTouch(els, numGetMultiKeys) => {
-          var numHits = 0
-          for (el <- els) {
-            if (el.lru != null &&
-                el.lru.next != null && // The entry might have been deleted already
-                el.lru.prev != null)   // so don't put it back.
-              touch(el)
-            numHits += 1
-          }
-          
+          var numHits = lruTouchMulti(els)
+
           get_hits += numHits      // TODO: How to account for range hits?
 
           if (numGetMultiKeys > 0) // TODO: How does memcached count get-multi?
@@ -251,8 +266,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
                   current.cid == el.cid) { // Or, must have the same CAS value.
                 if (isErrorEntry ||
                     expTime == 0L) {
-                  if (el.lru != null)
-                      el.lru.remove
+                  lruRemove(el.lru)
                   
                   data_i_!!(dataMod - key)
                   usedMemory -= el.data.size
