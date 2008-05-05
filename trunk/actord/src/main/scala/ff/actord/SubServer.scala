@@ -236,18 +236,6 @@ class MSubServer(val id: Int, val limitMemory: Long)
     
     loop {
       receive {
-        case ModTouch(els, numGetMultiKeys) => {
-          var numHits = lruTouchMulti(els)
-
-          get_hits += numHits      // TODO: How to account for range hits?
-
-          if (numGetMultiKeys > 0) // TODO: How does memcached count get-multi?
-            cmd_gets += 1L         
-          
-          if (numGetMultiKeys > numHits)
-            get_misses += (numGetMultiKeys - numHits)
-        }
-        
         case ModSet(el, noReply) => {
           setEntry(el)
           if (!noReply) 
@@ -352,7 +340,6 @@ class MSubServer(val id: Int, val limitMemory: Long)
   
   case class ModSet    (el: MEntry, noReply: Boolean)
   case class ModDelete (key: String, el: MEntry, expTime: Long, noReply: Boolean)
-  case class ModTouch  (els: Iterator[MEntry], numKeys: Int)
   case class ModDelta  (key: String, delta: Long,    noReply: Boolean)
   case class ModAddRep (el: MEntry, isAdd: Boolean,  noReply: Boolean) // For add/replace.
   case class ModXPend  (el: MEntry, append: Boolean, noReply: Boolean) // For append/prepend.
