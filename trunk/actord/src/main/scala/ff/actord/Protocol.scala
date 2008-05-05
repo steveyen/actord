@@ -200,18 +200,19 @@ class MProtocol {
    * the message can be processed successfully.  Or, just
    * returns 0 (or OK) to mean we've processed the message.
    *
-   * cmdArr     - the incoming message command line bytes, including CRNL. 
+   * cmdArr     - the incoming message command line bytes, including CRNL, and maybe more. 
+   * cmdArrLen  - tells us what part of the cmdArr belongs to the command line, including CRNL.
    * readyCount - number of bytes from message start (including cmdArr)
    *              plus remaining data, available to be read.
    */
   def process(server: MServer,
               session: MSession, 
               cmdArr: Array[Byte], // We do not own the input cmdArr.
-              cmdArrLength: Int,   // Number of command line bytes in cmdArr, including CRNL.
+              cmdArrLen: Int,      // Number of command line bytes in cmdArr, including CRNL.
               readyCount: Int): Int = {
-if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLength)) return GOOD
+if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
 
-    val cmdArgs = splitArr(cmdArr, cmdArrLength - CRNL.length)
+    val cmdArgs = splitArr(cmdArr, cmdArrLen - CRNL.length)
     val cmdName = cmdArgs(0)
 
     findSpec(cmdName, singleLineSpecLookup).map(
@@ -232,7 +233,7 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLength)) return G
         //
         if (spec.checkArgs(cmdArgs)) {
           var dataSize    = cmdArgs(4).toInt
-          val totalNeeded = cmdArr.length + dataSize + CRNL.length
+          val totalNeeded = cmdArrLen + dataSize + CRNL.length
           if (totalNeeded <= readyCount) {
             val expTime = cmdArgs(3).toLong
             
@@ -461,7 +462,7 @@ object BENCHMARK_NETWORK_ONLY {
   val valBeg = "VALUE ".getBytes
   val valEnd = " 0 400\r\n".getBytes
 
-  def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArrLength: Int): Boolean = { 
+  def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Boolean = { 
     // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
     return false
 
@@ -473,7 +474,7 @@ object BENCHMARK_NETWORK_ONLY {
     val s = SPACE
     var i = 0
     var k = -1 // Index of the key's first byte.
-    val len = cmdArrLength - CRNL.length
+    val len = cmdArrLen - CRNL.length
     while (k == -1 && i < len) {
       if (cmdArr(i) == s) {
         k = i + 1

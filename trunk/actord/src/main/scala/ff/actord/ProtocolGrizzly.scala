@@ -131,17 +131,16 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent:
         if (waitingFor > buf.length)
           bufGrow(waitingFor)
       } else {
-        val nLine = indexCR + CRNL.length
-        val aLine = new Array[Byte](nLine)
+        val cmdLen = indexCR + CRNL.length
 
-        read(aLine)
-
-        if (aLine(nLine - 2) != CR ||
-            aLine(nLine - 1) != NL) {
-          s.close
+        if (buf(cmdLen - 2) != CR ||
+            buf(cmdLen - 1) != NL) {
+            s.close
           throw new RuntimeException("missing CRNL")
         } else {
-          val bytesNeeded = protocol.process(server, new GSessionContext(ctx), aLine, aLine.length, available)
+          readPos = cmdLen
+
+          val bytesNeeded = protocol.process(server, new GSessionContext(ctx), buf, cmdLen, available)
           if (bytesNeeded == 0) {
             nMessages = nMessages + 1              
 
