@@ -40,5 +40,33 @@ object Util {
   } catch { 
     case _ => defaultVal
   }
+
+  def splitArray(a: Array[Byte], len: Int): Seq[String] = { // Faster than regexp-based String.split() method.
+    val r = new scala.collection.mutable.ArrayBuffer[String]
+    val x = SPACE
+    var s = 0
+    var i = 0
+    while (i < len) {
+      if (a(i) == x) {
+        if (s < i)
+          r += (new String(a, s, i - s, "US-ASCII"))
+        s = i + 1
+      }
+      i += 1
+    }
+    if (s < len)
+      r += (new String(a, s, len - s, "US-ASCII"))
+    r
+  }
+
+  def indexOfByte(buf: Array[Byte], offset: Int, length: Int, s: Byte): Int = { 
+    var i = offset
+    while (i < length) { // Faster than scala's iterator-based indexOf() implementation.
+      if (buf(i) == s)
+        return i
+      i += 1
+    }
+    -1
+  }
 }
 
