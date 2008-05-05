@@ -28,7 +28,7 @@ trait MSession {
   def read(bytes: Array[Byte]): Unit
   def write(bytes: Array[Byte]): Unit
 
-  def numMessages: Long // Number of messages on this session so far.
+  def numMessages: Long // Number of messages processed on this session so far.
 }
 
 /**
