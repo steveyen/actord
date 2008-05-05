@@ -71,7 +71,7 @@ class MProtocol {
 
   /**
    * Commands defined with a single line.
-   *
+   * More popular commands should be listed first.
    * Subclasses might override this list to add custom commands.
    */
   def singleLineSpecs = List( 
@@ -127,7 +127,7 @@ class MProtocol {
            
   /**
    * Commands that use a multiple lines, such as a line followed by byte data.
-   *
+   * More popular commands should be listed first.
    * Subclasses might override this list to add custom commands.
    */
   def multiLineSpecs = List( 
