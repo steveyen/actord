@@ -99,6 +99,8 @@ abstract class TreapNodeFactory[A <% Ordered[A], B <: AnyRef]  {
   def mkNode(basis: TreapFullNode[A, B], 
              left:  TreapNode[A, B], 
              right: TreapNode[A, B]): TreapNode[A, B]
+
+  def compare(x: A, y: A) = x compare y
 }
 
 // ---------------------------------------------------------
@@ -214,7 +216,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def lastKey(t: T)  = if (right(t).isEmpty) key else right(t).lastKey(t)
 
   def lookup(t: T, s: A): Node = {
-    val c = s compare key
+    val c = t.compare(s, key)
     if (c == 0)
       this
     else {
@@ -316,9 +318,11 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
     left(t).elements(t).append(Pair(key, value(t)), () => right(t).elements(t))
 
   def range(t: T, from: Option[A], until: Option[A]): TreapNode[A, B] = {
-    if (from  == None && until == None)    return this
-    if (from  != None && key < from.get)   return right(t).range(t, from, until)
-    if (until != None && key >= until.get) return left(t).range(t, from, until)
+    if (from == None && until == None) 
+      return this
+
+    if (from  != None && t.compare(key, from.get) < 0)   return right(t).range(t, from, until)
+    if (until != None && t.compare(key, until.get) >= 0) return left(t).range(t, from, until)
     
     val (l1, m1, r1) = from.map(s => left(t).split(t, s)).
                             getOrElse(null, null, left(t))
