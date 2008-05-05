@@ -132,8 +132,8 @@
               <jvmarg value="-javaagent:tmp/shiftone-jrat.jar"/>
               <jvmarg value="-agentlib:hprof=heap=sites"/>
               <jvmarg value="-agentlib:hprof=cpu=samples"/>
-              <jvmarg value="-agentlib:hprof=cpu=times,thread=y"/>
                 -->
+              <jvmarg value="-agentlib:hprof=cpu=times,thread=y"/>
               <!-- for persistence...
               <arg value="-s_path tmp/data"/>
               <arg value="-s_interval 5000"/>
