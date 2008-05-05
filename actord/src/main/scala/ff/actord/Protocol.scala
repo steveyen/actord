@@ -26,7 +26,8 @@ trait MSession {
 
   def read: Byte
   def read(bytes: Array[Byte]): Unit
-  def write(bytes: Array[Byte]): Unit
+  def write(bytes: Array[Byte]): Unit = write(bytes, 0, bytes.length)
+  def write(bytes: Array[Byte], offset: Int, length: Int): Unit
 
   def numMessages: Long // Number of messages processed on this session so far.
 }
@@ -461,7 +462,7 @@ object BENCHMARK_NETWORK_ONLY {
 
   def shortCircuit(session: MSession, cmdArr: Array[Byte]): Boolean = { 
     // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
-    // return false
+    return false
 
     if (cmdArr(0) != GByte) // Do a short circuit only for 'get' messages.
       return false

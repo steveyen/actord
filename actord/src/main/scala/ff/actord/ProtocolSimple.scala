@@ -146,7 +146,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
     readPos += bytes.length
   }
   
-  def write(bytes: Array[Byte]): Unit = bos.write(bytes)
+  def write(bytes: Array[Byte], offset: Int, length: Int): Unit = bos.write(bytes, offset, length)
 
   def ident: Long = sessionIdent  
   def close: Unit = s.close

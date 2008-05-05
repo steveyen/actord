@@ -211,8 +211,8 @@ class MainProgMina extends MainProg {
     val protocol     = createProtocol
 
     codecFactory.addMessageDecoder(createMessageDecoder(server, protocol))
-    codecFactory.addMessageEncoder[Array[Byte]](classOf[Array[Byte]], 
-                                                createMessageEncoder(server, protocol))
+    codecFactory.addMessageEncoder[IoBuffer](classOf[IoBuffer], 
+                                             createMessageEncoder(server, protocol))
     
     acceptor.getFilterChain.
              addLast("codec", createCodecFilter(codecFactory))  
@@ -227,7 +227,7 @@ class MainProgMina extends MainProg {
   def createCodecFactory: DemuxingProtocolCodecFactory     = new DemuxingProtocolCodecFactory
   def createCodecFilter(f: ProtocolCodecFactory): IoFilter = new ProtocolCodecFilter(f)
   
-  def createMessageDecoder(server: MServer, protocol: MProtocol): MessageDecoder[Array[Byte]] = new MMinaDecoder(server, protocol)
-  def createMessageEncoder(server: MServer, protocol: MProtocol): MessageEncoder[Array[Byte]] = new MMinaEncoder(server, protocol)
+  def createMessageDecoder(server: MServer, protocol: MProtocol): MessageDecoder[IoBuffer] = new MMinaDecoder(server, protocol)
+  def createMessageEncoder(server: MServer, protocol: MProtocol): MessageEncoder[IoBuffer] = new MMinaEncoder(server, protocol)
 }
 

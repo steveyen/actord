@@ -188,8 +188,8 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent:
 
     def read: Byte                     = GSession.this.read
     def read(bytes: Array[Byte]): Unit = GSession.this.read(bytes)
-    def write(bytes: Array[Byte]): Unit = 
-      ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes))
+    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
+      ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes, offset, length))
 
     def numMessages: Long = nMessages
   }
