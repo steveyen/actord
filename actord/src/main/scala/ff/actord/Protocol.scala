@@ -336,7 +336,6 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArgs)) return GOOD
 //    statLine("limit_maxbytes", svr.limitMemory.toString)
       statLine("current_bytes",  Runtime.getRuntime.totalMemory.toString)
       statLine("free_bytes",     Runtime.getRuntime.freeMemory.toString)
-      statLine("lru_size",       svrStats.lruSize.toString)
 
 //    statLine("pid",           0.toString)
 //    statLine("pointer_size",  0.toString)
