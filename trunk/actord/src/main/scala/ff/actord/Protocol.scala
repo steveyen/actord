@@ -461,7 +461,7 @@ object BENCHMARK_NETWORK_ONLY {
 
   def shortCircuit(session: MSession, cmdArr: Array[Byte]): Boolean = { 
     // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
-    return false
+    // return false
 
     if (cmdArr(0) != GByte) // Do a short circuit only for 'get' messages.
       return false
