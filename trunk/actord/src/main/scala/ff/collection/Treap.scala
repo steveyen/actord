@@ -213,21 +213,24 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def firstKey(t: T) = if (left(t).isEmpty)  key else left(t).firstKey(t)
   def lastKey(t: T)  = if (right(t).isEmpty) key else right(t).lastKey(t)
 
-  def lookup(t: T, s: A): Node = 
-    if (s == key)
+  def lookup(t: T, s: A): Node = {
+    val c = s compare key
+    if (c == 0)
       this
     else {
-      if (s < key)
+      if (c < 0)
         left(t).lookup(t, s)
       else
         right(t).lookup(t, s)
-    }    
+    }
+  }
 
   def split(t: T, s: A) = {
-    if (s == key) {
+    val c = s compare key
+    if (c == 0) {
       (left(t), this, right(t))
     } else {
-      if (s < key) {
+      if (c < 0) {
         if (isLeaf(t))
           (left(t), null, this) // Optimization when isLeaf.
         else {
