@@ -123,7 +123,8 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
     def read: Byte                     = buf.get
     def read(bytes: Array[Byte]): Unit = buf.get(bytes)
   
-    def write(bytes: Array[Byte]): Unit = sess.write(bytes)
+    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
+      sess.write(IoBuffer.wrap(bytes, offset, length))
   
     def numMessages: Long = sess.getReadMessages
   }
@@ -131,8 +132,8 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
 
 // -------------------------------------------------------
 
-class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[Array[Byte]] {
-  def encode(session: IoSession, message: Array[Byte], out: ProtocolEncoderOutput): Unit =
-    out.write(IoBuffer.wrap(message))
+class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[IoBuffer] {
+  def encode(session: IoSession, message: IoBuffer, out: ProtocolEncoderOutput): Unit =
+    out.write(message)
 }
 
