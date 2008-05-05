@@ -113,10 +113,10 @@ class MSubServer(val id: Int, val limitMemory: Long)
   
   // --------------------------------------------
 
-  var stats_cmd_gets   = 0L // This stat is 'covered' by the lruHead sync object.
-  var stats_cmd_sets   = 0L // This stat is 'covered' by the mod actor sync loop.
-  var stats_get_hits   = 0L // This stat is 'covered' by the lruHead sync object.
-  var stats_get_misses = 0L // This stat is 'covered' by the lruHead sync object.
+  protected var stats_cmd_gets   = 0L // This stat is 'covered' by the lruHead sync object.
+  protected var stats_cmd_sets   = 0L // This stat is 'covered' by the mod actor sync loop.
+  protected var stats_get_hits   = 0L // This stat is 'covered' by the lruHead sync object.
+  protected var stats_get_misses = 0L // This stat is 'covered' by the lruHead sync object.
 
   // --------------------------------------------
 
