@@ -214,10 +214,10 @@ class MProtocol {
 if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
 
     val length     = cmdArrLen - CRNL.length
-    val spcPos     = indexOfByte(cmdArr, 0, length, SPACE)
+    val spcPos     = arrayIndexOf(cmdArr, 0, length, SPACE)
     val cmdLen     = if (spcPos > 0) spcPos else length
     val cmdArgsLen = Math.max(length - (cmdLen + 1), 0)
-    val cmdArgs    = splitArray(cmdArr, cmdLen + 1, cmdArgsLen)
+    val cmdArgs    = arraySplit(cmdArr, cmdLen + 1, cmdArgsLen, SPACE)
 
     findSpec(cmdArr, cmdLen, singleLineSpecLookup).map(
       spec => {
@@ -456,7 +456,7 @@ object BENCHMARK_NETWORK_ONLY {
       return false
 
     val len = cmdArrLen - CRNL.length
-    val k = indexOfByte(cmdArr, 0, len, SPACE) + 1
+    val k = arrayIndexOf(cmdArr, 0, len, SPACE) + 1
     session.write(valBeg)
     session.write(cmdArr, k, len - k)
     session.write(valEnd)

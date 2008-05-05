@@ -41,9 +41,8 @@ object Util {
     case _ => defaultVal
   }
 
-  def splitArray(a: Array[Byte], offset: Int, len: Int): Seq[String] = { 
+  def arraySplit(a: Array[Byte], offset: Int, len: Int, x: Byte): Seq[String] = { 
     val r = new scala.collection.mutable.ArrayBuffer[String]
-    val x = SPACE
     var s = offset
     var i = offset
     val j = offset + len
@@ -60,11 +59,11 @@ object Util {
     r
   }
 
-  def indexOfByte(buf: Array[Byte], offset: Int, length: Int, s: Byte): Int = { 
+  def arrayIndexOf(a: Array[Byte], offset: Int, length: Int, x: Byte): Int = { 
     var i = offset
     val j = offset + length
     while (i < j) { // Faster than scala's iterator-based indexOf() implementation.
-      if (buf(i) == s)
+      if (a(i) == x)
         return i
       i += 1
     }
