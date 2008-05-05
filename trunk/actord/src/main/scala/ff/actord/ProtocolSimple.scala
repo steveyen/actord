@@ -78,10 +78,10 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
       }
 
       if (available >= waitingFor) {
-        val indexCR: Int = if (available >= 2 &&
-                               available == availablePrev + 1) {
-                             if (buf(available - 2) == CR) {
-                               available - 2
+        val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
+                               available == availablePrev + 1) { // the entire buf again for a CR.
+                             if (buf(available - 2) == CR) { 
+                               available - 2                 
                              } else
                                -1
                            } else
