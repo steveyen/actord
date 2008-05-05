@@ -68,7 +68,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
     val d = data     
     val r = keys.flatMap(key => getUnexpired(key, d))
 
-    lruTouchMulti(r.elements)
+    lruTouchManyWithStats(r.elements, keys.length)
       
     r.elements
   }
@@ -103,7 +103,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
 
   def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
     var r = data.range(keyFrom, keyTo)
-    lruTouchMulti(r.values)
+    lruTouchManyWithStats(r.values, 0)
     r.values
   }
   
@@ -113,12 +113,29 @@ class MSubServer(val id: Int, val limitMemory: Long)
   
   // --------------------------------------------
 
+  var stats_cmd_gets   = 0L // This stat is 'covered' by the lruHead sync object.
+  var stats_cmd_sets   = 0L // This stat is 'covered' by the mod actor sync loop.
+  var stats_get_hits   = 0L // This stat is 'covered' by the lruHead sync object.
+  var stats_get_misses = 0L // This stat is 'covered' by the lruHead sync object.
+
+  // --------------------------------------------
+
   val lruHead: LRUList = new LRUList(" head ", null, null) // Least recently used sentinel.
   val lruTail: LRUList = new LRUList(" tail ", null, null) // Most recently used sentinel.
 
   lruHead.append(lruTail) // The lruHead is also used for synchronization.
 
-  def lruTouchMulti(els: Iterator[MEntry]): Int = lruHead.synchronized {
+  def lruTouchManyWithStats(els: Iterator[MEntry], numSought: Int): Unit = lruHead.synchronized {
+    var numTouched = lruTouchMany(els)
+
+    stats_get_hits += numTouched // TODO: How to account for range hits?
+    if (numSought > 0)           // TODO: How does memcached count get-multi?
+      stats_cmd_gets += 1L         
+    if (numSought > numTouched)
+      stats_get_misses += (numSought - numTouched)
+  }
+
+  def lruTouchMany(els: Iterator[MEntry]): Int = lruHead.synchronized {
     var n = 0
     for (el <- els) {
       if (el.lru != null &&
@@ -165,10 +182,6 @@ class MSubServer(val id: Int, val limitMemory: Long)
     //
     var usedMemory = 0L // In bytes.
     var evictions  = 0L // Number of valid entries that were evicted since server start.
-    var cmd_gets   = 0L
-    var cmd_sets   = 0L
-    var get_hits   = 0L
-    var get_misses = 0L
 
     /**
      * Runs eviction if memory is over limits.
@@ -241,7 +254,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
           if (!noReply) 
               reply(true)
           evictCheck
-          cmd_sets += 1L
+          stats_cmd_sets += 1L
         }
 
         case ModDelete(key, el, expTime, noReply) => {
@@ -330,8 +343,8 @@ class MSubServer(val id: Int, val limitMemory: Long)
           // TODO: The data.size method is slow / walks all nodes!
           //
           reply(MServerStats(data.size, usedMemory, evictions, 
-                             cmd_gets, cmd_sets,
-                             get_hits, get_misses))
+                             stats_cmd_gets, stats_cmd_sets,
+                             stats_get_hits, stats_get_misses))
       }
     }
   }
