@@ -25,8 +25,8 @@ object MServerSpecRunner extends ConsoleRunner(MServerSpec)
 object MServerSpec extends Specification with MTestUtil {
   def prep = {
     val m: MServer = new MMainServer
-    val ea  = MEntry("a", 0L, 0L, 0, new Array[Byte](0), 0L)
-    val ea2 = MEntry("a", 1L, 0L, 0, new Array[Byte](0), 0L)
+    val ea  = MEntry("a", 0L, 0L, new Array[Byte](0), 0L)
+    val ea2 = MEntry("a", 1L, 0L, new Array[Byte](0), 0L)
     (m, ea, ea2)
   }
   
@@ -136,9 +136,9 @@ object MServerSpec extends Specification with MTestUtil {
     "checkAndSet" in {
       val (m, ea, ea2) = prep
 
-      val c0 = MEntry("c", 0L, 0L, 0, new Array[Byte](0), 0L)
-      val c1 = MEntry("c", 1L, 0L, 0, new Array[Byte](0), 1L)
-      val c2 = MEntry("c", 2L, 0L, 0, new Array[Byte](0), 2L)
+      val c0 = MEntry("c", 0L, 0L, new Array[Byte](0), 0L)
+      val c1 = MEntry("c", 1L, 0L, new Array[Byte](0), 1L)
+      val c2 = MEntry("c", 2L, 0L, new Array[Byte](0), 2L)
 
       assertEquals("get 00", true,     m.get(List("c")).toList.isEmpty)
       assertEquals("set c0", true,     m.set(c0, false))
@@ -167,8 +167,8 @@ object MServerSpec extends Specification with MTestUtil {
     "getMulti" in {
       val (m, ea, ea2) = prep
 
-      val c0 = MEntry("c0", 0L, 0L, 0, new Array[Byte](0), 0L)
-      val c1 = MEntry("c1", 1L, 0L, 0, new Array[Byte](0), 1L)
+      val c0 = MEntry("c0", 0L, 0L, new Array[Byte](0), 0L)
+      val c1 = MEntry("c1", 1L, 0L, new Array[Byte](0), 1L)
 
       assertEquals("get 00", true, m.get(List("c0")).toList.isEmpty)
       assertEquals("get 00", true, m.get(List("c1")).toList.isEmpty)
@@ -192,9 +192,9 @@ object MServerSpec extends Specification with MTestUtil {
     "append data correctly" in {
       val (m, ea, ea2) = prep
 
-      val c0 = MEntry("c0", 0L, 0L, 5, "hello".getBytes, 0L)
-      val c1 = MEntry("c0", 0L, 0L, 5, "world".getBytes, 0L)
-      val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
+      val c0 = MEntry("c0", 0L, 0L, "hello".getBytes, 0L)
+      val c1 = MEntry("c0", 0L, 0L, "world".getBytes, 0L)
+      val c2 = MEntry("c0", 0L, 0L, "there".getBytes, 0L)
       
       assertEquals("get 00", true,  m.get(List("c0")).toList.isEmpty)
       assertEquals("apd 00", false, m.xpend(c0, true, false))
@@ -210,9 +210,9 @@ object MServerSpec extends Specification with MTestUtil {
     "prepend data correctly" in {
       val (m, ea, ea2) = prep
 
-      val c0 = MEntry("c0", 0L, 0L, 5, "hello".getBytes, 0L)
-      val c1 = MEntry("c0", 0L, 0L, 5, "world".getBytes, 0L)
-      val c2 = MEntry("c0", 0L, 0L, 5, "there".getBytes, 0L)
+      val c0 = MEntry("c0", 0L, 0L, "hello".getBytes, 0L)
+      val c1 = MEntry("c0", 0L, 0L, "world".getBytes, 0L)
+      val c2 = MEntry("c0", 0L, 0L, "there".getBytes, 0L)
       
       assertEquals("get 00", true,  m.get(List("c0")).toList.isEmpty)
       assertEquals("apd 00", false, m.xpend(c0, true, false))
@@ -228,7 +228,7 @@ object MServerSpec extends Specification with MTestUtil {
     "expire entries" in {
       val (m, ea, ea2) = prep
 
-      val c0 = MEntry("c0", 0L, Util.nowInSeconds + 1L, 5, "hello".getBytes, 0L) // Expires in 1 sec.
+      val c0 = MEntry("c0", 0L, Util.nowInSeconds + 1L, "hello".getBytes, 0L) // Expires in 1 sec.
 
       assertEquals("get 00", true, m.get(List("c0")).toList.isEmpty)
       assertEquals("set c0", true, m.set(c0, false))
@@ -247,7 +247,7 @@ object MServerSpec extends Specification with MTestUtil {
       assertEquals("r0 stats", 0L, r0.usedMemory)
       assertEquals("r0 stats", 0L, r0.evictions)
 
-      val entrya = MEntry("a", 0L, 0L, 10, new Array[Byte](10), 0L)
+      val entrya = MEntry("a", 0L, 0L, new Array[Byte](10), 0L)
       assertEquals("set 1", true, m.set(entrya, false))
 
       val r1: MServerStats = m.stats
@@ -255,7 +255,7 @@ object MServerSpec extends Specification with MTestUtil {
       assertEquals("r1 stats", 10L, r1.usedMemory)
       assertEquals("r1 stats", 0L,  r1.evictions)
 
-      val entryb = MEntry("b", 0L, 0L, 10, new Array[Byte](10), 0L)
+      val entryb = MEntry("b", 0L, 0L, new Array[Byte](10), 0L)
       assertEquals("set 2", true, m.set(entryb, false))
 
       val r2: MServerStats = m.stats
@@ -321,19 +321,19 @@ trait MTestUtil {
     o + "->" + o.map(e => new String(e.data, "US-ASCII")).getOrElse("")
   
   def simpleEntry(key: String, v: String) =
-    MEntry(key, 0L, 0L, v.getBytes.size, v.getBytes, 0L)
+    MEntry(key, 0L, 0L, v.getBytes, 0L)
       
   def dataSame(iter: Iterator[MEntry], b: MEntry) =
     iter.toList.
          headOption.
-         map(a => (a.dataSize == b.dataSize) &&
+         map(a => (a.data.size == b.data.size) &&
                   (a.data == b.data || a.data.deepEquals(b.data))).
          getOrElse(false)
 
   def dataEquals(iter: Iterator[MEntry], b: Array[Byte]) =
     iter.toList.
          headOption.
-         map(a => (a.dataSize == b.size) &&
+         map(a => (a.data.size == b.size) &&
                   (a.data == b || a.data.deepEquals(b))).
          getOrElse(false)
 
@@ -343,7 +343,7 @@ trait MTestUtil {
          map(a => (a.key == b.key) &&
                   (a.flags == b.flags) &&
                   (a.expTime == b.expTime) &&
-                  (a.dataSize == b.dataSize) &&
+                  (a.data.size == b.data.size) &&
                   (a.data == b.data || a.data.deepEquals(b.data)) &&
                   (a.cid == b.cid)).
          getOrElse(false)

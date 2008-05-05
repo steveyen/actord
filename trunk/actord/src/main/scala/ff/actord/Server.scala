@@ -225,7 +225,6 @@ case class MServerStats(numEntries: Long,
 case class MEntry(key: String, 
                   flags: Long,
                   expTime: Long,     // Expiry timestamp, in seconds since epoch.
-                  dataSize: Int, 
                   data: Array[Byte],
                   cid: Long) {       // Unique id for CAS operations.
   def isExpired: Boolean = 
@@ -241,26 +240,25 @@ case class MEntry(key: String,
   //       a problem.
   // 
   def updateExpTime(e: Long) =
-    MEntry(key, flags, e, dataSize, data, cid + 1L)
+    MEntry(key, flags, e, data, cid + 1L)
 
   def updateData(d: Array[Byte]) =
-    MEntry(key, flags, expTime, d.length, d, cid + 1L)
+    MEntry(key, flags, expTime, d, cid + 1L)
   
   /**
    * Concatenate the data arrays from this with that,
    * using the basis for all other fields.
    */
   def concat(that: MEntry, basis: MEntry) = {
-    val sizeNew = this.dataSize + that.dataSize
+    val sizeNew = this.data.size + that.data.size
     val dataNew = new Array[Byte](sizeNew)
 
-    System.arraycopy(this.data, 0, dataNew, 0,             this.dataSize)
-    System.arraycopy(that.data, 0, dataNew, this.dataSize, that.dataSize)    
+    System.arraycopy(this.data, 0, dataNew, 0,              this.data.size)
+    System.arraycopy(that.data, 0, dataNew, this.data.size, that.data.size)    
     
     MEntry(basis.key, 
            basis.flags, 
            basis.expTime,
-           sizeNew,
            dataNew,
            basis.cid + 1L)
   }
