@@ -467,11 +467,20 @@ object BENCHMARK_NETWORK_ONLY {
     if (cmdArr(0) != GByte) // Do a short circuit only for 'get' messages.
       return false
 
-    val k   = cmdArr.indexOf(SPACE) + 1
-    val key = cmdArr.slice(k, cmdArr.length - k)
+    // val k = cmdArr.indexOf(SPACE) + 1 // TOO SLOW
+    //
+    var i = 0
+    var k = -1
+    var len = cmdArr.length
+    while (k == -1 && i < cmdArr.length) {
+      if (cmdArr(i) == SPACE) {
+        k = i + 1
+      }
+      i += 1
+    }
 
     session.write(valBeg)
-    session.write(key)
+    session.write(cmdArr, k, cmdArr.length - k - 2) // 2 == CRNL.length
     session.write(valEnd)
     session.write(entry.data)
     session.write(CRNLBytes)
