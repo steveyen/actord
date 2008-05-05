@@ -92,17 +92,16 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
           if (waitingFor > buf.length)
             bufGrow(waitingFor)
         } else {
-          val nLine = indexCR + CRNL.length
-          val aLine = new Array[Byte](nLine)
+          val cmdLen = indexCR + CRNL.length
 
-          read(aLine)
-
-          if (aLine(nLine - 2) != CR ||
-              aLine(nLine - 1) != NL) {
+          if (buf(cmdLen - 2) != CR ||
+              buf(cmdLen - 1) != NL) {
             s.close
             throw new RuntimeException("missing CRNL")
           } else {
-            val bytesNeeded = protocol.process(server, this, aLine, aLine.length, available)
+            readPos = cmdLen
+
+            val bytesNeeded = protocol.process(server, this, buf, cmdLen, available)
             if (bytesNeeded == 0) {
               if (available > readPos)
                 Array.copy(buf, readPos, buf, 0, available - readPos)
