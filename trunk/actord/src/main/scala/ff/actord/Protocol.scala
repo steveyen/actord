@@ -77,9 +77,11 @@ class MProtocol {
   def singleLineSpecs = List( 
       Spec("get <key>*",
            (svr, cmd) => { 
+if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(svr, cmd)) {
              svr.get(cmd.args).
                  foreach(el => cmd.write(el, false))
              cmd.reply(END)
+}
            }),
 
       Spec("gets <key>*",
@@ -211,7 +213,8 @@ class MProtocol {
               cmdArr: Array[Byte], // We do not own the input cmdArr.
               cmdArrLen: Int,      // Number of command line bytes in cmdArr, including CRNL.
               readyCount: Int): Int = {
-if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
+    if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) 
+       return GOOD
 
     val length     = cmdArrLen - CRNL.length
     val spcPos     = arrayIndexOf(cmdArr, 0, length, SPACE)
@@ -449,9 +452,8 @@ object BENCHMARK_NETWORK_ONLY {
   val valEnd = stringToArray(" 0 400\r\n")
 
   def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Boolean = { 
-    // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
+    // Return true to benchmark just the networking layers, not the in-memory or persistent storage or findSpec.
     return false
-
     if (cmdArr(0) != GByte) // Do a short circuit only for 'get' messages.
       return false
 
@@ -459,6 +461,19 @@ object BENCHMARK_NETWORK_ONLY {
     val k = arrayIndexOf(cmdArr, 0, len, SPACE) + 1
     session.write(valBeg)
     session.write(cmdArr, k, len - k)
+    session.write(valEnd)
+    session.write(entry.data)
+    session.write(CRNLBytes)
+    session.write(END)
+    true
+  }
+
+  def shortCircuitGet(svr: MServer, cmd: MCommand): Boolean = {
+    // Return true to benchmark just the networking layers around a get, not the in-memory or persistent storage.
+    return false
+    val session = cmd.session
+    session.write(valBeg)
+    session.write(stringToArray(cmd.args(0)))
     session.write(valEnd)
     session.write(entry.data)
     session.write(CRNLBytes)
