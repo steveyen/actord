@@ -30,7 +30,7 @@ object Util {
   def nowInSeconds: Long = System.currentTimeMillis / 1000
   
   def parseLong(s: String, defaultVal: Long) = try { 
-    s.trim.toLong 
+    java.lang.Long.parseLong(s.trim)
   } catch { 
     case _ => defaultVal
   }
