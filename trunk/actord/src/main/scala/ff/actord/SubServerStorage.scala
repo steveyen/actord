@@ -117,11 +117,11 @@ class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
   override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
     new MEntryStorageTreap(r, subServerStorage)    
   
-  def serializeKey(x: String): Array[Byte]     = x.getBytes
-  def unserializeKey(arr: Array[Byte]): String = new String(arr)
+  def serializeKey(x: String): Array[Byte]     = stringToArray(x)
+  def unserializeKey(arr: Array[Byte]): String = arrayToString(arr)
 
   def serializeValue(x: MEntry, loc: StorageLoc, appender: StorageLocAppender): Unit = {
-    val arr = x.key.getBytes
+    val arr = stringToArray(x.key)
     appender.appendArray(arr, 0, arr.length)
     appender.appendLong(x.flags)
     appender.appendLong(x.expTime)
@@ -130,7 +130,7 @@ class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
   }
     
   def unserializeValue(loc: StorageLoc, reader: StorageLocReader): MEntry = {
-    val key     = new String(reader.readArray)
+    val key     = arrayToString(reader.readArray)
     val flags   = reader.readLong
     val expTime = reader.readLong
     val data    = reader.readArray

@@ -21,11 +21,11 @@ package ff.actord
 object Util {
   final val ZERO       = java.lang.Integer.valueOf(0)
   final val SPACE      = ' '.asInstanceOf[Byte]
-  final val SPACEBytes = " ".getBytes
+  final val SPACEBytes = stringToArray(" ")
   final val CR         = '\r'.asInstanceOf[Byte]
   final val NL         = '\n'.asInstanceOf[Byte]
   final val CRNL       = "\r\n"
-  final val CRNLBytes  = CRNL.getBytes
+  final val CRNLBytes  = stringToArray(CRNL)
 
   def nowInSeconds: Long = System.currentTimeMillis / 1000
   
@@ -41,8 +41,15 @@ object Util {
     else 
       0L
 
+  def stringToArray(s: String): Array[Byte] = stringToArray(s, 0, s.length)
+  def stringToArray(s: String, offset: Int, length: Int): Array[Byte] = {
+    val r = new Array[Byte](length)
+    s.getBytes(offset, offset + length, r, 0)
+    r
+  }
+
   def arrayToString(a: Array[Byte]): String = arrayToString(a, 0, a.length)
-  def arrayToString(a: Array[Byte], offset: Int, length: Int): String = new String(a, offset, length, "US-ASCII")
+  def arrayToString(a: Array[Byte], offset: Int, length: Int): String = new String(a, 0, offset, length)
 
   def arraySlice(a: Array[Byte], offset: Int, length: Int): Array[Byte] = {
     val dest = new Array[Byte](length)

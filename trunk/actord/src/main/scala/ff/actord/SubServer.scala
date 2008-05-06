@@ -302,7 +302,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
           val result = (getUnexpired(key) match {
             case None => -1L
             case Some(el) => {
-              val v = Math.max(0L, (try { new String(el.data, "US-ASCII").toLong } catch { case _ => 0L }) + delta)
+              val v = Math.max(0L, (try { arrayToString(el.data).toLong } catch { case _ => 0L }) + delta)
               val s = v.toString
               setEntry(el.updateData(s.getBytes))
               v
