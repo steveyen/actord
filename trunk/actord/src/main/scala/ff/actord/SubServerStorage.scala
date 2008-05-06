@@ -64,8 +64,8 @@ class MPersistentSubServer(override val id: Int,
                            override val limitMemory: Long, 
                            val subServerStorage: MSubServerStorage)
   extends MSubServer(id, limitMemory) {
-  override def createSortedMap: immutable.SortedMap[String, MEntry] = {
-    val t = new MEntryStorageTreap(TreapEmptyNode[String, MEntry], subServerStorage)
+  override def createSortedMap: immutable.SortedMap[OString, MEntry] = {
+    val t = new MEntryStorageTreap(TreapEmptyNode[OString, MEntry], subServerStorage)
     
     // TODO: What about file versioning?
     //
@@ -74,7 +74,7 @@ class MPersistentSubServer(override val id: Int,
       getOrElse(t)
   }
     
-  override protected def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
+  override protected def data_i_!!(d: immutable.SortedMap[OString, MEntry]) = 
     synchronized { 
       super.data_i_!!(d) 
       version_i = Math.max(0L, version_i + 1L)
@@ -111,14 +111,14 @@ class MPersistentSubServer(override val id: Int,
   
 // ------------------------------------------------
 
-class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
+class MEntryStorageTreap(override val root: TreapNode[OString, MEntry],
                          val subServerStorage: MSubServerStorage)
-  extends StorageTreap[String, MEntry](root, subServerStorage) {
-  override def mkTreap(r: TreapNode[String, MEntry]): Treap[String, MEntry] = 
+  extends StorageTreap[OString, MEntry](root, subServerStorage) {
+  override def mkTreap(r: TreapNode[OString, MEntry]): Treap[OString, MEntry] = 
     new MEntryStorageTreap(r, subServerStorage)    
   
-  def serializeKey(x: String): Array[Byte]     = stringToArray(x)
-  def unserializeKey(arr: Array[Byte]): String = arrayToString(arr)
+  def serializeKey(x: OString): Array[Byte]     = stringToArray(x.self)
+  def unserializeKey(arr: Array[Byte]): OString = OString(arrayToString(arr))
 
   def serializeValue(x: MEntry, loc: StorageLoc, appender: StorageLocAppender): Unit = {
     val arr = stringToArray(x.key)
@@ -211,10 +211,10 @@ class MCleaner(subServersIn: Seq[MSubServer], // The subServers that this cleane
     }
   } 
   
-  def walk(treap: MEntryStorageTreap, minFileId: Int, node: TreapNode[String, MEntry]): Unit =
+  def walk(treap: MEntryStorageTreap, minFileId: Int, node: TreapNode[OString, MEntry]): Unit =
     node match {
-      case e: TreapEmptyNode[String, MEntry] =>
-      case x: StorageTreapNode[String, MEntry] =>
+      case e: TreapEmptyNode[OString, MEntry] =>
+      case x: StorageTreapNode[OString, MEntry] =>
         val emptyNodeLoc = treap.emptyNodeLoc
 
         val vloc = x.swizzleValue.loc

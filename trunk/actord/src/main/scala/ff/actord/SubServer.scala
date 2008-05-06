@@ -26,15 +26,15 @@ class MSubServer(val id: Int, val limitMemory: Long)
   /**
    * Override to pass in other implementations, such as for persistence.
    */
-  def createSortedMap: immutable.SortedMap[String, MEntry] =
-                   new ff.collection.Treap[String, MEntry]
+  def createSortedMap: immutable.SortedMap[OString, MEntry] =
+                   new ff.collection.Treap[OString, MEntry]
 
   /**
    * TODO: Maybe just use volatile, or AtomicReference around data_i.
    */
   protected var data_i = createSortedMap
   
-  protected def data_i_!!(d: immutable.SortedMap[String, MEntry]) = 
+  protected def data_i_!!(d: immutable.SortedMap[OString, MEntry]) = 
     synchronized { data_i = d }  
   
   /**
@@ -50,7 +50,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
       getUnexpired(key, data)
     
   def getUnexpired(key: String, 
-                   map: immutable.SortedMap[String, MEntry]): Option[MEntry] =
+                   map: immutable.SortedMap[OString, MEntry]): Option[MEntry] =
     map.get(key) match {
       case s @ Some(el) => {
         if (el.isExpired) {
@@ -92,7 +92,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
   def checkAndSet(el: MEntry, cidPrev: Long, async: Boolean) =
     modify(ModCAS(el, cidPrev, async), async, "N/A")
 
-  def keys = data.keys
+  def keys = data.keys.map(_.self)
   
   def flushAll(expTime: Long): Unit =
     for ((key, el) <- data)
@@ -241,7 +241,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
       
       lruTouch(el)
 
-      data_i_!!(dataMod + (el.key -> el))
+      data_i_!!(dataMod + (OString(el.key) -> el))
       usedMemory += el.data.size
       
       true
