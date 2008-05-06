@@ -236,10 +236,10 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
         //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
         //
         if (spec.checkArgs(cmdArgs)) {
-          var dataSize    = cmdArgs(3).toInt
+          var dataSize    = Integer.parseInt(cmdArgs(3))
           val totalNeeded = cmdArrLen + dataSize + CRNL.length
           if (totalNeeded <= readyCount) {
-            val expTime = cmdArgs(2).toLong
+            val expTime = parseLong(cmdArgs(2), 0L)
             
             // TODO: Handle this better when dataSize is huge.
             //       Perhaps use mmap, or did mina read it entirely 
@@ -254,7 +254,7 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
               spec.process(server, 
                            MCommand(session, cmdArr, cmdLen, cmdArgs,
                                     MEntry(cmdArgs(0),
-                                           cmdArgs(1).toLong,
+                                           parseLong(cmdArgs(1), 0L),
                                            if (expTime != 0 &&
                                                expTime <= SECONDS_IN_30_DAYS)
                                                expTime + nowInSeconds
