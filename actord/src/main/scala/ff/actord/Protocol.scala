@@ -42,7 +42,7 @@ trait MSession {
 case class Spec(line: String, process: (MServer, MCommand) => Unit) {
   val args      = line.split(" ")
   val name      = args(0)
-  val nameBytes = name.getBytes
+  val nameBytes = stringToArray(name)
   val minArgs   = args.filter(_.startsWith("<")).length
 
   def checkArgs(a: Seq[String]) = a.length >= minArgs
@@ -58,12 +58,12 @@ case class Spec(line: String, process: (MServer, MCommand) => Unit) {
  * should not find any java IO or NIO or mina or grizzly words here.
  */
 object MProtocol {
-  val OK           = ("OK"         + CRNL).getBytes
-  val END          = ("END"        + CRNL).getBytes
-  val DELETED      = ("DELETED"    + CRNL).getBytes
-  val NOT_FOUND    = ("NOT_FOUND"  + CRNL).getBytes
-  val NOT_STORED   = ("NOT_STORED" + CRNL).getBytes
-  val STORED       = ("STORED"     + CRNL).getBytes
+  val OK           = stringToArray("OK"         + CRNL)
+  val END          = stringToArray("END"        + CRNL)
+  val DELETED      = stringToArray("DELETED"    + CRNL)
+  val NOT_FOUND    = stringToArray("NOT_FOUND"  + CRNL)
+  val NOT_STORED   = stringToArray("NOT_STORED" + CRNL)
+  val STORED       = stringToArray("STORED"     + CRNL)
 }
 
 class MProtocol {
@@ -110,7 +110,7 @@ class MProtocol {
             }),
 
       Spec("version", 
-           (svr, cmd) => cmd.reply(("VERSION " + MServer.version + CRNL).getBytes)),
+           (svr, cmd) => cmd.reply(stringToArray("VERSION " + MServer.version + CRNL))),
       Spec("verbosity",
            (svr, cmd) => cmd.reply(OK)), // TODO: verbosity command.
       Spec("quit",
@@ -158,7 +158,7 @@ class MProtocol {
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
            (svr, cmd) => 
-              cmd.reply((svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL).getBytes)),
+              cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
 
       // Extensions to basic protocol.
       //
@@ -225,7 +225,7 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
           spec.process(server, MCommand(session, cmdArr, cmdLen, cmdArgs, null))
           GOOD
         } else {
-          session.write(("CLIENT_ERROR args: " + (new String(cmdArr, 0, length)) + CRNL).getBytes)
+          session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, length) + CRNL))
           GOOD
         }
       }
@@ -265,19 +265,19 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
                                            (session.numMessages & 0xFFFFFFFFL))))
               GOOD
             } else {
-              session.write(("CLIENT_ERROR missing CRNL after data" + CRNL).getBytes)
+              session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
               GOOD
             }
           } else {
             totalNeeded
           }
         } else {
-          session.write(("CLIENT_ERROR args: " + (new String(cmdArr, 0, length)) + CRNL).getBytes)
+          session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, length) + CRNL))
           GOOD
         }
       }
     ) getOrElse {
-      session.write(("ERROR " + (new String(cmdArr, 0, cmdLen)) + CRNL).getBytes) 
+      session.write(stringToArray("ERROR " + arrayToString(cmdArr, 0, cmdLen) + CRNL)) 
       GOOD // Saw an unknown command, but keep going and process the next command.
     }
   }
@@ -334,7 +334,7 @@ if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) return GOOD
     }
 
     sb.append("END\r\n")
-    sb.toString.getBytes
+    stringToArray(sb.toString)
   }
 
 /*
@@ -412,7 +412,7 @@ case class MCommand(session: MSession, cmdArr: Array[Byte], cmdLen: Int, args: S
       reply(if (v < 0)
               NOT_FOUND
             else
-              (v.toString + CRNL).getBytes)
+              stringToArray(v.toString + CRNL))
 
   /**
    * A VALUE response of a String of a single line, followed by a single MEntry data bytes.
@@ -424,13 +424,13 @@ case class MCommand(session: MSession, cmdArr: Array[Byte], cmdLen: Int, args: S
         if (x != null)
             x
         else
-            entry.comm_!(("VALUE " + entry.key + " " + entry.flags + " " + entry.data.size).getBytes).
+            entry.comm_!(stringToArray("VALUE " + entry.key + " " + entry.flags + " " + entry.data.size)).
                   asInstanceOf[Array[Byte]]
       }
       session.write(line)
       if (withCAS) {
         session.write(SPACEBytes)
-        session.write(entry.cid.toString.getBytes)
+        session.write(stringToArray(entry.cid.toString))
       }
       session.write(CRNLBytes)
       session.write(entry.data)
@@ -445,8 +445,8 @@ object BENCHMARK_NETWORK_ONLY {
     manyBytes(i) = 'a'.asInstanceOf[Byte]
   val entry = MEntry(null, 0, 0, manyBytes, 0L)
   val GByte = 'g'.asInstanceOf[Byte]
-  val valBeg = "VALUE ".getBytes
-  val valEnd = " 0 400\r\n".getBytes
+  val valBeg = stringToArray("VALUE ")
+  val valEnd = stringToArray(" 0 400\r\n")
 
   def shortCircuit(session: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Boolean = { 
     // Return true to benchmark just the networking layers, not the in-memory or persistent storage.
