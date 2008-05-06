@@ -177,9 +177,9 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(svr, cmd)) {
   // ----------------------------------------
 
   def indexSpecs(specs: List[Spec]): Array[List[Spec]] = {
-    val lookup = new Array[List[Spec]](26) // A perfect hash lookup table, by first character of spec.name.
+    val lookup = new Array[List[Spec]](26) // A lookup table by first character of spec.name.
     for (i <- 0 until lookup.length)
-      lookup(i) = Nil
+      lookup(i) = Nil                      // Buckets in the lookup table are just Lists.
     specs.map(spec => {
       val index = spec.name(0) - 'a'
       lookup(index) = lookup(index) ::: List(spec) // Concat so that more popular commands come first.
