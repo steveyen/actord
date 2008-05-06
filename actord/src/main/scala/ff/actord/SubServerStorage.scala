@@ -139,11 +139,6 @@ class MEntryStorageTreap(override val root: TreapNode[String, MEntry],
   }
 
   def errorValue(loc: StorageLoc, error: Object) = MEntryStorageTreap.errorEntry
-
-  override def priority(node: StorageTreapNode[String, MEntry]) = {
-    val h = node.key.hashCode
-    ((h << 16) & 0xffff0000) | ((h >> 16) & 0x0000ffff)
-  }
 }
 
 object MEntryStorageTreap {
