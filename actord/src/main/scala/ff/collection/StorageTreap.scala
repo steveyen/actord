@@ -40,17 +40,6 @@ abstract class StorageTreap[A <% Ordered[A], B <: AnyRef](
    */
   def errorValue(loc: StorageLoc, error: Object): B
   
-  /**
-   * Subclasses will definitely want to consider overriding this
-   * weak priority calculation.  Consider, for example, leveraging
-   * the treap's heap-like ability to shuffle high-priority 
-   * nodes to the top of the heap for faster access.
-   */
-  def priority(node: StorageTreapNode[A, B]) = {
-    val h = node.key.hashCode
-    ((h << 16) & 0xffff0000) | ((h >> 16) & 0x0000ffff)
-  }
-  
   // --------------------------------------------
 
   override def mkLeaf(key: A, value: B) = {
@@ -322,7 +311,5 @@ case class StorageTreapNode[A <% Ordered[A], B <: AnyRef](
   def left(t: T)  = storageTreap(t).swizzleLoadNode(swizzleLeft)
   def right(t: T) = storageTreap(t).swizzleLoadNode(swizzleRight)
   def value(t: T) = storageTreap(t).swizzleLoadValue(swizzleValue)
-  
-  override def priority(t: T) = storageTreap(t).priority(this) // Forward to an easier place for overriding. 
 }
 
