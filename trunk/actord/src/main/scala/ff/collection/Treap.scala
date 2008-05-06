@@ -89,6 +89,17 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
   override def compare(k0: A, k1: A): Int = k0.compare(k1)
     
   override def toString = root.toString
+
+  /**
+   * Subclasses will definitely want to consider overriding this
+   * weak priority calculation.  Consider, for example, leveraging
+   * the treap's heap-like ability to shuffle high-priority 
+   * nodes to the top of the heap for faster access.
+   */
+  def priority(node: TreapFullNode[A, B]): Int = {
+    val h = node.key.hashCode
+    ((h << 16) & 0xffff0000) | ((h >> 16) & 0x0000ffff)
+  }
 }
 
 // ---------------------------------------------------------
@@ -101,6 +112,7 @@ abstract class TreapNodeFactory[A <% Ordered[A], B <: AnyRef]  {
              right: TreapNode[A, B]): TreapNode[A, B]
 
   def compare(x: A, y: A): Int
+  def priority(n: TreapFullNode[A, B]): Int
 }
 
 // ---------------------------------------------------------
@@ -197,16 +209,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def right(t: T): Node
   def value(t: T): B
   
-  /**
-   * Subclasses will definitely want to consider overriding this
-   * weak priority calculation.  Consider, for example, leveraging
-   * the treap's heap-like ability to shuffle high-priority 
-   * nodes to the top of the heap for faster access.
-   */
-  def priority(t: T) = {
-    val h = key.hashCode
-    ((h << 16) & 0xffff0000) | ((h >> 16) & 0x0000ffff)
-  }
+  def priority(t: T) = t.priority(this)
 
   def isEmpty: Boolean = false
   def isLeaf(t: T): Boolean  = left(t).isEmpty && right(t).isEmpty
