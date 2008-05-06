@@ -27,6 +27,9 @@ object Util {
   final val CRNL       = "\r\n"
   final val CRNLBytes  = stringToArray(CRNL)
 
+  implicit def ostringWrapper(x: String) = OString(x)
+  implicit def ostringUnwrapper(x: OString): String = x.mkString
+
   def nowInSeconds: Long = System.currentTimeMillis / 1000
   
   def parseLong(s: String, defaultVal: Long) = try { 
