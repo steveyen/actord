@@ -29,16 +29,25 @@ object Util {
 
   def nowInSeconds: Long = System.currentTimeMillis / 1000
   
-  def itemToLong(items: Seq[String], at: Int) =
-    if (items.length > at)
-      parseLong(items(at), 0L)
-    else 
-      0L
-      
   def parseLong(s: String, defaultVal: Long) = try { 
     s.trim.toLong 
   } catch { 
     case _ => defaultVal
+  }
+
+  def itemToLong(items: Seq[String], at: Int): Long =
+    if (items.length > at) 
+      parseLong(items(at), 0L)
+    else 
+      0L
+
+  def arrayToString(a: Array[Byte]): String = arrayToString(a, 0, a.length)
+  def arrayToString(a: Array[Byte], offset: Int, length: Int): String = new String(a, offset, length, "US-ASCII")
+
+  def arraySlice(a: Array[Byte], offset: Int, length: Int): Array[Byte] = {
+    val dest = new Array[Byte](length)
+    Array.copy(a, offset, dest, 0, length)
+    dest
   }
 
   def arraySplit(a: Array[Byte], offset: Int, len: Int, x: Byte): Seq[String] = { 
@@ -48,14 +57,14 @@ object Util {
     val j = offset + len
     while (i < j) { 
       if (a(i) == x) { // Faster than regexp-based String.split() method.
-        if (s < i)
-          r += (new String(a, s, i - s, "US-ASCII"))
+        if (s < i) 
+          r += arrayToString(a, s, i - s)
         s = i + 1
       }
       i += 1
     }
     if (s < i)
-      r += (new String(a, s, i - s, "US-ASCII"))
+      r += arrayToString(a, s, i - s)
     r
   }
 
@@ -70,16 +79,31 @@ object Util {
     -1
   }
 
+  def arrayCompare(a: Array[Byte], b: Array[Byte]): Int = arrayCompare(a, a.length, b, b.length)
   def arrayCompare(a: Array[Byte], aLength: Int, b: Array[Byte], bLength: Int): Int = { // Like memcmp.
-    val len = Math.min(aLength, bLength)
+    val len = if (aLength < bLength) aLength else bLength
     var i = 0
     while (i < len) {
-      val c = b(i) - a(i)
+      val c = a(i) - b(i)
       if (c != 0)
          return c
       i += 1
     }
-    bLength - aLength
+    aLength - bLength
+  }
+
+  def arrayHash(a: Array[Byte]): Int = {
+    val F32_INIT  = 2166136261L // Simple hashCode doesn't work on Array[Byte].
+    val F32_PRIME = 16777619
+    val len = a.length
+    var r = F32_INIT
+    var i = 0
+    while (i < len) {
+      r *= F32_PRIME;
+      r ^= a(i)
+      i += 1
+    }
+    (r & 0xffffffffL).toInt
   }
 }
 
