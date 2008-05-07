@@ -9,7 +9,7 @@ import scala.collection._
 trait Node {
   def name: String
   def weight: Float
-  def kind: String // Ex: process, server, shelf, rack, cabinent, row, datacenter, region, universe.
+  def kind: String // Ex: process, server, shelf, rack, cabinet, row, datacenter, region, universe.
   def info: String // For app-specific information associated with the node, like "host:port" info.
   def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node
 }
