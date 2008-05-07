@@ -73,13 +73,13 @@ class NodeTree(root: Node, steps: Seq[Step]) {
   def choose(x: Int, numReplicas: Int, kind: String, 
              startRep: Int,
              startNode: Node,
-             loadMap: Map[String, Float]): Seq[Node] = 
-      choose(x, numReplicas, kind, startRep, startNode, loadMap, MAX_TOTAL_RETRY, MAX_LOCAL_RETRY)
+             nodeStatusMap: Map[String, Float]): Seq[Node] = 
+      choose(x, numReplicas, kind, startRep, startNode, nodeStatusMap, MAX_TOTAL_RETRY, MAX_LOCAL_RETRY)
 
   def choose(x: Int, numReplicas: Int, kind: String, 
              startRep: Int,
              startNode: Node,
-             loadMap: Map[String, Float],
+             nodeStatusMap: Map[String, Float],
              fTotalMax: Int, fLocalMax: Int): Seq[Node] = {
     var fTotal = 0
     var fLocal = 0
@@ -106,7 +106,7 @@ class NodeTree(root: Node, steps: Seq[Step]) {
         if (o.kind == kind) {
           val outCollision = out.exists(_.name == o.name) 
           if (outCollision == false && 
-              nodeOk(o, loadMap, x)) {
+              nodeOk(o, nodeStatusMap, x)) {
             fTotal = 0
             fLocal = 0
             cur = startNode
@@ -127,27 +127,27 @@ class NodeTree(root: Node, steps: Seq[Step]) {
     out
   }
 
-  def nodeOk(o: Node, loadMap: Map[String, Float], x: Int) = true
+  def nodeOk(o: Node, nodeStatusMap: Map[String, Float], x: Int) = true
 }
 
 trait Step {
-  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node]
+  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node]
 }
 
 case class StepTake(nodeName: String) {
-  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node] = {
+  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] = {
     t.findNode(nodeName).toList
   }
 }
 
-case class StepChooseFirstN(numReplicas: Int) {
-  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node] = {
-    Nil
+case class StepChooseFirstN(numReplicas: Int, kind: String) {
+  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] = {
+    working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap))
   }
 }
 
-case class StepChooseIndependent(numReplicas: Int) {
-  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node] = {
-    Nil
+case class StepChooseIndependent(numReplicas: Int, kind: String) {
+  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] = {
+    working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap))
   }
 }
