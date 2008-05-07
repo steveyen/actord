@@ -47,7 +47,12 @@ case class StrawBucket(name: String, weight: Float, kind: String, info: String, 
   def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
 }
 
-class NodeTree(root: Node, steps: Seq[Step]) { 
+class NodeTree(root: Node) { 
+  def doSteps(x: Int, steps: Seq[Step], nodeStatusMap: Map[String, Float]): Seq[Node] = {
+    val empty: Seq[Node] = Nil
+    steps.foldLeft(empty)((accum, step) => step.doStep(x, this, accum, nodeStatusMap))
+  }
+
   def visitNodes(p: (Node) => Unit): Unit = visitNodes(p, root)
   def visitNodes(p: (Node) => Unit, curr: Node): Unit =
     if (curr != null) {
