@@ -4,10 +4,12 @@
  */
 package ff.actord.client
 
+import scala.collection._
+
 trait Node {
   def name: String
   def weight: Float
-  def kind: String // Ex: process, server, shelf, rack, cabinent, row, datacenter, region.
+  def kind: String // Ex: process, server, shelf, rack, cabinent, row, datacenter, region, universe.
   def info: String // For app-specific information associated with the node, like "host:port" info.
   def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node
 }
@@ -45,9 +47,23 @@ case class StrawBucket(name: String, weight: Float, kind: String, info: String, 
   def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
 }
 
-trait Step
-
 class NodeTree(root: Node, steps: Seq[Step]) { 
+  def visitNodes(p: (Node) => Unit): Unit = visitNodes(p, root)
+  def visitNodes(p: (Node) => Unit, curr: Node): Unit =
+    if (curr != null) {
+      p(curr)
+      curr match {
+        case b: BucketNode => b.children.foreach(visitNodes(p, _))
+	case _ => 
+      }
+    }
+
+  val mapNodes = new mutable.HashMap[String, Node]
+
+  visitNodes((x: Node) => mapNodes += (x.name -> x))
+
+  def findNode(s: String): Option[Node] = mapNodes.get(s)
+
   def MAX_TOTAL_RETRY = 10
   def MAX_LOCAL_RETRY = 3
 
@@ -114,59 +130,24 @@ class NodeTree(root: Node, steps: Seq[Step]) {
   def nodeOk(o: Node, loadMap: Map[String, Float], x: Int) = true
 }
 
-class Crush {
-  /**
-   * Select n items of type t.
-   */
-  def crushSelect(n: Int, t: String, work: List[Node]) = {
-    /*
-    var out = Nil // Out output, initially empty.
-    for (bucket <- work) {
-      for (rep <- 0 until numrep) {
-        // keep trying until we get an non-out, non-colliding item 
-        var ftotal = 0 // No failures yet.
+trait Step {
+  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node]
+}
 
-        var retry_descent = true
-        while (retry_descent) {
-          retry_descent = false
-
-          var in = bucket // initial bucket
-          var flocal = 0 // No failures on this replica.
-
-          var retry_bucket = true
-          while (retry_bucket) {
-            retry_bucket = false
-
-            var r = rep
-            var rprime = r + ftotal // TODO: Alg dependent calc here (first-n, uniform, etc)
-            var o = b.c(rprime, x) // Pseudo-randomly choose a nested item
-            if (type(o) == t) {
-              val collision = out.find(o)
-              if (collision || is_out(o) or failed(o) or overload(o, x) {
-                ftotal = ftotal + 1
-                flocal = flocal + 1
-                if (collision && flocal < 3)
-                  retry_bucket = true // Retry collisions locally a few times.
-                else if (ftotal < 10)
-                  retry_descent = true // Otherwise retry descent from i
-              } else
-                out = out ::: List(o)
-                
-            } else {
-              in = bucket(o) // Continue descent
-              retry_bucket = true
-            }
-          }
-        }
-      }
-    }
-    out
-    */
-  }
-  
-  def calcPlacementGroup(r: Int, o: String, k: Int) = {
-    // m = (2^k) - 1
-    // pgid = (r, hash(o) & m)
+case class StepTake(nodeName: String) {
+  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node] = {
+    t.findNode(nodeName).toList
   }
 }
 
+case class StepChooseFirstN(numReplicas: Int) {
+  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node] = {
+    Nil
+  }
+}
+
+case class StepChooseIndependent(numReplicas: Int) {
+  def doStep(t: NodeTree, working: Seq[Node]): Seq[Node] = {
+    Nil
+  }
+}
