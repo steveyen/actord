@@ -47,6 +47,11 @@ case class StrawBucket(name: String, weight: Float, kind: String, info: String, 
   def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
 }
 
+class NodeMap(tree: NodeTree, steps: Seq[Step]) {
+  def findReplicas(x: Int, nodeStatusMap: Map[String, Float]): Seq[Node] = 
+    tree.doSteps(x, steps, nodeStatusMap)
+}
+
 class NodeTree(root: Node) { 
   def doSteps(x: Int, steps: Seq[Step], nodeStatusMap: Map[String, Float]): Seq[Node] = {
     val empty: Seq[Node] = Nil
