@@ -8,66 +8,140 @@ import scala.collection._
 
 trait Node {
   def name: String
-  def weight: Float
   def kind: String // Ex: process, server, shelf, rack, cabinet, row, datacenter, region, universe.
   def info: String // For app-specific information associated with the node, like "host:port" info.
-  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node
+  def chooseChild(x: Int, rep: Int, fTotal: Int, fLocal: Int, numReplicas: Int, firstN: Boolean): Node
 }
 
-case class LeafNode(name: String, weight: Float, kind: String, info: String) extends Node {
-  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = null
+case class LeafNode(name: String, kind: String, info: String) extends Node {
+  def chooseChild(x: Int, rep: Int, fTotal: Int, fLocal: Int, numReplicas: Int, firstN: Boolean): Node = null
 }
 
 trait BucketNode extends Node {
-  def children: Seq[Node]
   def bucketType: String
 
-  // val sumOfWeights: Float = children.foldLeft(0.0)((accum, child) => accum + child.weight)
+  def child(i: Int): Node
+  def childCount: Int
+  def childWeight(i: Int): Float
 
-  def crushHash32_2(name: String, x: Int): Int = 0 // TODO
-  def crushHash32_2(x: Int, name: String): Int = 0 // TODO
-  def crushHash32_4(x: Int, c: Node, r: Int, name: String): Int = 0 // TODO
+  val sumOfWeights: Float = {
+    var x: Float = 0.0F
+    for (i <- 0 until childCount)
+      x += childWeight(i)
+    x
+  }
+
+  def hash32(x: Int): Int = 0 // TODO
+  def hash32_2(name: String, x: Int): Int = 0 // TODO
+  def hash32_2(x: Int, name: String): Int = 0 // TODO
+  def hash32_4(x: Int, c: Node, r: Int, name: String): Int = 0 // TODO
 }
 
-case class ListBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
+case class UniformBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node], 
+                         uniformChildWeight: Float) 
+  extends BucketNode {
+  def bucketType: String = "uniform"
+
+  def child(i: Int): Node = children(i)
+  def childCount: Int = children.length
+  def childWeight(i: Int): Float = uniformChildWeight
+
+  def chooseChild(x: Int, rep: Int, fTotal: Int, fLocal: Int, numReplicas: Int, firstN: Boolean): Node = {
+    val n = childCount
+
+    val firstN = true
+    val r = { if (firstN || rep >= n)
+                fTotal + rep
+              else if (n % numReplicas == 0)
+                fLocal * (rep + 1)
+              else
+                fLocal * rep }
+
+    val o = hash32_2(x, name) & 0xffff
+    val p = primes(hash32_2(name, x).toInt % n)
+    val s = (x + o + (r + 1) * p) % n
+    children(s)
+  }
+
+  val primes: Seq[Int] = {
+    val n = childCount
+    val a = new Array[Int](n)
+    var x = n + 1 + (hash32(n) % (3 * n)) // Need big number.
+    x |= 1                                     // That is odd.
+    var i = 0
+    while (i < n) {
+       var j = 2
+       while (((j * j) <= x) && 
+              ((x % j) != 0)) {
+         if ((j * j) > x) {
+           a(i) = x
+           i += 1
+         }
+         x += 2
+         j += 1
+       }
+    }
+    a
+  }
+}
+
+case class ListBucket(name: String, weight: Float, kind: String, info: String, 
+                      children: Seq[Node], childWeights: Seq[Float]) 
   extends BucketNode {
   def bucketType: String = "list"
-  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = {
-    for (i <- 0 until children.length) {
-      val c = children(i)
-      var w = crushHash32_4(x, c, r, name)
+
+  def child(i: Int): Node = children(i)
+  def childCount: Int = children.length
+  def childWeight(i: Int): Float = childWeights(i)
+
+  def chooseChild(x: Int, rep: Int, fTotal: Int, fLocal: Int, numReplicas: Int, firstN: Boolean): Node = {
+    val n = childCount
+
+    val firstN = true
+    val r = { if (firstN)
+                fTotal
+              else
+                fLocal * rep }
+
+    for (i <- 0 until n) {
+      val c = child(i)
+      var w = hash32_4(x, c, r, name)
       w = w & 0xffff
-      // w = w * sumOfWeights
+      w = (w.toFloat * sumOfWeights).toInt
       w = w >> 16
-      if (w < c.weight)
+      if (w < childWeight(i))
         return c
     }
     null
   }
 }
 
-case class TreeBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
+case class TreeBucket(name: String, weight: Float, kind: String, info: String, 
+                      children: Seq[Node], childWeights: Seq[Float]) 
   extends BucketNode {
   def bucketType: String = "tree"
-  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = null // TODO
+
+  def child(i: Int): Node = children(i)
+  def childCount: Int = children.length
+  def childWeight(i: Int): Float = childWeights(i)
+
+  def chooseChild(x: Int, rep: Int, fTotal: Int, fLocal: Int, numReplicas: Int, firstN: Boolean): Node = 
+    null // TODO
 }
 
-case class UniformBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
-  extends BucketNode {
-  def bucketType: String = "uniform"
-  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = {
-    val o = crushHash32_2(x, name) & 0xffff
-    val p = primes(crushHash32_2(name, x).toInt % children.length)
-    val s = (x + o + (r + 1) * p) % children.length
-    children(s)
-  }
-  val primes: Seq[Int] = Nil // TODO
-}
-
-case class StrawBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
+case class StrawBucket(name: String, weight: Float, kind: String, info: String, 
+                       children: Seq[Node], childWeights: Seq[Float]) 
   extends BucketNode {
   def bucketType: String = "straw"
-  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = null // TODO
+
+  def child(i: Int): Node = children(i)
+  def childCount: Int = children.length
+  def childWeight(i: Int): Float = childWeights(i)
+
+  def chooseChild(x: Int, rep: Int, fTotal: Int, fLocal: Int, numReplicas: Int, firstN: Boolean): Node = 
+    null // TODO
+
+  val straws = Nil
 }
 
 // -----------------------------------------------------------
@@ -88,7 +162,9 @@ class NodeTree(root: Node) {
     if (curr != null) {
       p(curr)
       curr match {
-        case b: BucketNode => b.children.foreach(visitNodes(p, _))
+        case b: BucketNode => 
+          for (i <- 0 until b.childCount)
+            visitNodes(p, b.child(i))
 	case _ => 
       }
     }
@@ -108,18 +184,22 @@ class NodeTree(root: Node) {
   def choose(x: Int, numReplicas: Int, kind: String, 
              startRep: Int,
              startNode: Node,
-             nodeStatusMap: Map[String, Float]): Seq[Node] = 
-      choose(x, numReplicas, kind, startRep, startNode, nodeStatusMap, MAX_TOTAL_RETRY, MAX_LOCAL_RETRY)
+             nodeStatusMap: Map[String, Float],
+             firstN: Boolean): Seq[Node] = 
+      choose(x, numReplicas, kind, startRep, startNode, nodeStatusMap, firstN, 
+             MAX_TOTAL_RETRY, MAX_LOCAL_RETRY)
 
   def choose(x: Int, numReplicas: Int, kind: String, 
              startRep: Int,
-             startNode: Node,
+             startNode: Node, // TODO: Utilize startRep.
              nodeStatusMap: Map[String, Float],
-             fTotalMax: Int, fLocalMax: Int): Seq[Node] = {
+             firstN: Boolean,
+             fTotalMax: Int, 
+             fLocalMax: Int): Seq[Node] = {
     var fTotal = 0
     var fLocal = 0
     var cur    = startNode
-    var rep    = startRep
+    var rep    = startRep 
     var out: List[Node] = Nil
 
     def loopAgain {
@@ -136,7 +216,7 @@ class NodeTree(root: Node) {
     }
 
     while (rep < numReplicas) {
-      val o = cur.chooseChild(x, rep, fTotal, fLocal, numReplicas)
+      val o = cur.chooseChild(x, rep, fTotal, fLocal, numReplicas, firstN)
       if (o != null) {
         if (o.kind == kind) {
           val outCollision = out.exists(_.name == o.name) 
@@ -162,7 +242,7 @@ class NodeTree(root: Node) {
     out
   }
 
-  def nodeOk(o: Node, nodeStatusMap: Map[String, Float], x: Int) = true
+  def nodeOk(o: Node, nodeStatusMap: Map[String, Float], x: Int) = true // TODO
 }
 
 // -----------------------------------------------------------
@@ -178,10 +258,10 @@ case class StepTake(nodeName: String) {
 
 case class StepChooseFirstN(numReplicas: Int, kind: String) {
   def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] =
-    working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap))
+    working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap, true))
 }
 
 case class StepChooseIndependent(numReplicas: Int, kind: String) {
   def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] =
-    working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap))
+    working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap, false))
 }
