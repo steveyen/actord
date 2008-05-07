@@ -145,19 +145,16 @@ trait Step {
 }
 
 case class StepTake(nodeName: String) {
-  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] = {
+  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] =
     t.findNode(nodeName).toList
-  }
 }
 
 case class StepChooseFirstN(numReplicas: Int, kind: String) {
-  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] = {
+  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] =
     working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap))
-  }
 }
 
 case class StepChooseIndependent(numReplicas: Int, kind: String) {
-  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] = {
+  def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] =
     working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap))
-  }
 }
