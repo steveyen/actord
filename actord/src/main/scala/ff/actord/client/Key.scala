@@ -4,18 +4,80 @@
  */
 package ff.actord.client
 
-case class Bucket
+trait Node {
+  def ident: Long
+  def weight: Float
+  def kind: String // Ex: process, server, shelf, rack, cabinent, row, datacenter, region.
+  def info: String
+  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node
+}
+
+case class LeafNode(ident: Long, weight: Float, kind: String, info: String) extends Node {
+  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = this
+}
+
+trait BucketNode extends Node {
+  def children: Seq[Node]
+  def bucketType: String
+}
+
+case class ListBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+  extends BucketNode {
+  def bucketType: String = "list"
+  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+}
+
+case class TreeBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+  extends BucketNode {
+  def bucketType: String = "tree"
+  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+}
+
+case class UniformBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+  extends BucketNode {
+  def bucketType: String = "uniform"
+  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+}
+
+case class StrawBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+  extends BucketNode {
+  def bucketType: String = "straw"
+  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+}
+
+trait Step
+
+class NodeTree(root: Node, steps: Seq[Step]) { 
+  /**
+   * Choose numReplicas distinct Nodes of a certain kind.
+   */
+  def choose(x: Int, numReplicas: Int, kind: String, inNodes: Seq[Node], loadMap: Map[Long, Float]): Seq[Node] = {
+    for (rep <- 0 until numReplicas) {
+      var fTotal = 0
+      var fLocal = 0
+      var in = inNodes(0)
+
+      val h = 1 // ? what is h?  maybe a hash func?
+
+      var skipRep = false
+      var retryRep = false
+      while (true) {
+        val r = rep
+        val out = in.choose(x, r, h, fTotal, fLocal, numReplicas)
+        if (out.kind == kind) {
+          1
+        }
+      }
+    }
+    Nil
+  }
+}
 
 class Crush {
   /**
-   * Put item a into working vector.
-   */
-  def crushTake(a: Bucket) = List(a)
-
-  /**
    * Select n items of type t.
    */
-  def crushSelect(n: Int, t: String, work: List[Bucket]) = {
+  def crushSelect(n: Int, t: String, work: List[Node]) = {
     /*
     var out = Nil // Out output, initially empty.
     for (bucket <- work) {
