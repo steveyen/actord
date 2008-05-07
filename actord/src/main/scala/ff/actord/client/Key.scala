@@ -5,15 +5,15 @@
 package ff.actord.client
 
 trait Node {
-  def ident: Long
+  def name: String
   def weight: Float
   def kind: String // Ex: process, server, shelf, rack, cabinent, row, datacenter, region.
-  def info: String
-  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node
+  def info: String // For app-specific information associated with the node, like "host:port" info.
+  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node
 }
 
-case class LeafNode(ident: Long, weight: Float, kind: String, info: String) extends Node {
-  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = this
+case class LeafNode(name: String, weight: Float, kind: String, info: String) extends Node {
+  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = null
 }
 
 trait BucketNode extends Node {
@@ -21,56 +21,97 @@ trait BucketNode extends Node {
   def bucketType: String
 }
 
-case class ListBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+case class ListBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
   extends BucketNode {
   def bucketType: String = "list"
-  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
 }
 
-case class TreeBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+case class TreeBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
   extends BucketNode {
   def bucketType: String = "tree"
-  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
 }
 
-case class UniformBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+case class UniformBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
   extends BucketNode {
   def bucketType: String = "uniform"
-  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
 }
 
-case class StrawBucket(ident: Long, weight: Float, kind: String, info: String, children: Seq[Node]) 
+case class StrawBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node]) 
   extends BucketNode {
   def bucketType: String = "straw"
-  def choose(x: Int, r: Int, h: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
+  def chooseChild(x: Int, r: Int, fTotal: Int, fLocal: Int, numReplicas: Int): Node = children(0)
 }
 
 trait Step
 
 class NodeTree(root: Node, steps: Seq[Step]) { 
+  def MAX_TOTAL_RETRY = 10
+  def MAX_LOCAL_RETRY = 3
+
   /**
    * Choose numReplicas distinct Nodes of a certain kind.
    */
-  def choose(x: Int, numReplicas: Int, kind: String, inNodes: Seq[Node], loadMap: Map[Long, Float]): Seq[Node] = {
-    for (rep <- 0 until numReplicas) {
-      var fTotal = 0
-      var fLocal = 0
-      var in = inNodes(0)
+  def choose(x: Int, numReplicas: Int, kind: String, 
+             startRep: Int,
+             startNode: Node,
+             loadMap: Map[String, Float]): Seq[Node] = 
+      choose(x, numReplicas, kind, startRep, startNode, loadMap, MAX_TOTAL_RETRY, MAX_LOCAL_RETRY)
 
-      val h = 1 // ? what is h?  maybe a hash func?
+  def choose(x: Int, numReplicas: Int, kind: String, 
+             startRep: Int,
+             startNode: Node,
+             loadMap: Map[String, Float],
+             fTotalMax: Int, fLocalMax: Int): Seq[Node] = {
+    var fTotal = 0
+    var fLocal = 0
+    var cur    = startNode
+    var rep    = startRep
+    var out: List[Node] = Nil
 
-      var skipRep = false
-      var retryRep = false
-      while (true) {
-        val r = rep
-        val out = in.choose(x, r, h, fTotal, fLocal, numReplicas)
-        if (out.kind == kind) {
-          1
-        }
+    def loopAgain {
+      if (fTotal < fTotalMax) {
+        fTotal += 1
+        fLocal = 0
+        cur = startNode // Try again with another path from the startNode.
+      } else {
+        fTotal = 0
+        fLocal = 0
+        cur = startNode 
+        rep += 1        // Give up, returning less replicas than requested.
       }
     }
-    Nil
+
+    while (rep < numReplicas) {
+      val o = cur.chooseChild(x, rep, fTotal, fLocal, numReplicas)
+      if (o != null) {
+        if (o.kind == kind) {
+          val outCollision = out.exists(_.name == o.name) 
+          if (outCollision == false && 
+              nodeOk(o, loadMap, x)) {
+            fTotal = 0
+            fLocal = 0
+            cur = startNode
+            rep += 1
+            out = o :: out // Successfully found a new distinct replica.
+          } else {
+            if (outCollision && fLocal < fLocalMax) {
+              fLocal += 1
+            } else 
+	      loopAgain
+          }
+        } else {
+          cur = o // Keep descending.
+        }
+      } else 
+        loopAgain
+    }
+    out
   }
+
+  def nodeOk(o: Node, loadMap: Map[String, Float], x: Int) = true
 }
 
 class Crush {
