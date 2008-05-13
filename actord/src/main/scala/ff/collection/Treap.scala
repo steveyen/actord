@@ -231,7 +231,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   }
 
   def split(t: T, s: A) = {
-    val c = s compare key
+    val c = t.compare(s, key)
     if (c == 0) {
       (left(t), this, right(t))
     } else {
