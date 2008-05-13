@@ -212,7 +212,7 @@ abstract class TreapFullNode[A <% Ordered[A], B <: AnyRef] extends TreapNode[A, 
   def priority(t: T) = t.priority(this)
 
   def isEmpty: Boolean = false
-  def isLeaf(t: T): Boolean  = left(t).isEmpty && right(t).isEmpty
+  def isLeaf(t: T): Boolean = left(t).isEmpty && right(t).isEmpty
   
   def count(t: T)    = 1L + left(t).count(t) + right(t).count(t)
   def firstKey(t: T) = if (left(t).isEmpty)  key else left(t).firstKey(t)
