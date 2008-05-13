@@ -23,7 +23,7 @@ import scala.collection._
  * See: http://www.cs.cmu.edu/afs/cs.cmu.edu/project/scandal/public/papers/treaps-spaa98.pdf
  */
 class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
-  extends TreapNodeFactory[A, B]
+  extends TreapBase[A, B]
      with immutable.SortedMap[A, B]
 {
   def this() = this(TreapEmptyNode[A, B])
@@ -104,7 +104,7 @@ class Treap[A <% Ordered[A], B <: AnyRef](val root: TreapNode[A, B])
 
 // ---------------------------------------------------------
 
-abstract class TreapNodeFactory[A <% Ordered[A], B <: AnyRef]  {
+abstract class TreapBase[A <% Ordered[A], B <: AnyRef]  {
   def mkLeaf(k: A, v: B): TreapNode[A, B]
 
   def mkNode(basis: TreapFullNode[A, B], 
@@ -119,7 +119,7 @@ abstract class TreapNodeFactory[A <% Ordered[A], B <: AnyRef]  {
 
 abstract class TreapNode[A <% Ordered[A], B <: AnyRef] 
 {
-  type T     = TreapNodeFactory[A, B]
+  type T     = TreapBase[A, B]
   type Node  = TreapNode[A, B]
   type Full  = TreapFullNode[A, B]
   type Empty = TreapEmptyNode[A, B]
