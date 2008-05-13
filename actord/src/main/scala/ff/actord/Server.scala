@@ -106,7 +106,7 @@ class MMainServer(val subServerNum: Int, // Number of internal "shards" for this
     subServers(i) = createSubServer(i)
     
   def subServerList = subServers.toList
-  val subServerHead = subServers(0)
+  val subServerOnly = if (subServerNum == 1) subServers(0) else null
   
   /**
    * Subclasses might override to provide a custom MSubServer.
@@ -115,8 +115,8 @@ class MMainServer(val subServerNum: Int, // Number of internal "shards" for this
     new MSubServer(id, limitMemory / subServerNum)
   
   def subServerForKey(key: String) = 
-    if (subServerNum <= 1)
-        subServerHead
+    if (subServerOnly != null)
+        subServerOnly
     else
         subServers(subServerIdForKey(key))
 
@@ -133,8 +133,8 @@ class MMainServer(val subServerNum: Int, // Number of internal "shards" for this
    * ordering of the input keys.
    */  
   def get(keys: Seq[String]): Iterator[MEntry] = {
-    if (subServerNum <= 1) 
-        subServerHead.get(keys)
+    if (subServerOnly != null)
+        subServerOnly.get(keys)
     else {
       // First group the keys for each subServer, for better 
       // cache locality and synchronization avoidance.
