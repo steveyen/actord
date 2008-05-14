@@ -23,7 +23,7 @@ import scala.collection._
 object MainFlag
 {
   def parseFlags(args: Array[String], flags: List[Flag],
-                 title: String, version: String): immutable.Map[String, List[String]] = {
+                 title: String, version: String): (String, String) => String = {
     val flagValues = parseFlags(args, flags)
 
     for (FlagValue(flag, values) <- flagValues) {
@@ -44,7 +44,13 @@ object MainFlag
       }
     }
     
-    immutable.Map(flagValues.map(x => (x.flag.name -> x.value)):_*)
+    val argsMap = immutable.Map(flagValues.map(x => (x.flag.name -> x.value)):_*)
+
+    ((flagName: String, defaultVal: String) => { // This parseFlags returns a closure, which
+       argsMap.get(flagName).                    // retrieves a named flag value or a defaultVal.
+               flatMap(_.headOption).
+               getOrElse(defaultVal)
+     })
   }
 
   /**
