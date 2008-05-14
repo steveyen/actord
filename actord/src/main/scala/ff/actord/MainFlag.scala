@@ -32,7 +32,7 @@ object MainFlag
         System.exit(1)
       }
 
-      if (flag.name == "help") {
+      if (flag.name == "help") { // Provide a standard behavior for help.
         println(title)
         println(" version : " + version)
         println(" usage   : <java-invocation> [flags*]\n")
