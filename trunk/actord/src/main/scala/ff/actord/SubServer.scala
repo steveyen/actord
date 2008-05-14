@@ -26,15 +26,14 @@ class MSubServer(val id: Int, val limitMemory: Long)
   /**
    * Override to pass in other implementations, such as for persistence.
    */
-  def createSortedMap: immutable.SortedMap[OString, MEntry] =
-                   new ff.collection.Treap[OString, MEntry]
+  def createMap: immutable.Map[OString, MEntry] = new ff.collection.Treap[OString, MEntry]
 
   /**
    * TODO: Maybe just use volatile, or AtomicReference around data_i.
    */
-  protected var data_i = createSortedMap
+  protected var data_i = createMap
   
-  protected def data_i_!!(d: immutable.SortedMap[OString, MEntry]) = 
+  protected def data_i_!!(d: immutable.Map[OString, MEntry]) = 
     synchronized { data_i = d }  
   
   /**
@@ -50,7 +49,7 @@ class MSubServer(val id: Int, val limitMemory: Long)
       getUnexpired(key, data)
     
   def getUnexpired(key: String, 
-                   map: immutable.SortedMap[OString, MEntry]): Option[MEntry] =
+                   map: immutable.Map[OString, MEntry]): Option[MEntry] =
     map.get(key) match {
       case s @ Some(el) => {
         if (el.isExpired) {
@@ -108,9 +107,13 @@ class MSubServer(val id: Int, val limitMemory: Long)
     (mod !? MServerStatsRequest).asInstanceOf[MServerStats]
 
   def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
-    var r = data.range(keyFrom, keyTo)
-    lruTouchManyWithStats(r.values, 0)
-    r.values
+    val d = data
+    if (d.isInstanceOf[SortedMap[OString, MEntry]]) {
+      var r = d.asInstanceOf[SortedMap[OString, MEntry]].range(keyFrom, keyTo)
+      lruTouchManyWithStats(r.values, 0)
+      r.values
+    } else
+      Nil.elements
   }
   
   def act(el: MEntry, async: Boolean) = Iterator.empty  
