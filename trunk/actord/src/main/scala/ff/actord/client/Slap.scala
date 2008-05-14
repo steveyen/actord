@@ -73,7 +73,6 @@ object Slap {
       val out = s.getOutputStream
 
       val buf = new Array[Byte](10000)
-      var available = buf.length
 
       val keyPrefix = Math.abs(new java.util.Random().nextInt & 0x0000FFF)
   
@@ -99,15 +98,13 @@ object Slap {
         out.write(getBytes)
         out.flush
 
-        available = buf.length
-
         val numRead = in.read(buf, 0, buf.length)
         if (numRead <= 0)
           throw new RuntimeException("read error")
 
         var lineStart = 0
 
-        while (lineStart >= 0 && buf(lineStart) != 'E') {
+        while (lineStart >= 0 && buf(lineStart) != 'E') { // Huge assumption this is an "END\r\n".
           val nl = findByte(nlByte, lineStart, numRead)
           if (nl < 0)
             throw new RuntimeException("END error")
