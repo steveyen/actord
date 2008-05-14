@@ -64,7 +64,7 @@ class MPersistentSubServer(override val id: Int,
                            override val limitMemory: Long, 
                            val subServerStorage: MSubServerStorage)
   extends MSubServer(id, limitMemory) {
-  override def createSortedMap: immutable.SortedMap[OString, MEntry] = {
+  override def createMap: immutable.Map[OString, MEntry] = {
     val t = new MEntryStorageTreap(TreapEmptyNode[OString, MEntry], subServerStorage)
     
     // TODO: What about file versioning?
@@ -74,7 +74,7 @@ class MPersistentSubServer(override val id: Int,
       getOrElse(t)
   }
     
-  override protected def data_i_!!(d: immutable.SortedMap[OString, MEntry]) = 
+  override protected def data_i_!!(d: immutable.Map[OString, MEntry]) = 
     synchronized { 
       super.data_i_!!(d) 
       version_i = Math.max(0L, version_i + 1L)
