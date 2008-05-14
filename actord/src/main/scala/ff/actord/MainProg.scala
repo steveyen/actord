@@ -31,31 +31,8 @@ abstract class MainProg {
   /**
    * Start a server, parsing command-line arguments.
    */
-  def start(args: Array[String]) {
-    import MainFlag._
-    
-    val flagValues = parseFlags(args, flags)
-
-    for (FlagValue(flag, values) <- flagValues) {
-      if (flag == FLAG_ERR) {
-        println("error: " + flag.specs.mkString(" | ") + " : " + values.mkString(" ").trim)
-        System.exit(1)
-      }
-
-      if (flag.name == "help") {
-        println("actord -- simple mesh of actors\n")
-        println(" version : " + MServer.version)
-        println(" usage   : <java-invocation> [flags*]\n")
-        for (s <- flags) {
-          println(s.specs.mkString(" | "))
-          println(" " + s.description.split("\n").mkString("\n "))
-        }
-        System.exit(1)
-      }
-    }
-    
-    start(immutable.Map(flagValues.map(x => (x.flag.name -> x.value)):_*))
-  }
+  def start(args: Array[String]): Unit =
+    start(MainFlag.parseFlags(args, flags, "actord -- simple mesh of actors", MServer.version))
   
   def start(args: immutable.Map[String, List[String]]) {
     def arg(flagName: String, defaultVal: String) =
