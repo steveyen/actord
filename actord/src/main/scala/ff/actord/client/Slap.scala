@@ -29,8 +29,8 @@ object Slap {
     val n = if (args.length >= 1) args(0).toInt else 10000
     val c = if (args.length >= 2) args(1).toInt else 1
 
-    println("iterations per client : " + n)
-    println("number of clients     : " + c)
+    println("reads per client  : " + n)
+    println("number of clients : " + c)
 
     val startingLine  = new Line
     val finishingLine = new Line
@@ -50,8 +50,8 @@ object Slap {
 
     val duration = (end - beg).asInstanceOf[Double]
 
-    println("total time (sec): " + duration / 1000.0)
-    println("reads / sec: " + ((1000.0 * n * c) / duration))
+    println("total time (sec) : " + duration / 1000.0)
+    println("reads / sec      : " + ((1000.0 * n * c) / duration))
   }
 
   class Line {
@@ -70,27 +70,22 @@ object Slap {
     override def run = {
       val s = new Socket(address, port)
       val in = new BufferedReader(new InputStreamReader(s.getInputStream))
-      val out = new PrintWriter(s.getOutputStream, true)
-
-      def line(x: String) = x + CRNL
-
-      def r = in.readLine
-  
-      def w(x: String) = {
-        out.write(line(x))
-        out.flush
-      }
+      val out = s.getOutputStream
 
       val keyPrefix = Math.abs(new java.util.Random().nextInt & 0x0000FFF)
   
       def key(k: String) = keyPrefix + "_" + k
       def skey(k: String) = " " + key(k)  
 
+      val getBytes = ("get" + skey("hello") + CRNL).getBytes
+
       startingLine.waitUntil(1)
 
       for (i <- 0 until n) {
-        w("get" + skey("hello"))
-        while (r != "END") 
+        out.write(getBytes)
+        out.flush
+
+        while (in.readLine != "END") 
           true
       }
 
