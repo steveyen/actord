@@ -69,8 +69,11 @@ object Slap {
   class SlapClient(startingLine: Line, finishingLine: Line, n: Int) extends Thread {
     override def run = {
       val s = new Socket(address, port)
-      val in = new BufferedReader(new InputStreamReader(s.getInputStream))
+      val in = s.getInputStream
       val out = s.getOutputStream
+
+      val buf = new Array[Byte](10000)
+      var available = buf.length
 
       val keyPrefix = Math.abs(new java.util.Random().nextInt & 0x0000FFF)
   
@@ -78,6 +81,17 @@ object Slap {
       def skey(k: String) = " " + key(k)  
 
       val getBytes = ("get" + skey("hello") + CRNL).getBytes
+      val nlByte   = '\n'.asInstanceOf[Byte]
+
+      def findByte(x: Byte, offset: Int, length: Int): Int = {
+        var j = offset
+        while (j < length) {
+          if (buf(j) == x)
+            return j
+          j += 1
+        }
+        -1
+      }
 
       startingLine.waitUntil(1)
 
@@ -85,8 +99,21 @@ object Slap {
         out.write(getBytes)
         out.flush
 
-        while (in.readLine != "END") 
-          true
+        available = buf.length
+
+        val numRead = in.read(buf, 0, buf.length)
+        if (numRead <= 0)
+          throw new RuntimeException("read error")
+
+        var lineStart = 0
+
+        while (lineStart >= 0 && buf(lineStart) != 'E') {
+          val nl = findByte(nlByte, lineStart, numRead)
+          if (nl < 0)
+            throw new RuntimeException("END error")
+
+          lineStart = nl + 1
+        }
       }
 
       finishingLine.inc
