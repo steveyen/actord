@@ -63,6 +63,12 @@ class MSubServer(val id: Int, val limitMemory: Long)
     }
 
   def get(keys: Seq[String]): Iterator[MEntry] = {
+    if (keys.length == 1) { // Optimization for single key.
+      val r = getUnexpired(keys(0))
+      lruTouchManyWithStats(r.elements, 1)
+      return r.elements
+    }
+
     // Grab the data snapshot just once, outside the loop.
     //
     val d = data     
