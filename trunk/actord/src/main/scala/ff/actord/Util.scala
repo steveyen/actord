@@ -54,28 +54,46 @@ object Util {
   def arrayToString(a: Array[Byte]): String = arrayToString(a, 0, a.length)
   def arrayToString(a: Array[Byte], offset: Int, length: Int): String = new String(a, 0, offset, length)
 
-  def arraySlice(a: Array[Byte], offset: Int, length: Int): Array[Byte] = {
-    val dest = new Array[Byte](length)
+  def arraySlice[T](a: Array[T], offset: Int, length: Int): Array[T] = {
+    val dest = new Array[T](length)
     Array.copy(a, offset, dest, 0, length)
     dest
   }
 
+  def arrayEnsureSize[T](a: Array[T], length: Int): Array[T] = {
+    if (length <= a.length)
+      a
+    else {
+      val x = new Array[T](length * 4)
+      Array.copy(a, 0, x, 0, a.length)
+      x
+    }
+  }
+
   def arraySplit(a: Array[Byte], offset: Int, len: Int, x: Byte): Seq[String] = { 
-    val r = new scala.collection.mutable.ArrayBuffer[String]
+    var r = new Array[String](10) // Faster than mutable.ArrayBuffer.
+    var k = 0                     // The next position in r to write.
     var s = offset
     var i = offset
     val j = offset + len
     while (i < j) { 
       if (a(i) == x) { // Faster than regexp-based String.split() method.
-        if (s < i) 
-          r += arrayToString(a, s, i - s)
+        if (s < i) {
+          r = arrayEnsureSize(r, k + 1)
+          r(k) = arrayToString(a, s, i - s)
+          k += 1
+        }
         s = i + 1
       }
       i += 1
     }
-    if (s < i)
-      r += arrayToString(a, s, i - s)
-    r
+    if (s < i) {
+      r = arrayEnsureSize(r, k + 1)
+      r(k) = arrayToString(a, s, i - s)
+      k += 1
+    }
+
+    arraySlice(r, 0, k)
   }
 
   def arrayIndexOf(a: Array[Byte], offset: Int, length: Int, x: Byte): Int = { 
