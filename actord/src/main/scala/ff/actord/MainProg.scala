@@ -34,12 +34,7 @@ abstract class MainProg {
   def start(args: Array[String]): Unit =
     start(MainFlag.parseFlags(args, flags, "actord -- simple mesh of actors", MServer.version))
   
-  def start(args: immutable.Map[String, List[String]]) {
-    def arg(flagName: String, defaultVal: String) =
-      args.get(flagName).
-           flatMap(_.headOption).
-           getOrElse(defaultVal)
-  
+  def start(arg: (String, String) => String) {
     val port      = arg("port",     default_port).toInt
     val limitMem  = arg("limitMem", default_limitMem).toLong * 1024L * 1024L
     val availCpus = Runtime.getRuntime.availableProcessors
