@@ -26,9 +26,9 @@ object MainFlag
                  title: String, version: String): (String, String) => String = {
     val flagValues = parseFlags(args, flags)
 
-    for (FlagValue(flag, values) <- flagValues) {
+    for (FlagValue(flag, value) <- flagValues) {
       if (flag == FLAG_ERR) {
-        println("error: " + flag.specs.mkString(" | ") + " : " + values.mkString(" ").trim)
+        println("error: " + flag.specs.mkString(" | ") + " : " + value.mkString(" ").trim)
         System.exit(1)
       }
 
