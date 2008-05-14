@@ -19,49 +19,83 @@ import java.io._
 import java.net._
 
 object Slap {
+  val address = InetAddress.getByName("127.0.0.1")
+  val port    = 11211
+  val CRNL    = "\r\n"
+
   def main(args: Array[String]) {
-    def address = InetAddress.getByName("127.0.0.1")
-    def port    = 11211
-  
-    val CRNL = "\r\n"
-  
-    val s = new Socket(address, port)
-    val in = new BufferedReader(new InputStreamReader(s.getInputStream))
-    val out = new PrintWriter(s.getOutputStream, true)
+    println("simple slap perf test tool: " + args.mkString(" "))
 
-    def line(x: String) = x + CRNL
+    val n = if (args.length >= 1) args(0).toInt else 10000
+    val c = if (args.length >= 2) args(1).toInt else 1
 
-    def r = in.readLine
-  
-    def w(x: String) = {
-      out.write(line(x))
-      out.flush
-    }
+    println("iterations per client : " + n)
+    println("number of clients     : " + c)
 
-    val keyPrefix = Math.abs(new java.util.Random().nextInt & 0x0000FFF)
-  
-    def key(k: String) = keyPrefix + "_" + k
-    def skey(k: String) = " " + key(k)
-  
-    println("actord slap perf test tool: " + args.mkString(" "))
+    val startingLine  = new Line
+    val finishingLine = new Line
 
-    val n = if (args.length > 0) args(0).toInt else 10000
+    for (i <- 0 until c)
+      (new SlapClient(startingLine, finishingLine, n)).start
 
-    println("iterations: " + n)
+    Thread.sleep(500) // Let all the clients get to the starting line.
 
     val beg = System.currentTimeMillis
 
-    for (i <- 0 until n) {
-      w("get" + skey("hello"))
-      r // "END"
-    }
+    startingLine.inc
+
+    finishingLine.waitUntil(c)
 
     val end = System.currentTimeMillis
 
     val duration = (end - beg).asInstanceOf[Double]
 
     println("total time (sec): " + duration / 1000.0)
-    println("reads / sec: " + ((1000.0 * n) / duration))
+    println("reads / sec: " + ((1000.0 * n * c) / duration))
+  }
+
+  class Line {
+    private var f = 0
+    def inc = synchronized {
+      f += 1
+      notifyAll
+    }
+    def waitUntil(x: Int) = synchronized {
+      while (f < x)
+        wait
+    }
+  }
+
+  class SlapClient(startingLine: Line, finishingLine: Line, n: Int) extends Thread {
+    override def run = {
+      val s = new Socket(address, port)
+      val in = new BufferedReader(new InputStreamReader(s.getInputStream))
+      val out = new PrintWriter(s.getOutputStream, true)
+
+      def line(x: String) = x + CRNL
+
+      def r = in.readLine
+  
+      def w(x: String) = {
+        out.write(line(x))
+        out.flush
+      }
+
+      val keyPrefix = Math.abs(new java.util.Random().nextInt & 0x0000FFF)
+  
+      def key(k: String) = keyPrefix + "_" + k
+      def skey(k: String) = " " + key(k)  
+
+      startingLine.waitUntil(1)
+
+      for (i <- 0 until n) {
+        w("get" + skey("hello"))
+        while (r != "END") 
+          true
+      }
+
+      finishingLine.inc
+    }
   }
 }
 
