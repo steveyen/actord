@@ -22,6 +22,31 @@ import scala.collection._
  */
 object MainFlag
 {
+  def parseFlags(args: Array[String], flags: List[Flag],
+                 title: String, version: String): immutable.Map[String, List[String]] = {
+    val flagValues = parseFlags(args, flags)
+
+    for (FlagValue(flag, values) <- flagValues) {
+      if (flag == FLAG_ERR) {
+        println("error: " + flag.specs.mkString(" | ") + " : " + values.mkString(" ").trim)
+        System.exit(1)
+      }
+
+      if (flag.name == "help") {
+        println(title)
+        println(" version : " + version)
+        println(" usage   : <java-invocation> [flags*]\n")
+        for (s <- flags) {
+          println(s.specs.mkString(" | "))
+          println(" " + s.description.split("\n").mkString("\n "))
+        }
+        System.exit(1)
+      }
+    }
+    
+    immutable.Map(flagValues.map(x => (x.flag.name -> x.value)):_*)
+  }
+
   /**
    * Parse the flags on a command-line.  The returned list
    * might have an entry of FlagValue(FLAG_ERR, ...) to signal 
