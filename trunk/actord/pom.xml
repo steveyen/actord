@@ -127,8 +127,8 @@
               <jvmarg value="-server"/>
               <jvmarg value="-Xms256M"/>
               <jvmarg value="-Xmx256M"/>
-              <!-- for profiling/performance...
               <jvmarg value="-verbosegc"/>
+              <!-- for profiling/performance...
               <jvmarg value="-javaagent:tmp/shiftone-jrat.jar"/>
               <jvmarg value="-agentlib:hprof=heap=sites"/>
               <jvmarg value="-agentlib:hprof=cpu=samples"/>
