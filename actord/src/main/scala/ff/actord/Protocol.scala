@@ -39,7 +39,7 @@ trait MSession {
  * TODO: Research how mina allows request and response streaming.
  * TODO: Is there an equivalent of writev/readv in mina?
  */
-case class Spec(line: String, process: (MCommand) => Unit) {
+case class MSpec(line: String, process: (MCommand) => Unit) {
   val args      = line.split(" ")
   val name      = args(0)
   val nameBytes = stringToArray(name)
@@ -73,13 +73,13 @@ trait MProtocol {
    * Commands defined with a single line.
    * More popular commands should be listed first.
    */
-  def singleLineSpecs: List[Spec] = Nil
+  def singleLineSpecs: List[MSpec] = Nil
            
   /**
    * Commands that use a multiple lines, such as a line followed by byte data.
    * More popular commands should be listed first.
    */
-  def multiLineSpecs: List[Spec] = Nil
+  def multiLineSpecs: List[MSpec] = Nil
       
   // ----------------------------------------
 
@@ -88,8 +88,8 @@ trait MProtocol {
                           
   // ----------------------------------------
 
-  def indexSpecs(specs: List[Spec]): Array[List[Spec]] = {
-    val lookup = new Array[List[Spec]](26) // A lookup table by first character of spec.name.
+  def indexSpecs(specs: List[MSpec]): Array[List[MSpec]] = {
+    val lookup = new Array[List[MSpec]](26) // A lookup table by first character of spec.name.
     for (i <- 0 until lookup.length)
       lookup(i) = Nil                      // Buckets in the lookup table are just Lists.
     for (spec <- specs) {
@@ -99,7 +99,7 @@ trait MProtocol {
     lookup
   }
 
-  def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[Spec]]): Option[Spec] = 
+  def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
     lookup(x(0) - 'a').find(spec => arrayCompare(spec.nameBytes, spec.nameBytes.length, x, xLen) == 0)
 
   // ----------------------------------------
@@ -200,96 +200,96 @@ trait MProtocol {
 
 class MProtocolServer(svr: MServer) extends MProtocol {
   override def singleLineSpecs = List( 
-      Spec("get <key>*",
-           (cmd) => { 
+      MSpec("get <key>*",
+            (cmd) => { 
 if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
-             svr.get(cmd.args).
-                 foreach(el => cmd.write(el, false))
-             cmd.reply(END)
-}
-           }),
-
-      Spec("gets <key>*",
-           (cmd) => {
-             svr.get(cmd.args).
-                 foreach(el => cmd.write(el, true))
-             cmd.reply(END)
-           }),
-
-      Spec("delete <key> [<time>] [noreply]",
-           (cmd) => 
-             cmd.reply(svr.delete(cmd.args(0), cmd.argToLong(1), cmd.noReply), 
-                       DELETED, NOT_FOUND)),
-
-      Spec("incr <key> <value> [noreply]",
-           (cmd) => cmd.reply(svr.delta(cmd.args(0),  cmd.argToLong(1), cmd.noReply))),
-      Spec("decr <key> <value> [noreply]",
-           (cmd) => cmd.reply(svr.delta(cmd.args(0), -cmd.argToLong(1), cmd.noReply))),
-           
-      Spec("stats [<arg>]",
-           (cmd) => 
-             cmd.reply(stats(svr, cmd.argOrElse(0, null)))),
-
-      Spec("flush_all [<delay>] [noreply]",
-           (cmd) => {
-              svr.flushAll(cmd.argToLong(0))
-              cmd.reply(OK)
-            }),
-
-      Spec("version", 
-           (cmd) => cmd.reply(stringToArray("VERSION " + MServer.version + CRNL))),
-      Spec("verbosity",
-           (cmd) => cmd.reply(OK)), // TODO: verbosity command.
-      Spec("quit",
-           (cmd) => cmd.session.close),
-
-      // Extensions to basic protocol.
-      //
-      Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
-           (cmd) => { 
-             svr.range(cmd.args(0), cmd.args(1)).
-                 foreach(el => cmd.write(el, false))
-             cmd.reply(END)
-           }))
-           
-  override def multiLineSpecs = List( 
-      Spec("set <key> <flags> <expTime> <bytes> [noreply]",
-           (cmd) => 
-              cmd.reply(svr.set(cmd.entry, cmd.noReply), 
-                        STORED, NOT_STORED)),
-
-      Spec("add <key> <flags> <expTime> <bytes> [noreply]",
-           (cmd) => 
-              cmd.reply(svr.addRep(cmd.entry, true, cmd.noReply), 
-                        STORED, NOT_STORED)),
-
-      Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
-           (cmd) => 
-              cmd.reply(svr.addRep(cmd.entry, false, cmd.noReply), 
-                        STORED, NOT_STORED)),
-
-      Spec("append <key> <flags> <expTime> <bytes> [noreply]",
-           (cmd) => 
-              cmd.reply(svr.xpend(cmd.entry, true, cmd.noReply), 
-                        STORED, NOT_STORED)),
-
-      Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
-           (cmd) => 
-              cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
-                        STORED, NOT_STORED)),
-           
-      Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
-           (cmd) => 
-              cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
-
-      // Extensions to basic protocol.
-      //
-      Spec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
-           (cmd) => {
-              svr.act(cmd.entry, cmd.noReply).
+              svr.get(cmd.args).
                   foreach(el => cmd.write(el, false))
               cmd.reply(END)
-           }))
+}
+            }),
+
+      MSpec("gets <key>*",
+            (cmd) => {
+              svr.get(cmd.args).
+                  foreach(el => cmd.write(el, true))
+              cmd.reply(END)
+            }),
+
+      MSpec("delete <key> [<time>] [noreply]",
+            (cmd) => 
+              cmd.reply(svr.delete(cmd.args(0), cmd.argToLong(1), cmd.noReply), 
+                        DELETED, NOT_FOUND)),
+
+      MSpec("incr <key> <value> [noreply]",
+            (cmd) => cmd.reply(svr.delta(cmd.args(0),  cmd.argToLong(1), cmd.noReply))),
+      MSpec("decr <key> <value> [noreply]",
+            (cmd) => cmd.reply(svr.delta(cmd.args(0), -cmd.argToLong(1), cmd.noReply))),
+           
+      MSpec("stats [<arg>]",
+            (cmd) => 
+              cmd.reply(stats(svr, cmd.argOrElse(0, null)))),
+
+      MSpec("flush_all [<delay>] [noreply]",
+            (cmd) => {
+               svr.flushAll(cmd.argToLong(0))
+               cmd.reply(OK)
+             }),
+
+      MSpec("version", 
+            (cmd) => cmd.reply(stringToArray("VERSION " + MServer.version + CRNL))),
+      MSpec("verbosity",
+            (cmd) => cmd.reply(OK)), // TODO: verbosity command.
+      MSpec("quit",
+            (cmd) => cmd.session.close),
+
+      // Extensions to basic protocol.
+      //
+      MSpec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
+            (cmd) => { 
+              svr.range(cmd.args(0), cmd.args(1)).
+                  foreach(el => cmd.write(el, false))
+              cmd.reply(END)
+            }))
+           
+  override def multiLineSpecs = List( 
+      MSpec("set <key> <flags> <expTime> <bytes> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.set(cmd.entry, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("add <key> <flags> <expTime> <bytes> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.addRep(cmd.entry, true, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("replace <key> <flags> <expTime> <bytes> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.addRep(cmd.entry, false, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("append <key> <flags> <expTime> <bytes> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.xpend(cmd.entry, true, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("prepend <key> <flags> <expTime> <bytes> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
+                         STORED, NOT_STORED)),
+           
+      MSpec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
+            (cmd) => 
+               cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
+
+      // Extensions to basic protocol.
+      //
+      MSpec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
+            (cmd) => {
+               svr.act(cmd.entry, cmd.noReply).
+                   foreach(el => cmd.write(el, false))
+               cmd.reply(END)
+            }))
       
   def stats(svr: MServer, arg: String) = {
     var sb = new StringBuffer
