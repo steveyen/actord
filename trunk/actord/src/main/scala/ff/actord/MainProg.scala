@@ -64,7 +64,7 @@ abstract class MainProg {
   
   def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit
   
-  def createProtocol: MProtocol = new MProtocol
+  def createProtocol(server: MServer): MProtocol = new MProtocolBase(server)
 
   // ------------------------------------------------------
   
@@ -157,14 +157,14 @@ abstract class MainProg {
 
 class MainProgSimple extends MainProg {
   def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
-    (new SAcceptor(server, createProtocol, numProcessors, port)).start
+    (new SAcceptor(server, createProtocol(server), numProcessors, port)).start
 }
 
 // ------------------------------------------------------
 
 class MainProgGrizzly extends MainProg {
   def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
-    (new GAcceptor(server, createProtocol, numProcessors, port)).start
+    (new GAcceptor(server, createProtocol(server), numProcessors, port)).start
 }
 
 // ------------------------------------------------------
@@ -180,7 +180,7 @@ class MainProgMina extends MainProg {
   
   def initAcceptor(server: MServer, acceptor: IoAcceptor): IoAcceptor = {
     val codecFactory = createCodecFactory
-    val protocol     = createProtocol
+    val protocol     = createProtocol(server)
 
     codecFactory.addMessageDecoder(createMessageDecoder(server, protocol))
     codecFactory.addMessageEncoder[IoBuffer](classOf[IoBuffer], 
