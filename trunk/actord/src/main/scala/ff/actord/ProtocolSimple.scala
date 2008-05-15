@@ -20,20 +20,20 @@ import java.net._
 
 import ff.actord.Util._
 
-class SAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int) 
+class SAcceptor(protocol: MProtocol, numProcessors: Int, port: Int) 
   extends Thread {
   override def run = {
     var id = 0L
     val ss = new ServerSocket(port)
 
     while (true) {
-      (new SSession(server, protocol, ss.accept, id)).start
+      (new SSession(protocol, ss.accept, id)).start
       id += 1L
     }
   }
 }
 
-class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Long) 
+class SSession(protocol: MProtocol, s: Socket, sessionIdent: Long) 
   extends Thread 
      with MSession {
   s.setTcpNoDelay(true)
@@ -101,7 +101,7 @@ class SSession(server: MServer, protocol: MProtocol, s: Socket, sessionIdent: Lo
           } else {
             readPos = cmdLen
 
-            val bytesNeeded = protocol.process(server, this, buf, cmdLen, available)
+            val bytesNeeded = protocol.process(this, buf, cmdLen, available)
             if (bytesNeeded == 0) {
               if (available > readPos)
                 Array.copy(buf, readPos, buf, 0, available - readPos)

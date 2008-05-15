@@ -39,7 +39,7 @@ trait MSession {
  * TODO: Research how mina allows request and response streaming.
  * TODO: Is there an equivalent of writev/readv in mina?
  */
-case class Spec(line: String, process: (MServer, MCommand) => Unit) {
+case class Spec(line: String, process: (MCommand) => Unit) {
   val args      = line.split(" ")
   val name      = args(0)
   val nameBytes = stringToArray(name)
@@ -51,7 +51,7 @@ case class Spec(line: String, process: (MServer, MCommand) => Unit) {
 // -------------------------------------------------------
 
 /**
- * Protocol is defined at:
+ * The text protocol is defined at:
  * http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt
  *
  * This class should be networking implementation independent.  You
@@ -120,8 +120,7 @@ trait MProtocol {
    * readyCount - number of bytes from message start (including cmdArr)
    *              plus remaining data, available to be read.
    */
-  def process(server: MServer,
-              session: MSession, 
+  def process(session: MSession, 
               cmdArr: Array[Byte], // We do not own the input cmdArr.
               cmdArrLen: Int,      // Number of command line bytes in cmdArr, including CRNL.
               readyCount: Int): Int = {
@@ -137,7 +136,7 @@ trait MProtocol {
     findSpec(cmdArr, cmdLen, singleLineSpecLookup).map(
       spec => {
         if (spec.checkArgs(cmdArgs)) {
-          spec.process(server, MCommand(session, cmdArr, cmdLen, cmdArgs, null))
+          spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs, null))
           GOOD
         } else {
           session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, length) + CRNL))
@@ -166,8 +165,7 @@ trait MProtocol {
             
             if (session.read == CR &&
                 session.read == NL) {
-              spec.process(server, 
-                           MCommand(session, cmdArr, cmdLen, cmdArgs,
+              spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs,
                                     MEntry(cmdArgs(0),
                                            parseLong(cmdArgs(1), 0L),
                                            if (expTime != 0 &&
@@ -200,16 +198,11 @@ trait MProtocol {
 
 // -------------------------------------------
 
-class MProtocolBase(svr: MServer) extends MProtocol {
-  /**
-   * Commands defined with a single line.
-   * More popular commands should be listed first.
-   * Subclasses might override this list to add custom commands.
-   */
+class MProtocolServer(svr: MServer) extends MProtocol {
   override def singleLineSpecs = List( 
       Spec("get <key>*",
-           (svr, cmd) => { 
-if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(svr, cmd)) {
+           (cmd) => { 
+if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
              svr.get(cmd.args).
                  foreach(el => cmd.write(el, false))
              cmd.reply(END)
@@ -217,87 +210,82 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(svr, cmd)) {
            }),
 
       Spec("gets <key>*",
-           (svr, cmd) => {
+           (cmd) => {
              svr.get(cmd.args).
                  foreach(el => cmd.write(el, true))
              cmd.reply(END)
            }),
 
       Spec("delete <key> [<time>] [noreply]",
-           (svr, cmd) => 
+           (cmd) => 
              cmd.reply(svr.delete(cmd.args(0), cmd.argToLong(1), cmd.noReply), 
                        DELETED, NOT_FOUND)),
 
       Spec("incr <key> <value> [noreply]",
-           (svr, cmd) => cmd.reply(svr.delta(cmd.args(0),  cmd.argToLong(1), cmd.noReply))),
+           (cmd) => cmd.reply(svr.delta(cmd.args(0),  cmd.argToLong(1), cmd.noReply))),
       Spec("decr <key> <value> [noreply]",
-           (svr, cmd) => cmd.reply(svr.delta(cmd.args(0), -cmd.argToLong(1), cmd.noReply))),
+           (cmd) => cmd.reply(svr.delta(cmd.args(0), -cmd.argToLong(1), cmd.noReply))),
            
       Spec("stats [<arg>]",
-           (svr, cmd) => 
+           (cmd) => 
              cmd.reply(stats(svr, cmd.argOrElse(0, null)))),
 
       Spec("flush_all [<delay>] [noreply]",
-           (svr, cmd) => {
+           (cmd) => {
               svr.flushAll(cmd.argToLong(0))
               cmd.reply(OK)
             }),
 
       Spec("version", 
-           (svr, cmd) => cmd.reply(stringToArray("VERSION " + MServer.version + CRNL))),
+           (cmd) => cmd.reply(stringToArray("VERSION " + MServer.version + CRNL))),
       Spec("verbosity",
-           (svr, cmd) => cmd.reply(OK)), // TODO: verbosity command.
+           (cmd) => cmd.reply(OK)), // TODO: verbosity command.
       Spec("quit",
-           (svr, cmd) => cmd.session.close),
+           (cmd) => cmd.session.close),
 
       // Extensions to basic protocol.
       //
       Spec("range <key_from> <key_to>", // The key_from is inclusive lower-bound, key_to is exclusive upper-bound.
-           (svr, cmd) => { 
+           (cmd) => { 
              svr.range(cmd.args(0), cmd.args(1)).
                  foreach(el => cmd.write(el, false))
              cmd.reply(END)
            }))
            
-  /**
-   * Commands that use a multiple lines, such as a line followed by byte data.
-   * More popular commands should be listed first.
-   * Subclasses might override this list to add custom commands.
-   */
   override def multiLineSpecs = List( 
       Spec("set <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd) => 
+           (cmd) => 
               cmd.reply(svr.set(cmd.entry, cmd.noReply), 
                         STORED, NOT_STORED)),
 
       Spec("add <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd) => 
+           (cmd) => 
               cmd.reply(svr.addRep(cmd.entry, true, cmd.noReply), 
                         STORED, NOT_STORED)),
 
       Spec("replace <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd) => 
+           (cmd) => 
               cmd.reply(svr.addRep(cmd.entry, false, cmd.noReply), 
                         STORED, NOT_STORED)),
 
       Spec("append <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd) => 
+           (cmd) => 
               cmd.reply(svr.xpend(cmd.entry, true, cmd.noReply), 
                         STORED, NOT_STORED)),
 
       Spec("prepend <key> <flags> <expTime> <bytes> [noreply]",
-           (svr, cmd) => 
+           (cmd) => 
               cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
                         STORED, NOT_STORED)),
            
       Spec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
-           (svr, cmd) => 
+           (cmd) => 
               cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
 
       // Extensions to basic protocol.
       //
       Spec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
-           (svr, cmd) => {
+           (cmd) => {
               svr.act(cmd.entry, cmd.noReply).
                   foreach(el => cmd.write(el, false))
               cmd.reply(END)
@@ -484,7 +472,7 @@ object BENCHMARK_NETWORK_ONLY {
     true
   }
 
-  def shortCircuitGet(svr: MServer, cmd: MCommand): Boolean = {
+  def shortCircuitGet(cmd: MCommand): Boolean = {
     // Return true to benchmark just the networking layers around a get, not the in-memory or persistent storage.
     return false
     val session = cmd.session

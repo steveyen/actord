@@ -28,7 +28,7 @@ import ff.actord.Util._
 /**
  * Sun Grizzly / NIO based acceptor/protocol implementation.
  */
-class GAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: Int)
+class GAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
   extends Thread {
   override def run = {
     // See: http://weblogs.java.net/blog/jfarcand/archive/2008/02/writing_a_tcpud_1.html
@@ -40,7 +40,7 @@ class GAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: 
 
     val p: ProtocolChain = new DefaultProtocolChain
     p.addFilter(new ReadFilter)
-    p.addFilter(new GProtocolFilter(server, protocol)) // TODO: Collapse ReadFilter into our GProtocolFilter.
+    p.addFilter(new GProtocolFilter(protocol)) // TODO: Collapse ReadFilter into our GProtocolFilter.
 
     val c = new Controller
     c.addSelectorHandler(t)
@@ -52,7 +52,7 @@ class GAcceptor(server: MServer, protocol: MProtocol, numProcessors: Int, port: 
   }
 }
 
-class GProtocolFilter(server: MServer, protocol: MProtocol) extends ProtocolFilter {
+class GProtocolFilter(protocol: MProtocol) extends ProtocolFilter {
   var idCurr = 0L
   def idNext = synchronized {
     idCurr += 1L
@@ -67,7 +67,7 @@ class GProtocolFilter(server: MServer, protocol: MProtocol) extends ProtocolFilt
           val k = ctx.getSelectionKey
           var s = k.attachment.asInstanceOf[GSession]
           if (s == null) {
-              s = new GSession(server, protocol, k.channel, idNext)
+              s = new GSession(protocol, k.channel, idNext)
               k.attach(s)
           }
           
@@ -81,7 +81,7 @@ class GProtocolFilter(server: MServer, protocol: MProtocol) extends ProtocolFilt
   def postExecute(ctx: Context): Boolean = true
 }
 
-class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent: Long) {
+class GSession(protocol: MProtocol, s: Closeable, sessionIdent: Long) {
   val MIN_CMD_SIZE = "quit\r\n".length
   
   private var waitingFor    = MIN_CMD_SIZE
@@ -140,7 +140,7 @@ class GSession(server: MServer, protocol: MProtocol, s: Closeable, sessionIdent:
         } else {
           readPos = cmdLen
 
-          val bytesNeeded = protocol.process(server, new GSessionContext(ctx), buf, cmdLen, available)
+          val bytesNeeded = protocol.process(new GSessionContext(ctx), buf, cmdLen, available)
           if (bytesNeeded == 0) {
             nMessages = nMessages + 1              
 
