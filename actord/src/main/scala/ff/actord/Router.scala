@@ -47,7 +47,7 @@ class Router {
   }
   
   def startAcceptor(targetHost: String, targetPort: Int, port: Int): Unit = 
-    (new SAcceptor(null, createProtocol(targetHost, targetPort), 1, port)).start
+    (new SAcceptor(createProtocol(targetHost, targetPort), 1, port)).start
 
   def createProtocol(targetHost: String, targetPort: Int): MProtocol = 
     new RouterProtocol(targetHost, targetPort)
@@ -100,7 +100,7 @@ class Router {
   )
 }
 
-class RouterProtocol(targetHost: String, targetPort: Int) extends MProtocol {
+class RouterProtocol(targetHost: String, targetPort: Int) extends MProtocolServer(null) {
   // unfinished: 
   //  also can do a tee here, replicator, two-level cache
 }

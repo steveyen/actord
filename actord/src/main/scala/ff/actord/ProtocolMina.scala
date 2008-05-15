@@ -28,7 +28,7 @@ import org.apache.mina.transport.socket.nio._
 
 import ff.actord.Util._
 
-class MMinaHandler(server: MServer) extends IoHandlerAdapter {
+class MMinaHandler extends IoHandlerAdapter {
   val log = LoggerFactory.getLogger(getClass)
   
   override def exceptionCaught(session: IoSession, cause: Throwable) = {
@@ -51,13 +51,13 @@ class MMinaHandler(server: MServer) extends IoHandlerAdapter {
 // -------------------------------------------------------
 
 /**
- * Protocol is defined at:
+ * The text protocol is defined at:
  * http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt
  *
  * TODO: See if we can use something lower-level, like 
  *       CummulativeProtocolDecoder, for more performance.
  */
-class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder {
+class MMinaDecoder(protocol: MProtocol) extends MessageDecoder {
   val charsetDecoder     = Charset.forName("US-ASCII").newDecoder
   val MIN_CMD_SIZE       = "quit\r\n".length
   val WAITING_FOR        = new AttributeKey(getClass, "waiting_for")  
@@ -102,7 +102,7 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
         aLine(nLine - 1) != NL)
         return MessageDecoderResult.NOT_OK // TODO: Need to close session here?
 
-    val bytesNeeded = protocol.process(server, WrapIoSession(session, in), aLine, aLine.length, remaining)
+    val bytesNeeded = protocol.process(WrapIoSession(session, in), aLine, aLine.length, remaining)
     if (bytesNeeded == 0) {
       MessageDecoderResult.OK
     } else {
@@ -132,7 +132,7 @@ class MMinaDecoder(server: MServer, protocol: MProtocol) extends MessageDecoder 
 
 // -------------------------------------------------------
 
-class MMinaEncoder(server: MServer, protocol: MProtocol) extends MessageEncoder[IoBuffer] {
+class MMinaEncoder(protocol: MProtocol) extends MessageEncoder[IoBuffer] {
   def encode(session: IoSession, message: IoBuffer, out: ProtocolEncoderOutput): Unit =
     out.write(message)
 }

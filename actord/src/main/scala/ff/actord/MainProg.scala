@@ -64,7 +64,7 @@ abstract class MainProg {
   
   def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit
   
-  def createProtocol(server: MServer): MProtocol = new MProtocolBase(server)
+  def createProtocol(server: MServer): MProtocol = new MProtocolServer(server)
 
   // ------------------------------------------------------
   
@@ -157,14 +157,14 @@ abstract class MainProg {
 
 class MainProgSimple extends MainProg {
   def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
-    (new SAcceptor(server, createProtocol(server), numProcessors, port)).start
+    (new SAcceptor(createProtocol(server), numProcessors, port)).start
 }
 
 // ------------------------------------------------------
 
 class MainProgGrizzly extends MainProg {
   def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
-    (new GAcceptor(server, createProtocol(server), numProcessors, port)).start
+    (new GAcceptor(createProtocol(server), numProcessors, port)).start
 }
 
 // ------------------------------------------------------
@@ -182,24 +182,24 @@ class MainProgMina extends MainProg {
     val codecFactory = createCodecFactory
     val protocol     = createProtocol(server)
 
-    codecFactory.addMessageDecoder(createMessageDecoder(server, protocol))
+    codecFactory.addMessageDecoder(createMessageDecoder(protocol))
     codecFactory.addMessageEncoder[IoBuffer](classOf[IoBuffer], 
-                                             createMessageEncoder(server, protocol))
+                                             createMessageEncoder(protocol))
     
     acceptor.getFilterChain.
              addLast("codec", createCodecFilter(codecFactory))  
-    acceptor.setHandler(createHandler(server))
+    acceptor.setHandler(createHandler)
     acceptor
   }
   
   // Here are simple constructors that can be easily overridden by subclasses.
   //
-  def createHandler(server: MServer): IoHandler            = new MMinaHandler(server)
+  def createHandler: IoHandler                             = new MMinaHandler
   def createAcceptor(numProcessors: Int): IoAcceptor       = new NioSocketAcceptor(numProcessors)
   def createCodecFactory: DemuxingProtocolCodecFactory     = new DemuxingProtocolCodecFactory
   def createCodecFilter(f: ProtocolCodecFactory): IoFilter = new ProtocolCodecFilter(f)
   
-  def createMessageDecoder(server: MServer, protocol: MProtocol): MessageDecoder[IoBuffer] = new MMinaDecoder(server, protocol)
-  def createMessageEncoder(server: MServer, protocol: MProtocol): MessageEncoder[IoBuffer] = new MMinaEncoder(server, protocol)
+  def createMessageDecoder(protocol: MProtocol): MessageDecoder[IoBuffer] = new MMinaDecoder(protocol)
+  def createMessageEncoder(protocol: MProtocol): MessageEncoder[IoBuffer] = new MMinaEncoder(protocol)
 }
 
