@@ -155,10 +155,6 @@ trait MProtocol {
           if (totalNeeded <= readyCount) {
             val expTime = parseLong(cmdArgs(2), 0L)
             
-            // TODO: Handle this better when dataSize is huge.
-            //       Perhaps use mmap, or did mina read it entirely 
-            //       into memory by this point already?
-            //
             val data = new Array[Byte](dataSize)
             
             session.read(data)
