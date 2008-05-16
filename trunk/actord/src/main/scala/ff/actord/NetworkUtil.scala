@@ -21,7 +21,6 @@ import java.net._
 import ff.actord.Util._
 
 trait MNetworkReader {
-  def connReadProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int
   def connRead(buf: Array[Byte], offset: Int, length: Int): Int
   def connClose: Unit
 
@@ -39,12 +38,19 @@ trait MNetworkReader {
   def numMessages: Long = nMessages
 
   /**
+   * Called by messageRead() when there's a full message to process.  Returns 0 on success,
+   * or the number of bytes that messageRead needs to receive 
+   * before calling messageProcess again.
+   */
+  def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int
+
+  /**
    * Meant to be called by a driver loop to continually process incoming bytes.
-   * Invokes connRead() to get the input bytes, and when there's a complete
-   * message ready for processing, invokes connReadProcess().  
+   * Invokes connRead() to get the input bytes, and when we think there's a 
+   * complete message ready for processing, invokes messageProcess().  
    * Invokes connClose() when there's an error.
    */
-  def readMore: Boolean = {
+  def messageRead: Boolean = {
     readPos = 0
       
     val lastRead = connRead(buf, available, buf.length - available)
@@ -81,7 +87,7 @@ trait MNetworkReader {
         } else {
           readPos = cmdLen
 
-          val bytesNeeded = connReadProcess(buf, cmdLen, available)
+          val bytesNeeded = messageProcess(buf, cmdLen, available)
           if (bytesNeeded == 0) {
             if (available > readPos)
               Array.copy(buf, readPos, buf, 0, available - readPos)
@@ -92,7 +98,7 @@ trait MNetworkReader {
 
             nMessages += 1L
 
-            return false
+            return true // We've successfully read and processed a message.
           } else {
             waitingFor = bytesNeeded
             bufEnsureSize(waitingFor)
@@ -101,8 +107,8 @@ trait MNetworkReader {
       }
     }
 
-    true
-  }
+    false // Returns false if we haven't successfully read and processed a n
+  }       // message, and the caller should invoke us again.
   
   private def bufIndexOf(n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
     val b = buf

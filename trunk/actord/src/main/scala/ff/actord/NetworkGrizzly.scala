@@ -86,7 +86,7 @@ class GSession(protocol: MProtocol, s: Closeable, sessionIdent: Long)
      with MNetworkReader {
   override val minMessageLength = "quit\r\n".length
   
-  def connReadProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int =
+  def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int =
     protocol.process(this, cmdArr, cmdLen, available)
 
   var in: ByteBuffer = _
@@ -104,7 +104,7 @@ class GSession(protocol: MProtocol, s: Closeable, sessionIdent: Long)
     in = inIn
     ctx = ctxIn
     while (in.remaining > 0)
-      readMore
+      messageRead
   }
   
   def ident: Long = sessionIdent
