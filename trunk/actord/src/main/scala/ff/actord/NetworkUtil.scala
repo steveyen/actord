@@ -70,8 +70,7 @@ trait MNetworkReader {
       if (indexCR < 0 ||
           indexCR + CRNL.length > available) {
         waitingFor += 1
-        if (waitingFor > buf.length)
-          bufGrow(waitingFor)
+        bufEnsureSize(waitingFor)
       } else {
         val cmdLen = indexCR + CRNL.length
 
@@ -96,8 +95,7 @@ trait MNetworkReader {
             return false
           } else {
             waitingFor = bytesNeeded
-            if (waitingFor > buf.length)
-              bufGrow(waitingFor)
+            bufEnsureSize(waitingFor)
           }
         }
       }
@@ -116,10 +114,12 @@ trait MNetworkReader {
     -1
   }
 
-  private def bufGrow(size: Int) = {
-    val bufPrev = buf
-    buf = new Array[Byte](size)
-    Array.copy(bufPrev, 0, buf, 0, bufPrev.length)
+  def bufEnsureSize(size: Int): Unit = {
+    if (size > buf.length) {
+      val bufPrev = buf
+      buf = new Array[Byte](size)
+      Array.copy(bufPrev, 0, buf, 0, bufPrev.length)
+    }
   }
 
   def read: Byte = {
