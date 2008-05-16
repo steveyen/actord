@@ -81,116 +81,36 @@ class GProtocolFilter(protocol: MProtocol) extends ProtocolFilter {
   def postExecute(ctx: Context): Boolean = true
 }
 
-class GSession(protocol: MProtocol, s: Closeable, sessionIdent: Long) {
-  val MIN_CMD_SIZE = "quit\r\n".length
+class GSession(protocol: MProtocol, s: Closeable, sessionIdent: Long) 
+  extends MSession
+     with MNetworkReader {
+  override val minMessageLength = "quit\r\n".length
   
-  private var waitingFor    = MIN_CMD_SIZE
-  private var availablePrev = 0
-  private var available     = 0
-  private var readPos       = 0
+  def connReadProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int =
+    protocol.process(this, cmdArr, cmdLen, available)
 
-  private var buf = new Array[Byte](8000)
-  
-  private var nMessages = 0L
+  var in: ByteBuffer = _
+  var ctx: Context   = _
 
-  def bufIndexOf(buf: Array[Byte], offset: Int, n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
-    var i = offset
-    while (i < n) {
-      if (buf(i) == x)
-        return i
-      i += 1
-    }
-    -1
+  def connRead(buf: Array[Byte], offset: Int, length: Int): Int = {
+    val r = Math.min(length, in.remaining)
+    in.get(buf, offset, r)
+    r
   }
-  
-  def incoming(in: ByteBuffer, ctx: Context): Unit = {
-    readPos = 0
-    
-    val inCount = in.remaining
-    
-    if (available + inCount > buf.length)
-       bufGrow(available + inCount)
-    
-    in.get(buf, available, inCount)
-    
-    availablePrev = available
-    available     = available + inCount
 
-    if (available >= waitingFor) {
-      val indexCR: Int = if (available >= 2 &&
-                             available == availablePrev + 1) {
-                           if (buf(available - 2) == CR) {
-                             available - 2
-                           } else
-                             -1
-                         } else
-                           bufIndexOf(buf, 0, available, CR)
-      if (indexCR < 0 ||
-          indexCR + CRNL.length > available) {
-        waitingFor = waitingFor + 1
-        if (waitingFor > buf.length)
-          bufGrow(waitingFor)
-      } else {
-        val cmdLen = indexCR + CRNL.length
+  def connClose: Unit = s.close
 
-        if (buf(cmdLen - 2) != CR ||
-            buf(cmdLen - 1) != NL) {
-            s.close
-          throw new RuntimeException("missing CRNL")
-        } else {
-          readPos = cmdLen
-
-          val bytesNeeded = protocol.process(new GSessionContext(ctx), buf, cmdLen, available)
-          if (bytesNeeded == 0) {
-            nMessages = nMessages + 1              
-
-            if (available > readPos)
-              Array.copy(buf, readPos, buf, 0, available - readPos)
-          
-            waitingFor    = MIN_CMD_SIZE
-            availablePrev = 0
-            available     = available - readPos
-          } else {
-            waitingFor = bytesNeeded
-            if (waitingFor > buf.length)
-              bufGrow(waitingFor)
-          }
-        }
-      }
-    }
+  def incoming(inIn: ByteBuffer, ctxIn: Context): Unit = {
+    in = inIn
+    ctx = ctxIn
+    while (in.remaining > 0)
+      readMore
   }
   
-  def bufGrow(size: Int) = {
-    val bufPrev = buf
-    buf = new Array[Byte](size)
-    Array.copy(bufPrev, 0, buf, 0, bufPrev.length)
-  }
+  def ident: Long = sessionIdent
+  def close: Unit = s.close
 
-  def read: Byte = {
-    if (readPos >= available)
-      throw new RuntimeException("reading more than available: " + available)
-    val b = buf(readPos)
-    readPos = readPos + 1
-    b
-  }
-     
-  def read(bytes: Array[Byte]): Unit = {
-    if (readPos + bytes.length > available)
-      throw new RuntimeException("reading more bytes than available: " + available)
-    Array.copy(buf, readPos, bytes, 0, bytes.length)
-    readPos = readPos + bytes.length
-  }
-  
-  class GSessionContext(ctx: Context) extends MSession {
-    def ident: Long = sessionIdent
-    def close: Unit = s.close
-
-    def read: Byte                     = GSession.this.read
-    def read(bytes: Array[Byte]): Unit = GSession.this.read(bytes)
-    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
-      ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes, offset, length))
-
-    def numMessages: Long = nMessages
-  }
+  def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
+    ctx.getAsyncQueueWritable.writeToAsyncQueue(ByteBuffer.wrap(bytes, offset, length))
 }
 

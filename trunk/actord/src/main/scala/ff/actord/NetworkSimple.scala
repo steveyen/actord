@@ -56,7 +56,6 @@ class SSession(protocol: MProtocol, s: Socket, sessionIdent: Long)
   }
 
   def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
-  def connContinue: Boolean = s.isClosed == false
   def connClose: Unit = s.close
 
   override def run = {
