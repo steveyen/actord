@@ -105,9 +105,10 @@ trait MNetworkReader {
   }
   
   private def bufIndexOf(n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
+    val b = buf
     var i = 0 
     while (i < n) {
-      if (buf(i) == x)
+      if (b(i) == x)
         return i
       i += 1
     }
