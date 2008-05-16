@@ -40,119 +40,32 @@ class SAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
 
 class SSession(protocol: MProtocol, s: Socket, sessionIdent: Long) 
   extends Thread 
-     with MSession {
-  val MIN_CMD_SIZE = "quit\r\n".length
+     with MSession 
+     with MNetworkReader {
+  override val minMessageLength = "quit\r\n".length
   
-  private var waitingFor    = MIN_CMD_SIZE
-  private var availablePrev = 0
-  private var available     = 0
-  private var readPos       = 0
-
-  private var buf = new Array[Byte](8000)
   private val is  = s.getInputStream
   private val os  = s.getOutputStream
   private val bos = new BufferedOutputStream(os, 4000)
-  
-  private var nMessages = 0L
 
-  def bufIndexOf(buf: Array[Byte], offset: Int, n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
-    var i = offset
-    while (i < n) {
-      if (buf(i) == x)
-        return i
-      i += 1
-    }
-    -1
-  }
+  def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
+  def connContinue: Boolean = s.isClosed == false
+  def connClose: Unit = s.close
 
   override def run = {
-    while (s.isClosed == false) {
-      readPos = 0
-      
-      val lastRead = is.read(buf, available, buf.length - available)
-      if (lastRead <= -1)
-        s.close
-      
-      availablePrev = available
-      available += lastRead
-      if (available > buf.length) {
-        s.close
-        throw new RuntimeException("available larger than buf somehow")
-      }
-
-      if (available >= waitingFor) {
-        val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
-                               available == availablePrev + 1) { // the entire buf again for a CR.
-                             if (buf(available - 2) == CR) { 
-                               available - 2                 
-                             } else
-                               -1
-                           } else
-                             bufIndexOf(buf, 0, available, CR)
-        if (indexCR < 0 ||
-            indexCR + CRNL.length > available) {
-          waitingFor += 1
-          if (waitingFor > buf.length)
-            bufGrow(waitingFor)
-        } else {
-          val cmdLen = indexCR + CRNL.length
-
-          if (buf(cmdLen - 2) != CR ||
-              buf(cmdLen - 1) != NL) {
-            s.close
-            throw new RuntimeException("missing CRNL")
-          } else {
-            readPos = cmdLen
-
-            val bytesNeeded = protocol.process(this, buf, cmdLen, available)
-            if (bytesNeeded == 0) {
-              if (available > readPos)
-                Array.copy(buf, readPos, buf, 0, available - readPos)
-              else
-                bos.flush // Only force flush when there's no more input.
-            
-              available -= readPos
-              availablePrev = 0
-              waitingFor = MIN_CMD_SIZE
-
-              nMessages += 1L
-            } else {
-              waitingFor = bytesNeeded
-              if (waitingFor > buf.length)
-                bufGrow(waitingFor)
-            }
-          }
-        }
-      }
+    while (connContinue) {
+      read((cmdArr: Array[Byte], cmdLen: Int, available: Int) => {
+             val bytesNeeded = protocol.process(this, cmdArr, cmdLen, available)
+             if (bytesNeeded == 0)
+                bos.flush
+             bytesNeeded
+           })
     }
   }
-  
-  def bufGrow(size: Int) = {
-    val bufPrev = buf
-    buf = new Array[Byte](size)
-    Array.copy(bufPrev, 0, buf, 0, bufPrev.length)
-  }
 
-  def read: Byte = {
-    if (readPos >= available)
-      throw new RuntimeException("reading more than available: " + available)
-    val b = buf(readPos)
-    readPos += 1
-    b
-  }
-     
-  def read(bytes: Array[Byte]): Unit = {
-    if (readPos + bytes.length > available)
-      throw new RuntimeException("reading more bytes than available: " + available)
-    Array.copy(buf, readPos, bytes, 0, bytes.length)
-    readPos += bytes.length
-  }
-  
   def write(bytes: Array[Byte], offset: Int, length: Int): Unit = bos.write(bytes, offset, length)
 
   def ident: Long = sessionIdent  
   def close: Unit = s.close
-
-  def numMessages: Long = nMessages
 }
 
