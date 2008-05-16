@@ -27,17 +27,20 @@ class SAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
     val ss = new ServerSocket(port)
 
     while (true) {
-      (new SSession(protocol, ss.accept, id)).start
+      (new SSession(protocol, acceptSocket(ss.accept), id)).start
       id += 1L
     }
+  }
+
+  def acceptSocket(s: Socket): Socket = {
+    s.setTcpNoDelay(true)
+    s
   }
 }
 
 class SSession(protocol: MProtocol, s: Socket, sessionIdent: Long) 
   extends Thread 
      with MSession {
-  s.setTcpNoDelay(true)
-  
   val MIN_CMD_SIZE = "quit\r\n".length
   
   private var waitingFor    = MIN_CMD_SIZE
