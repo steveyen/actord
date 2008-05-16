@@ -103,4 +103,42 @@ class Router {
 class RouterProtocol(targetHost: String, targetPort: Int) extends MProtocolServer(null) {
   // unfinished: 
   //  also can do a tee here, replicator, two-level cache
+  /*
+    proxyServer        = ServerProxy(Client(targetHost, targetPort))
+    loggingProxyServer = LoggingProxy(ServerProxy(Client(targetHost, targetPort)))
+    replicatingProxy   = ServerProxy(Client(targetHost, targetPort),
+                                     Client(targetHost, targetPort))
+
+    the localCache is the hard one...
+      need individual specs
+        read-thru get spec
+        write-thru set spec
+
+    localCache = ReadThruProxy(Client(targetHost, targetPort)))
+    localCache = WriteThruProxy(Client(targetHost, targetPort)))
+
+    Option[localServer]
+    List[remoteServer]
+    rules on how to choose between and process commands
+
+    if sync-write-thru and set
+      set into remote
+
+    if localServer
+      try local first
+      if miss and sync-read-thru
+        get from remote and add to local
+        return hit or miss
+
+   router matrix          synch          or async
+     write-thru-to-remote early or late  early or late
+     read-thru-to-remote  early or late  early or late
+
+   MServer is a server interface
+   MMainServer implements MServer, is local in-mem cache/server
+   CClient is connection to remote memcached
+   MProxyServer implements MServer, wraps a single CClient, forwards msgs to remote server
+   MRouterServer forwards to 1 or more MServer
+
+  */
 }
