@@ -48,19 +48,19 @@ class SSession(protocol: MProtocol, s: Socket, sessionIdent: Long)
   private val os  = s.getOutputStream
   private val bos = new BufferedOutputStream(os, 4000)
 
-  def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = {
-    val bytesNeeded = protocol.process(this, cmdArr, cmdLen, available)
-    if (bytesNeeded == 0)
-      bos.flush
-    bytesNeeded
-  }
-
   def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
   def connClose: Unit = s.close
 
   override def run = {
     while (s.isClosed == false)
       messageRead
+  }
+
+  def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = {
+    val bytesNeeded = protocol.process(this, cmdArr, cmdLen, available)
+    if (bytesNeeded == 0)
+      bos.flush
+    bytesNeeded
   }
 
   def write(bytes: Array[Byte], offset: Int, length: Int): Unit = bos.write(bytes, offset, length)
