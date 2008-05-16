@@ -27,14 +27,14 @@ class SAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
     val ss = new ServerSocket(port)
 
     while (true) {
-      (new SSession(protocol, acceptSocket(ss.accept), id)).start
+      acceptSocket(ss.accept, id)
       id += 1L
     }
   }
 
-  def acceptSocket(s: Socket): Socket = {
+  def acceptSocket(s: Socket, id: Long): Unit = {
     s.setTcpNoDelay(true)
-    s
+    (new SSession(protocol, s, id)).start
   }
 }
 
