@@ -121,13 +121,12 @@ trait MNetworkReader {
     -1
   }
 
-  def bufEnsureSize(size: Int): Unit = {
+  def bufEnsureSize(size: Int): Unit = 
     if (size > buf.length) {
       val bufPrev = buf
       buf = new Array[Byte](size)
       Array.copy(bufPrev, 0, buf, 0, bufPrev.length)
     }
-  }
 
   def read: Byte = {
     if (readPos >= available)
