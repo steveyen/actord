@@ -21,8 +21,8 @@ import java.net._
 import ff.actord.Util._
 
 trait MNetworkReader {
+  def connReadProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int
   def connRead(buf: Array[Byte], offset: Int, length: Int): Int
-  def connContinue: Boolean
   def connClose: Unit
 
   def minMessageLength: Int = 0
@@ -38,66 +38,73 @@ trait MNetworkReader {
 
   def numMessages: Long = nMessages
 
-  def read(process: (Array[Byte], Int, Int) => Int): Unit = 
-    while (connContinue) {
-      readPos = 0
+  /**
+   * Meant to be called by a driver loop to continually process incoming bytes.
+   * Invokes connRead() to get the input bytes, and when there's a complete
+   * message ready for processing, invokes connReadProcess().  
+   * Invokes connClose() when there's an error.
+   */
+  def readMore: Boolean = {
+    readPos = 0
       
-      val lastRead = connRead(buf, available, buf.length - available)
-      if (lastRead <= -1)
-        connClose
-      
-      availablePrev = available
-      available += lastRead
-      if (available > buf.length) {
-        connClose
-        throw new RuntimeException("available larger than buf somehow")
-      }
+    val lastRead = connRead(buf, available, buf.length - available)
+    if (lastRead <= -1)
+      connClose
+     
+    availablePrev = available
+    available += lastRead
+    if (available > buf.length) {
+      connClose
+      throw new RuntimeException("available larger than buf somehow")
+    }
 
-      if (available >= waitingFor) {
-        val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
-                               available == availablePrev + 1) { // the entire buf again for a CR.
-                             if (buf(available - 2) == CR) { 
-                               available - 2                 
-                             } else
-                               -1
+    if (available >= waitingFor) {
+      val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
+                             available == availablePrev + 1) { // the entire buf again for a CR.
+                           if (buf(available - 2) == CR) { 
+                             available - 2                 
                            } else
-                             bufIndexOf(available, CR)
-        if (indexCR < 0 ||
-            indexCR + CRNL.length > available) {
-          waitingFor += 1
-          if (waitingFor > buf.length)
-            bufGrow(waitingFor)
+                             -1
+                         } else
+                           bufIndexOf(available, CR)
+      if (indexCR < 0 ||
+          indexCR + CRNL.length > available) {
+        waitingFor += 1
+        if (waitingFor > buf.length)
+          bufGrow(waitingFor)
+      } else {
+        val cmdLen = indexCR + CRNL.length
+
+        if (buf(cmdLen - 2) != CR ||
+            buf(cmdLen - 1) != NL) {
+          connClose
+          throw new RuntimeException("missing CRNL")
         } else {
-          val cmdLen = indexCR + CRNL.length
+          readPos = cmdLen
 
-          if (buf(cmdLen - 2) != CR ||
-              buf(cmdLen - 1) != NL) {
-            connClose
-            throw new RuntimeException("missing CRNL")
-          } else {
-            readPos = cmdLen
-
-            val bytesNeeded = process(buf, cmdLen, available)
-            if (bytesNeeded == 0) {
-              if (available > readPos)
-                Array.copy(buf, readPos, buf, 0, available - readPos)
+          val bytesNeeded = connReadProcess(buf, cmdLen, available)
+          if (bytesNeeded == 0) {
+            if (available > readPos)
+              Array.copy(buf, readPos, buf, 0, available - readPos)
             
-              available -= readPos
-              availablePrev = 0
-              waitingFor = minMessageLength
+            available -= readPos
+            availablePrev = 0
+            waitingFor = minMessageLength
 
-              nMessages += 1L
+            nMessages += 1L
 
-              return
-            } else {
-              waitingFor = bytesNeeded
-              if (waitingFor > buf.length)
-                bufGrow(waitingFor)
-            }
+            return false
+          } else {
+            waitingFor = bytesNeeded
+            if (waitingFor > buf.length)
+              bufGrow(waitingFor)
           }
         }
       }
     }
+
+    true
+  }
   
   private def bufIndexOf(n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
     var i = 0 
