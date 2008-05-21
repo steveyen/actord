@@ -31,7 +31,7 @@ class UAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
   val bufIn     = new Array[Byte](65536)
   var bufOut    = new Array[Byte](65536)
   var bufInPos  = 0
-  var bufOutPos = 0
+  var bufOutPos = 0 // Also serves as an error flag when 0.
 
   val s    = new DatagramSocket(port)
   val pIn  = new DatagramPacket(bufIn,  bufIn.length)
@@ -59,13 +59,14 @@ class UAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
         if (bufIn(4) == 0 && bufIn(5) == 1) {
           reqId     = (bufIn(0) * 256) + bufIn(1)
           seqId     = 0
-          bufOutPos = UDP_FRAME_HEADER_SIZE
           bufInPos  = UDP_FRAME_HEADER_SIZE
+          bufOutPos = UDP_FRAME_HEADER_SIZE // Already reserve output header to avoid memcpy.
 
           messageRead
         } else {
-          // TODO: send error reply:
-          // "SERVER_ERROR multi-packet request not supported"
+          val m = "SERVER_ERROR multi-packet request not supported\r\n".getBytes
+          write(m, 0, m.length)
+          flush
         }
       }
     }
@@ -82,7 +83,7 @@ class UAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
       -1
   }
 
-  def connClose: Unit = { /* NO-OP. */ }
+  def connClose: Unit = { bufOutPos = 0 }
 
   def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = {
     val bytesNeeded = protocol.process(this, cmdArr, cmdLen, available)
@@ -92,13 +93,15 @@ class UAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
   }
 
   def write(bytes: Array[Byte], offset: Int, length: Int): Unit = {
-    if (bufOutPos + length > bufOut.length) { // Ensure size.
-      var bufOutPrev = bufOut
-      bufOut = new Array[Byte]((bufOutPos + length) * 2)
-      Array.copy(bufOutPrev, 0, bufOut, 0, bufOutPrev.length)
+    if (bufOutPos > 0) {
+      if (bufOutPos + length > bufOut.length) { // Grow bufOut if needed.
+        var bufOutPrev = bufOut
+        bufOut = new Array[Byte]((bufOutPos + length) * 2)
+        Array.copy(bufOutPrev, 0, bufOut, 0, bufOutPrev.length)
+      }
+      Array.copy(bytes, offset, bufOut, bufOutPos, length)
+      bufOutPos += length
     }
-    Array.copy(bytes, offset, bufOut, bufOutPos, length)
-    bufOutPos += length
   }
 
   def flush: Unit = {
@@ -130,6 +133,6 @@ class UAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
   }
 
   def ident: Long = msgNum
-  def close: Unit = { /* NO-OP. */ }
+  def close: Unit = { bufOutPos = 0 }
 }
 
