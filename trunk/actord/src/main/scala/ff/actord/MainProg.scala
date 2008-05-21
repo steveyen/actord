@@ -23,7 +23,8 @@ import java.net._
 abstract class MainProg {
   var storePath: String = null
   
-  def default_port             = "11211"
+  def default_tcp_port         = "11211"
+  def default_udp_port         = "0"
   def default_limitMem         = "64"
   def default_storeInterval    = "5000"
   def default_storeLogFileSize = "10000000"
@@ -35,7 +36,8 @@ abstract class MainProg {
     start(MainFlag.parseFlags(args, flags, "actord -- simple mesh of actors", MServer.version))
   
   def start(arg: (String, String) => String) {
-    val port      = arg("port",     default_port).toInt
+    val portTCP   = arg("portTCP",  default_tcp_port).toInt
+    val portUDP   = arg("portUDP",  default_udp_port).toInt
     val limitMem  = arg("limitMem", default_limitMem).toLong * 1024L * 1024L
     val availCpus = Runtime.getRuntime.availableProcessors
     
@@ -46,12 +48,14 @@ abstract class MainProg {
 
     val server = createServer(availCpus, limitMem)
 
-    startAcceptor(server, availCpus, port)
+    startTCPAcceptor(server, availCpus, portTCP)
+    startUDPAcceptor(server, availCpus, portUDP)
+
     startPersister(server, storeInterval, storeLogFileSize)
 
-    println("limit memory      : " + limitMem)
-    println("available cpus    : " + availCpus)
-    println("listening on port : " + port)
+    println("limit memory    : " + limitMem)
+    println("available cpus  : " + availCpus)
+    println("listening (tcp) : " + portTCP)
 
     if (storePath != null) {
       println("storage path         : " + storePath)
@@ -62,12 +66,14 @@ abstract class MainProg {
   
   // ------------------------------------------------------
   
-  def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit
+  def startTCPAcceptor(server: MServer, numProcessors: Int, port: Int): Unit =
+    (new SAcceptor(createProtocol(server), numProcessors, port)).start
+
+  def startUDPAcceptor(server: MServer, numProcessors: Int, port: Int): Unit =
+    (new UAcceptor(createProtocol(server), numProcessors, port)).start
   
   def createProtocol(server: MServer): MProtocol = new MProtocolServer(server)
 
-  // ------------------------------------------------------
-  
   def createServer(numProcessors: Int, limitMem: Long): MServer = {
     if (storePath == null) {
       new MMainServer(numProcessors, limitMem) // Just an in-memory only server.
@@ -80,8 +86,6 @@ abstract class MainProg {
     }
   }
   
-  // ------------------------------------------------------
-
   def createPersister(subServers: Seq[MSubServer], checkInterval: Int, limitFileSize: Long) =
     new MPersister(subServers, checkInterval, limitFileSize)
     
@@ -99,9 +103,12 @@ abstract class MainProg {
     Flag("limitMem", 
              "-m <num>" :: Nil,
              "Use <num> MB memory max for data; default is " + default_limitMem + "."),
-    Flag("port", 
+    Flag("portTCP", 
              "-p <num>" :: Nil,
-             "Listen on port <num>; default is " + default_port + "."),
+             "Listen on TCP port <num>; default is " + default_tcp_port + "."),
+    Flag("portUDP", 
+             "-U <num>" :: Nil,
+             "Listen on UDP port <num>; default is " + default_udp_port + " (0 is off)."),
     Flag("storePath", 
              "-s_path <dir_path>" :: Nil,
              "Persist data to directory <dir_path>; default is no persistence."),
@@ -155,19 +162,12 @@ abstract class MainProg {
 
 // ------------------------------------------------------
 
-class MainProgSimple extends MainProg {
-  def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
-    (new SAcceptor(createProtocol(server), numProcessors, port)).start
-}
-
-// ------------------------------------------------------
+class MainProgSimple extends MainProg
 
 class MainProgGrizzly extends MainProg {
-  def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
+  override def startTCPAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
     (new GAcceptor(createProtocol(server), numProcessors, port)).start
 }
-
-// ------------------------------------------------------
 
 class MainProgMina extends MainProg {
   import org.apache.mina.common._
@@ -175,7 +175,7 @@ class MainProgMina extends MainProg {
   import org.apache.mina.filter.codec.demux._
   import org.apache.mina.transport.socket.nio._
 
-  def startAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
+  override def startTCPAcceptor(server: MServer, numProcessors: Int, port: Int): Unit = 
     initAcceptor(server, createAcceptor(numProcessors)).bind(new InetSocketAddress(port))
   
   def initAcceptor(server: MServer, acceptor: IoAcceptor): IoAcceptor = {
