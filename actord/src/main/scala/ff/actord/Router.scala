@@ -130,14 +130,37 @@ class RouterProtocol(targetHost: String, targetPort: Int) extends MProtocolServe
         get from remote and add to local
         return hit or miss
 
-   router matrix          synch          or async
-     write-thru-to-remote early or late  early or late
-     read-thru-to-remote  early or late  early or late
+   router matrix          synch            or async
+     write-thru-to-remote before or after  before or after
+     read-thru-to-remote  before or after  before or after
+
+   syncLevel is 0-sync, 1-sync, Quorum-sync, N-sync, All-sync
+
+   // By unified, we mean this pseudocode handles read and write ops.
+   //
+   // The primary might be the local store.
+   // The replicas might be 1 or more remote stores.
+   //
+   def unifiedOp(...) = { 
+     var repNBefore = _
+     var repNAfter  = _
+
+     if (startReplicas == before)
+       repNBefore = startReplicas(syncLevel)
+
+     var pri = doPrimary
+
+     if (startReplicas == after &&
+         pri & repNBefore are not satisfied)
+       repNAfter = startReplicas(syncLevel)
+
+     wait until (pri & repNBefore & repNAfter are satisfied) or timeout
+   }
 
    MServer is a server interface
    MMainServer implements MServer, is local in-mem cache/server
-   CClient is connection to remote memcached
-   MProxyServer implements MServer, wraps a single CClient, forwards msgs to remote server
+   CConn is connection to a single remote memcached on a host:port
+   MProxyServer implements MServer, wraps a single CConn, forwards msgs to remote server
    MRouterServer forwards to 1 or more MServer
 
   */
