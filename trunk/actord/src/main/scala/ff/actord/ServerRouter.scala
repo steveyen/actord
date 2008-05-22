@@ -159,9 +159,8 @@ class RouterProtocol(targetHost: String, targetPort: Int) extends MProtocolServe
 
    MServer is a server interface
    MMainServer implements MServer, is local in-mem cache/server
-   CConn is connection to a single remote memcached on a host:port
-   MProxyServer implements MServer, wraps a single CConn, forwards msgs to remote server
-   MRouterServer forwards to 1 or more MServer
+   MServerProxy implements MServer, forwards msgs to a single remote server at host:port
+   MServerRouter forwards to 1 or more MServer (which might just be proxies)
 
   */
 }
