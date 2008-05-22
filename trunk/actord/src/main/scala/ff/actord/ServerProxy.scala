@@ -93,7 +93,26 @@ abstract class MServerProxy(host: String, port: Int)
   /**
    * A transport protocol can convert incoming incr/decr messages to delta calls.
    */
-  def delta(key: String, mod: Long, async: Boolean): Long
+  def delta(key: String, mod: Long, async: Boolean): Long = {
+    if (mod > 0L) 
+      write("incr " + key + " " + mod + (if (async) " noreply" else "") + CRNL)
+    else
+      write("decr " + key + " " + (-mod) + (if (async) " noreply" else "") + CRNL)
+    os.flush
+
+    var result = 0L
+    if (!async) 
+      new Response(new MProtocol {
+        override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
+          Some(MSpec("UNUSED", (cmd) => { 
+            val s = arrayToString(x, 0, xLen)
+            if (s != "NOT_FOUND")
+              result = parseLong(s, 0L)
+            cmd.session.close 
+          }))
+      }).go
+    result
+  }
     
   /**
    * For add or replace.
