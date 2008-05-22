@@ -28,7 +28,9 @@ abstract class MServerProxy(host: String, port: Int)
   val is = s.getInputStream
   val os = s.getOutputStream
 
-  class Resp(protocol: MProtocol) extends MNetworkReader with MSession { // Processes the response/reply from the server.
+  def write(m: String): Unit = os.write(stringToArray(m))
+
+  class Response(protocol: MProtocol) extends MNetworkReader with MSession { // Processes the response/reply from the server.
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
     def connClose: Unit = { /* NO-OP */ }
 
@@ -45,17 +47,34 @@ abstract class MServerProxy(host: String, port: Int)
   }
 
   def get(keys: Seq[String]): Iterator[MEntry] = {
-    os.write(stringToArray("GET " + keys.mkString(" ") + CRNL))
+    write("get " + keys.mkString(" ") + CRNL)
+    os.flush
 
     var xs: List[MEntry] = Nil
-    new Resp(new MProtocol {
+    new Response(new MProtocol {
       override def singleLineSpecs = List(MSpec("END",                         (cmd) => { cmd.session.close }))
       override def  multiLineSpecs = List(MSpec("VALUE <key> <flags> <bytes>", (cmd) => { xs = cmd.entry :: xs }))
     }).go
     xs.elements
   }
 
-  def set(el: MEntry, async: Boolean): Boolean
+  def set(el: MEntry, async: Boolean): Boolean = {
+    write("set " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
+          (if (async) " noreply" else "") + CRNL)
+    os.write(el.data, 0, el.data.length)
+    os.write(CRNLBytes)
+    os.flush
+
+    var result = true
+    if (!async) 
+      new Response(new MProtocol {
+        override def singleLineSpecs = List(
+          MSpec("STORED",     (cmd) => { result = true;  cmd.session.close }),
+          MSpec("NOT_STORED", (cmd) => { result = false; cmd.session.close }))
+      }).go
+    result
+  }
+
   def delete(key: String, time: Long, async: Boolean): Boolean
 
   /**
