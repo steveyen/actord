@@ -75,7 +75,20 @@ abstract class MServerProxy(host: String, port: Int)
     result
   }
 
-  def delete(key: String, time: Long, async: Boolean): Boolean
+  def delete(key: String, time: Long, async: Boolean): Boolean = {
+    write("delete " + key + " " + time + 
+          (if (async) " noreply" else "") + CRNL)
+    os.flush
+
+    var result = true
+    if (!async) 
+      new Response(new MProtocol {
+        override def singleLineSpecs = List(
+          MSpec("DELETED",   (cmd) => { result = true;  cmd.session.close }),
+          MSpec("NOT_FOUND", (cmd) => { result = false; cmd.session.close }))
+      }).go
+    result
+  }
 
   /**
    * A transport protocol can convert incoming incr/decr messages to delta calls.
