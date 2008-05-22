@@ -37,7 +37,7 @@ trait BucketNode extends Node {
   def hash32_4(x: Int, c: Node, r: Int, name: String): Int = 0 // TODO
 }
 
-case class UniformBucket(name: String, weight: Float, kind: String, info: String, children: Seq[Node], 
+case class UniformBucket(name: String, kind: String, info: String, children: Seq[Node],
                          uniformChildWeight: Float) 
   extends BucketNode {
   def bucketType: String = "uniform"
@@ -85,7 +85,7 @@ case class UniformBucket(name: String, weight: Float, kind: String, info: String
   }
 }
 
-case class ListBucket(name: String, weight: Float, kind: String, info: String, 
+case class ListBucket(name: String, kind: String, info: String, 
                       children: Seq[Node], childWeights: Seq[Float]) 
   extends BucketNode {
   def bucketType: String = "list"
@@ -116,7 +116,7 @@ case class ListBucket(name: String, weight: Float, kind: String, info: String,
   }
 }
 
-case class TreeBucket(name: String, weight: Float, kind: String, info: String, 
+case class TreeBucket(name: String, kind: String, info: String, 
                       children: Seq[Node], childWeights: Seq[Float]) 
   extends BucketNode {
   def bucketType: String = "tree"
@@ -129,7 +129,7 @@ case class TreeBucket(name: String, weight: Float, kind: String, info: String,
     null // TODO
 }
 
-case class StrawBucket(name: String, weight: Float, kind: String, info: String, 
+case class StrawBucket(name: String, kind: String, info: String, 
                        children: Seq[Node], childWeights: Seq[Float]) 
   extends BucketNode {
   def bucketType: String = "straw"
@@ -265,3 +265,20 @@ case class StepChooseIndependent(numReplicas: Int, kind: String) {
   def doStep(x: Int, t: NodeTree, working: Seq[Node], nodeStatusMap: Map[String, Float]): Seq[Node] =
     working.flatMap(w => t.choose(x, numReplicas, kind, 0, w, nodeStatusMap, false))
 }
+
+// -----------------------------------------------------------
+
+/*
+  UniformBucket("root", 1.0, "root", null, 
+    UniformBucket("r_pst_001", 1.0, "region", null, 
+      UniformBucket("dc_001", 1.0, "datacenter", null, 
+        LeafNode("mc00001", "mc", "192.0.0.1:11211") ::
+        LeafNode("mc00002", "mc", "192.0.0.2:11211") ::
+        LeafNode("mc00003", "mc", "192.0.0.3:11211") ::
+        Nil, 
+        1.0) :: 
+      Nil,
+      1.0) ::
+    Nil,
+    1.0)
+*/
