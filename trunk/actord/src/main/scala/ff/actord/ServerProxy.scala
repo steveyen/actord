@@ -81,6 +81,8 @@ class MServerProxy(host: String, port: Int)
   val appendBytes  = stringToArray("append ")
   val prependBytes = stringToArray("prepend ")
   val casBytes     = stringToArray("cas ")
+  val rangeBytes   = stringToArray("range ")
+  val actBytes     = stringToArray("act ")
   val noreplyBytes = stringToArray(" noreply")
 
   def get(keys: Seq[String]): Iterator[MEntry] = {
@@ -212,8 +214,25 @@ class MServerProxy(host: String, port: Int)
    * The keyFrom is the range's lower-bound, inclusive.
    * The keyTo is the range's upper-bound, exclusive.
    */
-  def range(keyFrom: String, keyTo: String): Iterator[MEntry] = Nil.elements
+  def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
+    write(rangeBytes)
+    write(keyFrom)
+    write(SPACEBytes)
+    write(keyTo)
+    write(CRNLBytes)
+    flush
+    responseValues
+  }
 
-  def act(el: MEntry, async: Boolean): Iterator[MEntry] = Nil.elements
+  def act(el: MEntry, async: Boolean): Iterator[MEntry] = {
+    write(actBytes)
+    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
+    writeNoReplyFlag(async)
+    write(CRNLBytes)
+    write(el.data)
+    write(CRNLBytes)
+    flush
+    responseValues
+  }
 }
 
