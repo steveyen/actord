@@ -29,7 +29,11 @@ class MServerProxy(host: String, port: Int)
   val os = s.getOutputStream
   val bs = new BufferedOutputStream(os)
 
-  def write(m: String): Unit = bs.write(stringToArray(m))
+  def write(m: String): Unit                                = bs.write(stringToArray(m))
+  def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
+  def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
+
+  def flush = bs.flush
 
   class Response(protocol: MProtocol) extends MNetworkReader with MSession { // Processes the response/reply from the server.
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
@@ -67,28 +71,47 @@ class MServerProxy(host: String, port: Int)
     result
   }
 
+  val getBytes     = stringToArray("get ")
+  val setBytes     = stringToArray("set ")
+  val deleteBytes  = stringToArray("delete ")
+  val incrBytes    = stringToArray("incr ")
+  val decrBytes    = stringToArray("decr ")
+  val addBytes     = stringToArray("add ")
+  val replaceBytes = stringToArray("replace ")
+  val appendBytes  = stringToArray("append ")
+  val prependBytes = stringToArray("prepend ")
+  val casBytes     = stringToArray("cas ")
+  val noreplyBytes = stringToArray(" noreply")
+
   def get(keys: Seq[String]): Iterator[MEntry] = {
-    write("get " + keys.mkString(" "))
-    bs.write(CRNLBytes)
-    bs.flush
+    write(getBytes)
+    write(keys.mkString(" "))
+    write(CRNLBytes)
+    flush
     responseValues
   }
 
+  def writeNoReplyFlag(async: Boolean): Unit =
+    if (async)
+      write(noreplyBytes)
+
   def set(el: MEntry, async: Boolean): Boolean = {
-    write("set " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-          (if (async) " noreply" else ""))
-    bs.write(CRNLBytes)
-    bs.write(el.data, 0, el.data.length)
-    bs.write(CRNLBytes)
-    bs.flush
+    write(setBytes)
+    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
+    writeNoReplyFlag(async)
+    write(CRNLBytes)
+    write(el.data)
+    write(CRNLBytes)
+    flush
     response("STORED", "NOT_STORED", async)
   }
 
   def delete(key: String, time: Long, async: Boolean): Boolean = {
-    write("delete " + key + " " + time + 
-          (if (async) " noreply" else ""))
-    bs.write(CRNLBytes)
-    bs.flush
+    write(deleteBytes)
+    write(key + " " + time)
+    writeNoReplyFlag(async)
+    write(CRNLBytes)
+    flush
     response("DELETED", "NOT_FOUND", async)
   }
 
@@ -97,11 +120,13 @@ class MServerProxy(host: String, port: Int)
    */
   def delta(key: String, mod: Long, async: Boolean): Long = {
     if (mod > 0L) 
-      write("incr " + key + " " + mod + (if (async) " noreply" else ""))
-    else
-      write("decr " + key + " " + (-mod) + (if (async) " noreply" else ""))
-    bs.write(CRNLBytes)
-    bs.flush
+      write(incrBytes)
+    else 
+      write(decrBytes)
+    write(key + " " + Math.abs(mod))
+    writeNoReplyFlag(async)
+    write(CRNLBytes)
+    flush
 
     var result = 0L
     if (!async) 
@@ -122,15 +147,15 @@ class MServerProxy(host: String, port: Int)
    */
   def addRep(el: MEntry, isAdd: Boolean, async: Boolean): Boolean = {
     if (isAdd) 
-      write("add " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else ""))
+      write(addBytes)
     else
-      write("replace " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else ""))
-    bs.write(CRNLBytes)
-    bs.write(el.data, 0, el.data.length)
-    bs.write(CRNLBytes)
-    bs.flush
+      write(replaceBytes)
+    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
+    writeNoReplyFlag(async)
+    write(CRNLBytes)
+    write(el.data)
+    write(CRNLBytes)
+    flush
     response("STORED", "NOT_STORED", async)
   }
 
@@ -139,15 +164,15 @@ class MServerProxy(host: String, port: Int)
    */
   def xpend(el: MEntry, append: Boolean, async: Boolean): Boolean = {
     if (append) 
-      write("append " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else ""))
+      write(appendBytes)
     else
-      write("prepend " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else ""))
-    bs.write(CRNLBytes)
-    bs.write(el.data, 0, el.data.length)
-    bs.write(CRNLBytes)
-    bs.flush
+      write(prependBytes)
+    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
+    writeNoReplyFlag(async)
+    write(CRNLBytes)
+    write(el.data)
+    write(CRNLBytes)
+    flush
     response("STORED", "NOT_STORED", async)
   }
 
@@ -155,12 +180,13 @@ class MServerProxy(host: String, port: Int)
    * For CAS mutation.
    */  
   def checkAndSet(el: MEntry, cid: Long, async: Boolean): String = {
-    write("cas " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + " " + cid + 
-          (if (async) " noreply" else ""))
-    bs.write(CRNLBytes)
-    bs.write(el.data, 0, el.data.length)
-    bs.write(CRNLBytes)
-    bs.flush
+    write(casBytes)
+    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + " " + cid)
+    writeNoReplyFlag(async)
+    write(CRNLBytes)
+    write(el.data)
+    write(CRNLBytes)
+    flush
 
     var result = ""
     if (!async) 
