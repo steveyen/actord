@@ -67,7 +67,7 @@ case class UniformBucket(name: String, weight: Float, kind: String, info: String
     val n = childCount
     val a = new Array[Int](n)
     var x = n + 1 + (hash32(n) % (3 * n)) // Need big number.
-    x |= 1                                     // That is odd.
+    x |= 1                                // That is odd.
     var i = 0
     while (i < n) {
        var j = 2
