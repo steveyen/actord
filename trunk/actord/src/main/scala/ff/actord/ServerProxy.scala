@@ -22,28 +22,37 @@ import ff.actord.Util._
 
 abstract class MServerProxy(host: String, port: Int) 
   extends MServer {
+  def subServerList: List[MSubServer] = Nil
+  
   val s  = new Socket(host, port)
   val is = s.getInputStream
   val os = s.getOutputStream
 
-  abstract class ResponseHandler(protocol: MProtocol) extends MNetworkReader with MSession {
+  class Resp(protocol: MProtocol) extends MNetworkReader with MSession { // Processes the response/reply from the server.
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
     def connClose: Unit = { /* NO-OP */ }
+
     def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
       protocol.process(this, cmdArr, cmdLen, available)
 
     def ident: Long = 0L
-    def close: Unit = { /* NO-OP */ }
+    def close: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
 
-    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
-      throw new RuntimeException("unexpected write in MServerProxy")
+    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = { /* NO-OP */ } // TODO: Log these.
+
+    var end = false
+    def go  = while (!end) messageRead
   }
 
-  def subServerList: List[MSubServer] = Nil
-  
   def get(keys: Seq[String]): Iterator[MEntry] = {
     os.write(stringToArray("GET " + keys.mkString(" ") + CRNL))
-    Nil.elements
+
+    var xs: List[MEntry] = Nil
+    new Resp(new MProtocol {
+      override def singleLineSpecs = List(MSpec("END",                         (cmd) => { cmd.session.close }))
+      override def  multiLineSpecs = List(MSpec("VALUE <key> <flags> <bytes>", (cmd) => { xs = cmd.entry :: xs }))
+    }).go
+    xs.elements
   }
 
   def set(el: MEntry, async: Boolean): Boolean
