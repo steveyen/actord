@@ -269,9 +269,9 @@ case class StepChooseIndependent(numReplicas: Int, kind: String) {
 // -----------------------------------------------------------
 
 /*
-  UniformBucket("root", 1.0, "root", null, 
-    UniformBucket("r_pst_001", 1.0, "region", null, 
-      UniformBucket("dc_001", 1.0, "datacenter", null, 
+  UniformBucket("root", "root", null, 
+    UniformBucket("r_pst_001", "region", null, 
+      UniformBucket("dc_001", "datacenter", null, 
         LeafNode("mc00001", "mc", "192.0.0.1:11211") ::
         LeafNode("mc00002", "mc", "192.0.0.2:11211") ::
         LeafNode("mc00003", "mc", "192.0.0.3:11211") ::
