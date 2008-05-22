@@ -169,7 +169,7 @@ class NodeTree(root: Node) {
       }
     }
 
-  val mapNodes = new mutable.HashMap[String, Node]
+  val mapNodes = new mutable.HashMap[String, Node] // Keyed by node's name.
 
   visitNodes((x: Node) => mapNodes += (x.name -> x))
 
