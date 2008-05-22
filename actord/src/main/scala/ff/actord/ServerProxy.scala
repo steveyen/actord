@@ -68,14 +68,16 @@ class MServerProxy(host: String, port: Int)
   }
 
   def get(keys: Seq[String]): Iterator[MEntry] = {
-    write("get " + keys.mkString(" ") + CRNL)
+    write("get " + keys.mkString(" "))
+    bs.write(CRNLBytes)
     bs.flush
     responseValues
   }
 
   def set(el: MEntry, async: Boolean): Boolean = {
     write("set " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-          (if (async) " noreply" else "") + CRNL)
+          (if (async) " noreply" else ""))
+    bs.write(CRNLBytes)
     bs.write(el.data, 0, el.data.length)
     bs.write(CRNLBytes)
     bs.flush
@@ -84,7 +86,8 @@ class MServerProxy(host: String, port: Int)
 
   def delete(key: String, time: Long, async: Boolean): Boolean = {
     write("delete " + key + " " + time + 
-          (if (async) " noreply" else "") + CRNL)
+          (if (async) " noreply" else ""))
+    bs.write(CRNLBytes)
     bs.flush
     response("DELETED", "NOT_FOUND", async)
   }
@@ -94,9 +97,10 @@ class MServerProxy(host: String, port: Int)
    */
   def delta(key: String, mod: Long, async: Boolean): Long = {
     if (mod > 0L) 
-      write("incr " + key + " " + mod + (if (async) " noreply" else "") + CRNL)
+      write("incr " + key + " " + mod + (if (async) " noreply" else ""))
     else
-      write("decr " + key + " " + (-mod) + (if (async) " noreply" else "") + CRNL)
+      write("decr " + key + " " + (-mod) + (if (async) " noreply" else ""))
+    bs.write(CRNLBytes)
     bs.flush
 
     var result = 0L
@@ -119,10 +123,11 @@ class MServerProxy(host: String, port: Int)
   def addRep(el: MEntry, isAdd: Boolean, async: Boolean): Boolean = {
     if (isAdd) 
       write("add " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else "") + CRNL)
+            (if (async) " noreply" else ""))
     else
       write("replace " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else "") + CRNL)
+            (if (async) " noreply" else ""))
+    bs.write(CRNLBytes)
     bs.write(el.data, 0, el.data.length)
     bs.write(CRNLBytes)
     bs.flush
@@ -135,10 +140,11 @@ class MServerProxy(host: String, port: Int)
   def xpend(el: MEntry, append: Boolean, async: Boolean): Boolean = {
     if (append) 
       write("append " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else "") + CRNL)
+            (if (async) " noreply" else ""))
     else
       write("prepend " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + 
-            (if (async) " noreply" else "") + CRNL)
+            (if (async) " noreply" else ""))
+    bs.write(CRNLBytes)
     bs.write(el.data, 0, el.data.length)
     bs.write(CRNLBytes)
     bs.flush
@@ -150,7 +156,8 @@ class MServerProxy(host: String, port: Int)
    */  
   def checkAndSet(el: MEntry, cid: Long, async: Boolean): String = {
     write("cas " + el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + " " + cid + 
-          (if (async) " noreply" else "") + CRNL)
+          (if (async) " noreply" else ""))
+    bs.write(CRNLBytes)
     bs.write(el.data, 0, el.data.length)
     bs.write(CRNLBytes)
     bs.flush
