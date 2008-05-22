@@ -33,7 +33,7 @@ class MServerProxy(host: String, port: Int)
 
   class Response(protocol: MProtocol) extends MNetworkReader with MSession { // Processes the response/reply from the server.
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
-    def connClose: Unit = { /* NO-OP */ }
+    def connClose: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
 
     def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
       protocol.process(this, cmdArr, cmdLen, available)
