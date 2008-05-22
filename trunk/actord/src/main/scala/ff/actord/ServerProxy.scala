@@ -71,19 +71,20 @@ class MServerProxy(host: String, port: Int)
     result
   }
 
-  val getBytes     = stringToArray("get ")
-  val setBytes     = stringToArray("set ")
-  val deleteBytes  = stringToArray("delete ")
-  val incrBytes    = stringToArray("incr ")
-  val decrBytes    = stringToArray("decr ")
-  val addBytes     = stringToArray("add ")
-  val replaceBytes = stringToArray("replace ")
-  val appendBytes  = stringToArray("append ")
-  val prependBytes = stringToArray("prepend ")
-  val casBytes     = stringToArray("cas ")
-  val rangeBytes   = stringToArray("range ")
-  val actBytes     = stringToArray("act ")
-  val noreplyBytes = stringToArray(" noreply")
+  val getBytes      = stringToArray("get ")
+  val setBytes      = stringToArray("set ")
+  val deleteBytes   = stringToArray("delete ")
+  val incrBytes     = stringToArray("incr ")
+  val decrBytes     = stringToArray("decr ")
+  val addBytes      = stringToArray("add ")
+  val replaceBytes  = stringToArray("replace ")
+  val appendBytes   = stringToArray("append ")
+  val prependBytes  = stringToArray("prepend ")
+  val casBytes      = stringToArray("cas ")
+  val rangeBytes    = stringToArray("range ")
+  val actBytes      = stringToArray("act ")
+  val flushAllBytes = stringToArray("flush_all ")
+  val noreplyBytes  = stringToArray(" noreply")
 
   def get(keys: Seq[String]): Iterator[MEntry] = {
     write(getBytes)
@@ -206,7 +207,12 @@ class MServerProxy(host: String, port: Int)
    */
   def keys: Iterator[String] = Nil.elements
   
-  def flushAll(expTime: Long): Unit = { /* TODO */ }
+  def flushAll(expTime: Long): Unit = {
+    write(flushAllBytes)
+    write(expTime.toString)
+    write(CRNLBytes)
+    response("OK", "NOT_OK", false)
+  }
   
   def stats: MServerStats = null
 
