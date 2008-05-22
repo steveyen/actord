@@ -91,7 +91,7 @@ trait MProtocol {
   def indexSpecs(specs: List[MSpec]): Array[List[MSpec]] = {
     val lookup = new Array[List[MSpec]](26) // A lookup table by first character of spec.name.
     for (i <- 0 until lookup.length)
-      lookup(i) = Nil                      // Buckets in the lookup table are just Lists.
+      lookup(i) = Nil                       // Buckets in the lookup table are just Lists.
     for (spec <- specs) {
       val index = spec.name(0) - 'a'
       lookup(index) = lookup(index) ::: List(spec) // Concat so that more popular commands come first.
@@ -145,15 +145,16 @@ trait MProtocol {
       }
     ) orElse findSpec(cmdArr, cmdLen, multiLineSpecLookup).map(
       spec => {
-        // Handle mutator command: 
-        //   <cmdName> <key> <flags> <expTime> <bytes> [noreply]\r\n
-        //   cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]\r\n
+        // Handle multiLine command: 
+        //   <cmdName> <key> <flags> <dataSize>\r\n
+        //   <cmdName> <key> <flags> <expTime> <dataSize> [noreply]\r\n
+        //         cas <key> <flags> <expTime> <dataSize> <cas_unique> [noreply]\r\n
         //
         if (spec.checkArgs(cmdArgs)) {
-          var dataSize    = Integer.parseInt(cmdArgs(3))
+          var dataSize    = if (cmdArgs.length > 3) Integer.parseInt(cmdArgs(3)) else Integer.parseInt(cmdArgs(2))
           val totalNeeded = cmdArrLen + dataSize + CRNL.length
           if (totalNeeded <= readyCount) {
-            val expTime = parseLong(cmdArgs(2), 0L)
+            val expTime = if (cmdArgs.length > 3) parseLong(cmdArgs(2), 0L) else 0L
             
             val data = new Array[Byte](dataSize)
             
@@ -162,9 +163,9 @@ trait MProtocol {
             if (session.read == CR &&
                 session.read == NL) {
               spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs,
-                                    MEntry(cmdArgs(0),
+                                    MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
                                            parseLong(cmdArgs(1), 0L),
-                                           if (expTime != 0 &&
+                                           if (expTime != 0L &&
                                                expTime <= SECONDS_IN_30_DAYS)
                                                expTime + nowInSeconds
                                            else

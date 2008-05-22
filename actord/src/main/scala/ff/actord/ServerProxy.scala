@@ -22,13 +22,30 @@ import ff.actord.Util._
 
 abstract class MServerProxy(host: String, port: Int) 
   extends MServer {
-  val s   = new Socket(host, port)
-  val in  = s.getInputStream
-  val out = s.getOutputStream
+  val s  = new Socket(host, port)
+  val is = s.getInputStream
+  val os = s.getOutputStream
 
-  def subServerList: List[MSubServer]
+  abstract class ResponseHandler(protocol: MProtocol) extends MNetworkReader with MSession {
+    def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
+    def connClose: Unit = { /* NO-OP */ }
+    def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
+      protocol.process(this, cmdArr, cmdLen, available)
+
+    def ident: Long = 0L
+    def close: Unit = { /* NO-OP */ }
+
+    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
+      throw new RuntimeException("unexpected write in MServerProxy")
+  }
+
+  def subServerList: List[MSubServer] = Nil
   
-  def get(keys: Seq[String]): Iterator[MEntry]
+  def get(keys: Seq[String]): Iterator[MEntry] = {
+    os.write(stringToArray("GET " + keys.mkString(" ") + CRNL))
+    Nil.elements
+  }
+
   def set(el: MEntry, async: Boolean): Boolean
   def delete(key: String, time: Long, async: Boolean): Boolean
 
