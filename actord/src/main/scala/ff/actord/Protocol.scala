@@ -89,9 +89,9 @@ trait MProtocol {
   // ----------------------------------------
 
   def indexSpecs(specs: List[MSpec]): Array[List[MSpec]] = {
-    val lookup = new Array[List[MSpec]](26) // A lookup table by first character of spec.name.
+    val lookup = new Array[List[MSpec]](256) // A lookup table by first character of spec.name.
     for (i <- 0 until lookup.length)
-      lookup(i) = Nil                       // Buckets in the lookup table are just Lists.
+      lookup(i) = Nil                        // Buckets in the lookup table are just Lists.
     for (spec <- specs) {
       val index = spec.name(0) - 'a'
       lookup(index) = lookup(index) ::: List(spec) // Concat so that more popular commands come first.
