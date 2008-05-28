@@ -38,11 +38,21 @@ object Util {
     case _ => defaultVal
   }
 
-  def itemToLong(items: Seq[String], at: Int): Long =
-    if (items.length > at) 
-      parseLong(items(at), 0L)
+  def itemToInt(items: Seq[String], at: Int): Int = itemToInt(items, at, 0)
+  def itemToInt(items: Seq[String], at: Int, defVal: Int): Int =
+    if (at >= 0 && 
+        at < items.length) 
+      Integer.parseInt(items(at))
     else 
-      0L
+      defVal
+
+  def itemToLong(items: Seq[String], at: Int): Long = itemToLong(items, at, 0L)
+  def itemToLong(items: Seq[String], at: Int, defVal: Long): Long =
+    if (at >= 0 && 
+        at < items.length) 
+      parseLong(items(at), defVal)
+    else 
+      defVal
 
   def stringToArray(s: String): Array[Byte] = stringToArray(s, 0, s.length)
   def stringToArray(s: String, offset: Int, length: Int): Array[Byte] = {

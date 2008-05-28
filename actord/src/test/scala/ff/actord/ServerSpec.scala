@@ -137,16 +137,16 @@ object MServerSpec extends Specification with MTestUtil {
       val (m, ea, ea2) = prep
 
       val c0 = MEntry("c", 0L, 0L, new Array[Byte](0), 0L)
-      val c1 = MEntry("c", 1L, 0L, new Array[Byte](0), 1L)
-      val c2 = MEntry("c", 2L, 0L, new Array[Byte](0), 2L)
+      val c1 = MEntry("c", 1L, 0L, new Array[Byte](0), 10L)
+      val c2 = MEntry("c", 2L, 0L, new Array[Byte](0), 20L)
 
-      assertEquals("get 00", true,     m.get(List("c")).toList.isEmpty)
+      assertEquals("gets 00", true,    m.get(List("c")).toList.isEmpty)
       assertEquals("set c0", true,     m.set(c0, false))
-      assertEquals("get c0", true,     entrySame(m.get(List("c")), c0))
-      assertEquals("cas ca", "EXISTS", m.checkAndSet(c2, 2L, false))
-      assertEquals("get ca", true,     entrySame(m.get(List("c")), c0))
+      assertEquals("gets c0", true,    entrySame(m.get(List("c")), c0))
+      assertEquals("cas ca", "EXISTS", m.checkAndSet(c2, 20L, false))
+      assertEquals("gets ca", true,    entrySame(m.get(List("c")), c0))
       assertEquals("cas c1", "STORED", m.checkAndSet(c1, 0L, false))
-      assertEquals("get c1", true,     entrySame(m.get(List("c")), c1))
+      assertEquals("gets c1", true,    entrySame(m.get(List("c")), c1))
     }
 
     "be empty after flushAll" in {

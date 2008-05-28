@@ -58,8 +58,11 @@ class MServerProxy(host: String, port: Int)
   def responseValues: Iterator[MEntry] = {
     var xs: List[MEntry] = Nil
     new Response(new MProtocol {
-      override def singleLineSpecs = List(MSpec("END",                         (cmd) => { cmd.session.close }))
-      override def  multiLineSpecs = List(MSpec("VALUE <key> <flags> <bytes>", (cmd) => { xs = cmd.entry :: xs }))
+      override def singleLineSpecs = List(MSpec("END", (cmd) => { cmd.session.close }))
+      override def  multiLineSpecs = List(
+        new MSpec("VALUE <key> <flags> <dataSize> [cid]", (cmd) => { xs = cmd.entry :: xs }) {
+          override def casParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_cas, 0L)
+        })
     }).go
     xs.elements
   }
@@ -76,6 +79,7 @@ class MServerProxy(host: String, port: Int)
   }
 
   val getBytes      = stringToArray("get ")
+  val getsBytes     = stringToArray("gets ")
   val setBytes      = stringToArray("set ")
   val deleteBytes   = stringToArray("delete ")
   val incrBytes     = stringToArray("incr ")
@@ -91,7 +95,7 @@ class MServerProxy(host: String, port: Int)
   val noreplyBytes  = stringToArray(" noreply")
 
   def get(keys: Seq[String]): Iterator[MEntry] = {
-    write(getBytes)
+    write(getsBytes)
     write(keys.mkString(" "))
     write(CRNLBytes)
     flush
@@ -135,14 +139,14 @@ class MServerProxy(host: String, port: Int)
     write(CRNLBytes)
     flush
 
-    var result = 0L
+    var result = -1L
     if (!async) 
       new Response(new MProtocol {
         override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
           Some(MSpec("UNUSED", (cmd) => { 
             val s = arrayToString(x, 0, xLen)
             if (s != "NOT_FOUND")
-              result = parseLong(s, 0L)
+              result = parseLong(s, -1L)
             cmd.session.close 
           }))
       }).go

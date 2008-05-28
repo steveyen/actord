@@ -44,8 +44,17 @@ case class MSpec(line: String, process: (MCommand) => Unit) {
   val name      = args(0)
   val nameBytes = stringToArray(name)
   val minArgs   = args.filter(_.startsWith("<")).length
+  val argsRest  = args.toList.tail
 
   def checkArgs(a: Seq[String]) = a.length >= minArgs
+
+  val pos_dataSize = argsRest.indexOf("<dataSize>")
+  val pos_expTime  = argsRest.indexOf("<expTime>")
+  val pos_cas      = Math.max(argsRest.indexOf("<cid>"), argsRest.indexOf("[cid]"))
+
+  def dataSizeParse(cmdArgs: Seq[String]) = itemToInt(cmdArgs, pos_dataSize, -1)
+  def expTimeParse(cmdArgs: Seq[String])  = itemToLong(cmdArgs, pos_expTime,  0L)
+  def casParse(cmdArgs: Seq[String])      = itemToLong(cmdArgs, pos_cas, -1L)
 }
 
 // -------------------------------------------------------
@@ -145,41 +154,50 @@ trait MProtocol {
       }
     ) orElse findSpec(cmdArr, cmdLen, multiLineSpecLookup).map(
       spec => {
-        // Handle multiLine command: 
-        //   <cmdName> <key> <flags> <dataSize>\r\n
+        // Handle multiLine message:
         //   <cmdName> <key> <flags> <expTime> <dataSize> [noreply]\r\n
-        //         cas <key> <flags> <expTime> <dataSize> <cas_unique> [noreply]\r\n
+        //         cas <key> <flags> <expTime> <dataSize> <cid> [noreply]\r\n
+        //       VALUE <key> <flags> <dataSize> [cid]\r\n
         //
         if (spec.checkArgs(cmdArgs)) {
-          var dataSize    = if (cmdArgs.length > 3) Integer.parseInt(cmdArgs(3)) else Integer.parseInt(cmdArgs(2))
-          val totalNeeded = cmdArrLen + dataSize + CRNL.length
-          if (totalNeeded <= readyCount) {
-            val expTime = if (cmdArgs.length > 3) parseLong(cmdArgs(2), 0L) else 0L
+          var dataSize = spec.dataSizeParse(cmdArgs)
+          if (dataSize >= 0) {
+            val totalNeeded = cmdArrLen + dataSize + CRNL.length
+            if (totalNeeded <= readyCount) {
+              val expTime = spec.expTimeParse(cmdArgs)
+
+              val data = new Array[Byte](dataSize)
             
-            val data = new Array[Byte](dataSize)
+              session.read(data)
             
-            session.read(data)
-            
-            if (session.read == CR &&
-                session.read == NL) {
-              spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs,
-                                    MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
-                                           parseLong(cmdArgs(1), 0L),
-                                           if (expTime != 0L &&
-                                               expTime <= SECONDS_IN_30_DAYS)
-                                               expTime + nowInSeconds
-                                           else
-                                               expTime,
-                                           data,
-                                           (session.ident << 32) + 
-                                           (session.numMessages & 0xFFFFFFFFL))))
-              GOOD
+              if (session.read == CR &&
+                  session.read == NL) {
+                var cid = spec.casParse(cmdArgs)
+                if (cid == -1L)
+                    cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
+
+                spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs,
+                                      MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
+                                             parseLong(cmdArgs(1), 0L),
+                                             if (expTime != 0L &&
+                                                 expTime <= SECONDS_IN_30_DAYS)
+                                                 expTime + nowInSeconds
+                                             else
+                                                 expTime,
+                                             data,
+                                             cid)))
+                GOOD
+              } else {
+                session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
+                GOOD
+              }
             } else {
-              session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
-              GOOD
+              totalNeeded
             }
           } else {
-            totalNeeded
+            session.write(stringToArray("CLIENT_ERROR missing dataSize at " + spec.pos_dataSize + 
+                                        " in: " + arrayToString(cmdArr) + CRNL))
+            GOOD
           }
         } else {
           session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, length) + CRNL))
@@ -250,38 +268,38 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
             }))
            
   override def multiLineSpecs = List( 
-      MSpec("set <key> <flags> <expTime> <bytes> [noreply]",
+      MSpec("set <key> <flags> <expTime> <dataSize> [noreply]",
             (cmd) => 
                cmd.reply(svr.set(cmd.entry, cmd.noReply), 
                          STORED, NOT_STORED)),
 
-      MSpec("add <key> <flags> <expTime> <bytes> [noreply]",
+      MSpec("add <key> <flags> <expTime> <dataSize> [noreply]",
             (cmd) => 
                cmd.reply(svr.addRep(cmd.entry, true, cmd.noReply), 
                          STORED, NOT_STORED)),
 
-      MSpec("replace <key> <flags> <expTime> <bytes> [noreply]",
+      MSpec("replace <key> <flags> <expTime> <dataSize> [noreply]",
             (cmd) => 
                cmd.reply(svr.addRep(cmd.entry, false, cmd.noReply), 
                          STORED, NOT_STORED)),
 
-      MSpec("append <key> <flags> <expTime> <bytes> [noreply]",
+      MSpec("append <key> <flags> <expTime> <dataSize> [noreply]",
             (cmd) => 
                cmd.reply(svr.xpend(cmd.entry, true, cmd.noReply), 
                          STORED, NOT_STORED)),
 
-      MSpec("prepend <key> <flags> <expTime> <bytes> [noreply]",
+      MSpec("prepend <key> <flags> <expTime> <dataSize> [noreply]",
             (cmd) => 
                cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
                          STORED, NOT_STORED)),
            
-      MSpec("cas <key> <flags> <expTime> <bytes> <cas_unique> [noreply]",
+      MSpec("cas <key> <flags> <expTime> <dataSize> <cid> [noreply]",
             (cmd) => 
                cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
 
       // Extensions to basic protocol.
       //
-      MSpec("act <key> <flags> <expTime> <bytes> [noreply]", // Like RPC, but meant to call a registered actor.
+      MSpec("act <key> <flags> <expTime> <dataSize> [noreply]", // Like RPC, but meant to call a registered actor.
             (cmd) => {
                svr.act(cmd.entry, cmd.noReply).
                    foreach(el => cmd.write(el, false))
