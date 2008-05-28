@@ -36,6 +36,18 @@ object MServerProxySpec extends Specification with MTestUtil {
     (m, ea, ea2)
   }
   
+  override def entrySame(iter: Iterator[MEntry], b: MEntry) =
+    iter.toList.
+         headOption.
+         map(a => (a.key == b.key) &&
+                  (a.flags == b.flags) &&
+                  (a.expTime == b.expTime) &&
+                  (a.data.size == b.data.size) &&
+                  (a.data == b.data || a.data.deepEquals(b.data)) 
+                  // && (a.cid == b.cid) // NO CAS EQUALITY.
+                  ).
+         getOrElse(false)
+         
   def assertEquals(msg: String, x: Any, y: Any) =
     x.mustEqual(y)
   def assertEquals(x: Any, y: Any) =
@@ -43,8 +55,9 @@ object MServerProxySpec extends Specification with MTestUtil {
    
   "MServerProxy" should {
     "be empty after creation" in {
-if (false) {
       val (m, ea, ea2) = prep
+
+      Thread.sleep(200) // flushAll (called in prep) is asynchronous.
 
       m.get(List("a")).toList   must beEmpty
       m.delete("a", 0L, false)  must be(false)
@@ -61,7 +74,6 @@ if (false) {
       m.get(List("a")).toList   must beEmpty
       m.checkAndSet(ea, 0L, false) mustEqual("NOT_FOUND")
       m.get(List("a")).toList   must beEmpty
-}
     }
       
     "get after set" in {
@@ -144,34 +156,34 @@ if (false) {
     "checkAndSet" in {
       val (m, ea, ea2) = prep
 
-      val c0 = MEntry("c", 0L, 0L, new Array[Byte](0), 0L)
-      val c1 = MEntry("c", 1L, 0L, new Array[Byte](0), 1L)
-      val c2 = MEntry("c", 2L, 0L, new Array[Byte](0), 2L)
+      Thread.sleep(200) // flushAll (called in prep) is asynchronous.
 
-      assertEquals("get 00", true,     m.get(List("c")).toList.isEmpty)
+      val c0 = MEntry("c", 0L, 0L, new Array[Byte](0), 0L)
+      val c1 = MEntry("c", 1L, 0L, new Array[Byte](0), 10L)
+      val c2 = MEntry("c", 2L, 0L, new Array[Byte](0), 20L)
+
+      assertEquals("gets 00", true,    m.get(List("c")).toList.isEmpty)
       assertEquals("set c0", true,     m.set(c0, false))
-      assertEquals("get c0", true,     entrySame(m.get(List("c")), c0))
-      assertEquals("cas ca", "EXISTS", m.checkAndSet(c2, 2L, false))
-      assertEquals("get ca", true,     entrySame(m.get(List("c")), c0))
-      assertEquals("cas c1", "STORED", m.checkAndSet(c1, 0L, false))
-      assertEquals("get c1", true,     entrySame(m.get(List("c")), c1))
+      assertEquals("gets c0", true,    entrySame(m.get(List("c")), c0))
+      assertEquals("cas ca", "EXISTS", m.checkAndSet(c2, 20L, false))
+      assertEquals("gets ca", true,    entrySame(m.get(List("c")), c0))
+      val cx = m.get(List("c")).toList.head
+      assertEquals("cas c1", "STORED", m.checkAndSet(c1, cx.cid, false))
+      assertEquals("gets c1", true,    entrySame(m.get(List("c")), c1))
+      assertEquals("gets c1", cx.cid,  m.get(List("c")).toList.head.cid)
     }
 
     "be empty after flushAll" in {
-if (false) {
       val (m, ea, ea2) = prep
 
       assertEquals(true, m.set(simpleEntry("a1", "0"), false))
       assertEquals(true, m.set(simpleEntry("a2", "0"), false))
       assertEquals(true, m.set(simpleEntry("a3", "0"), false))
-      assertEquals(3, m.keys.toList.length)
       m.flushAll(0L)
-      Thread.sleep(500) // flushAll is asynchronous.
-      assertEquals(0, m.keys.toList.length)
+      Thread.sleep(200) // flushAll is asynchronous.
       assertEquals(true, m.get(List("a1")).toList.isEmpty)
       assertEquals(true, m.get(List("a2")).toList.isEmpty)
       assertEquals(true, m.get(List("a3")).toList.isEmpty)
-}
     }
 
     "getMulti" in {
