@@ -199,9 +199,9 @@ class MServerProxy(host: String, port: Int)
     if (!async) 
       new Response(new MProtocol {
         override def singleLineSpecs = List(
-          MSpec("STORED",     (cmd) => { result = "STORED";    cmd.session.close }),
-          MSpec("EXISTS",     (cmd) => { result = "EXISTS";    cmd.session.close }),
-          MSpec("NOT_STORED", (cmd) => { result = "NOT_FOUND"; cmd.session.close }))
+          MSpec("STORED",    (cmd) => { result = "STORED";    cmd.session.close }),
+          MSpec("EXISTS",    (cmd) => { result = "EXISTS";    cmd.session.close }),
+          MSpec("NOT_FOUND", (cmd) => { result = "NOT_FOUND"; cmd.session.close }))
       }).go
     result
   }
