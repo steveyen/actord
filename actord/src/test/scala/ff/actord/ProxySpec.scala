@@ -167,10 +167,18 @@ object MServerProxySpec extends Specification with MTestUtil {
       assertEquals("gets c0", true,    entrySame(m.get(List("c")), c0))
       assertEquals("cas ca", "EXISTS", m.checkAndSet(c2, 20L, false))
       assertEquals("gets ca", true,    entrySame(m.get(List("c")), c0))
+
       val cx = m.get(List("c")).toList.head
+      assertEquals("gets c1", true,  cx.cid == m.get(List("c")).toList.head.cid)
       assertEquals("cas c1", "STORED", m.checkAndSet(c1, cx.cid, false))
       assertEquals("gets c1", true,    entrySame(m.get(List("c")), c1))
-      assertEquals("gets c1", cx.cid,  m.get(List("c")).toList.head.cid)
+      assertEquals("gets c1", false,   cx.cid == m.get(List("c")).toList.head.cid)
+
+      val cy = m.get(List("c")).toList.head
+      assertEquals("gets c2", true,  cy.cid == m.get(List("c")).toList.head.cid)
+      assertEquals("set  c2", true,  m.set(c2, false))
+      assertEquals("gets c2", true,  entrySame(m.get(List("c")), c2))
+      assertEquals("gets c2", false, cy.cid == m.get(List("c")).toList.head.cid)
     }
 
     "be empty after flushAll" in {

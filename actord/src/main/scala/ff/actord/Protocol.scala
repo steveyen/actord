@@ -156,7 +156,7 @@ trait MProtocol {
       spec => {
         // Handle multiLine message:
         //   <cmdName> <key> <flags> <expTime> <dataSize> [noreply]\r\n
-        //         cas <key> <flags> <expTime> <dataSize> <cid> [noreply]\r\n
+        //         cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]\r\n
         //       VALUE <key> <flags> <dataSize> [cid]\r\n
         //
         if (spec.checkArgs(cmdArgs)) {
@@ -293,7 +293,7 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
                cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
                          STORED, NOT_STORED)),
            
-      MSpec("cas <key> <flags> <expTime> <dataSize> <cid> [noreply]",
+      MSpec("cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]", // Using <cid_unique>, not <cid>, for generated cid.
             (cmd) => 
                cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
 
