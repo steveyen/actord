@@ -297,7 +297,7 @@ if (false) { // TODO: No Proxy stats yet.
     }
 
     "handle simple benchmark" in {
-if (false) {
+if (false) { // TODO: No Proxy benchmark yet.
       val (m, ea, ea2) = prep
 
       val n = 4000
@@ -322,7 +322,7 @@ if (false) {
     }
 
     "simple multithreaded benchmark" in {
-if (false) {
+if (false) { // TODO: No Proxy benchmark yet.
       val (m, ea, ea2) = prep
 
       val nOperations = 4000
