@@ -30,6 +30,8 @@ object MServerProxySpec extends Specification with MTestUtil {
     val m = new ff.actord.MServerProxy("127.0.0.1", 11211)
 
     m.flushAll(0L)
+
+    Thread.sleep(200) // flushAll is asynchronous.
     
     val ea  = MEntry("a", 0L, 0L, new Array[Byte](0), 0L)
     val ea2 = MEntry("a", 1L, 0L, new Array[Byte](0), 0L)
@@ -56,8 +58,6 @@ object MServerProxySpec extends Specification with MTestUtil {
   "MServerProxy" should {
     "be empty after creation" in {
       val (m, ea, ea2) = prep
-
-      Thread.sleep(200) // flushAll (called in prep) is asynchronous.
 
       m.get(List("a")).toList   must beEmpty
       m.delete("a", 0L, false)  must be(false)
@@ -155,8 +155,6 @@ object MServerProxySpec extends Specification with MTestUtil {
 
     "checkAndSet" in {
       val (m, ea, ea2) = prep
-
-      Thread.sleep(200) // flushAll (called in prep) is asynchronous.
 
       val c0 = MEntry("c", 0L, 0L, new Array[Byte](0), 0L)
       val c1 = MEntry("c", 1L, 0L, new Array[Byte](0), 10L)
