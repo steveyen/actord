@@ -35,7 +35,10 @@ class MServerProxy(host: String, port: Int)
 
   def flush = bs.flush
 
-  class Response(protocol: MProtocol) extends MNetworkReader with MSession { // Processes the response/reply from the server.
+  /**
+   * Processes the response/reply from the server.
+   */
+  class Response(protocol: MProtocol) extends MNetworkReader with MSession { 
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
     def connClose: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
 
