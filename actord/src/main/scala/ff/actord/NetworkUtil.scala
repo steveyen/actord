@@ -38,11 +38,14 @@ trait MNetworkReader {
   def numMessages: Long = nMessages
 
   /**
-   * Called by messageRead() when there's a full message to process.  Returns 0 on success,
-   * or the number of bytes that messageRead needs to receive 
-   * before calling messageProcess again.
+   * Called by messageRead() when there's incoming bytes ready for processing.
+   * Should return the number of bytes (> 0) that messageRead needs to receive 
+   * before calling messageProcess again.  Or, should return zero if one message 
+   * was successfuly processed from the bytes available.
+   * The bufLen is the number of bytes to the first CRNL.
+   * The available is the number of bytes (sometimes > bufLen) already received.
    */
-  def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int
+  def messageProcess(buf: Array[Byte], bufLen: Int, available: Int): Int
 
   /**
    * Meant to be called by a driver loop to continually process incoming bytes.
@@ -52,8 +55,10 @@ trait MNetworkReader {
    */
   def messageRead: Boolean = {
     readPos = 0
-      
-    val lastRead = connRead(buf, available, buf.length - available)
+
+    // Only do a connRead if nothing remaining from last time around.
+    //      
+    val lastRead = if (available <= availablePrev) connRead(buf, available, buf.length - available) else 0
     if (lastRead <= -1)
       connClose
      
@@ -67,7 +72,7 @@ trait MNetworkReader {
     if (available >= waitingFor) {
       val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
                              available == availablePrev + 1) { // the entire buf again for a CR.
-                           if (buf(available - 2) == CR) { 
+                           if (buf(available - 2) == CR) {     // Assuming connRead doesn't chop up messages!
                              available - 2                 
                            } else
                              -1
@@ -88,7 +93,7 @@ trait MNetworkReader {
           readPos = cmdLen
 
           val bytesNeeded = messageProcess(buf, cmdLen, available)
-          if (bytesNeeded == 0) {
+          if (bytesNeeded <= 0) {
             if (available > readPos)
               Array.copy(buf, readPos, buf, 0, available - readPos)
             
@@ -107,8 +112,8 @@ trait MNetworkReader {
       }
     }
 
-    false // Returns false if we haven't successfully read and processed a n
-  }       // message, and the caller should invoke us again.
+    false // Returns false if we haven't successfully read and processed 
+  }       // a message, and the caller should invoke us again.
   
   private def bufIndexOf(n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
     val b = buf

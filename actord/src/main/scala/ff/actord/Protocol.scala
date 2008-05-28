@@ -93,14 +93,14 @@ trait MProtocol {
     for (i <- 0 until lookup.length)
       lookup(i) = Nil                        // Buckets in the lookup table are just Lists.
     for (spec <- specs) {
-      val index = spec.name(0) - 'a'
+      val index = spec.name(0) - 'A'
       lookup(index) = lookup(index) ::: List(spec) // Concat so that more popular commands come first.
     }
     lookup
   }
 
   def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-    lookup(x(0) - 'a').find(spec => arrayCompare(spec.nameBytes, spec.nameBytes.length, x, xLen) == 0)
+    lookup(x(0) - 'A').find(spec => arrayCompare(spec.nameBytes, spec.nameBytes.length, x, xLen) == 0)
 
   // ----------------------------------------
 

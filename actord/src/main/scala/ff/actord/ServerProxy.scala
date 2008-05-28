@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ff.actord.client
+package ff.actord
 
 import java.io._
 import java.net._
@@ -48,7 +48,8 @@ class MServerProxy(host: String, port: Int)
     def ident: Long = 0L
     def close: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
 
-    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = { /* NO-OP */ } // TODO: Log these.
+    def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
+      println(arrayToString(bytes, offset, length)) // TODO: Log these.
 
     var end = false
     def go  = while (!end) messageRead
@@ -214,6 +215,7 @@ class MServerProxy(host: String, port: Int)
     write(flushAllBytes)
     write(expTime.toString)
     write(CRNLBytes)
+    flush
     response("OK", "NOT_OK", false)
   }
   
