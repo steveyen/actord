@@ -142,7 +142,6 @@ if (false) {
     }
 
     "checkAndSet" in {
-if (false) {
       val (m, ea, ea2) = prep
 
       val c0 = MEntry("c", 0L, 0L, new Array[Byte](0), 0L)
@@ -156,7 +155,6 @@ if (false) {
       assertEquals("get ca", true,     entrySame(m.get(List("c")), c0))
       assertEquals("cas c1", "STORED", m.checkAndSet(c1, 0L, false))
       assertEquals("get c1", true,     entrySame(m.get(List("c")), c1))
-}
     }
 
     "be empty after flushAll" in {
@@ -168,7 +166,7 @@ if (false) {
       assertEquals(true, m.set(simpleEntry("a3", "0"), false))
       assertEquals(3, m.keys.toList.length)
       m.flushAll(0L)
-      Thread.sleep(200) // flushAll is asynchronous.
+      Thread.sleep(500) // flushAll is asynchronous.
       assertEquals(0, m.keys.toList.length)
       assertEquals(true, m.get(List("a1")).toList.isEmpty)
       assertEquals(true, m.get(List("a2")).toList.isEmpty)
