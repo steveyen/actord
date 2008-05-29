@@ -84,15 +84,15 @@ trait MServerRouter extends MProtocol {
 
   def processTargetResponse(target: MRouterTarget, clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Int = {
     if (!noReply(cmdArr, cmdArrLen)) {
-      var m = clientSession.attachment.asInstanceOf[mutable.Map[MRouterTarget, Response]]
+      var m = clientSession.attachment.asInstanceOf[mutable.Map[MRouterTarget, TargetResponse]]
       if (m == null) {
-          m = new mutable.HashMap[MRouterTarget, Response]
+          m = new mutable.HashMap[MRouterTarget, TargetResponse]
           clientSession.attachment_!(m)
       }
       var r = if (m.contains(target)) 
                 m(target) 
               else {
-                val rr = new Response(target, clientSession)
+                val rr = new TargetResponse(target, clientSession)
                 m += (target -> rr)
                 rr
               }
@@ -112,9 +112,10 @@ trait MServerRouter extends MProtocol {
   val VALUEBytes   = stringToArray("VALUE ")
 
   /**
-   * Processes the response/reply from the server.
+   * Processes the response/reply from the downstream target server.
    */
-  class Response(target: MRouterTarget, clientSession: MSession) extends MNetworkReader with MSession with MProtocol { 
+  class TargetResponse(target: MRouterTarget, clientSession: MSession) 
+    extends MNetworkReader with MSession with MProtocol { 
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = 
       try {
         target.readResponse(buf, offset, length)
@@ -175,13 +176,9 @@ trait MServerRouter extends MProtocol {
 
 trait MRouterTarget {
   def readResponse(buf: Array[Byte], offset: Int, length: Int): Int
-
-  def write(m: String): Unit                               
-  def write(a: Array[Byte]): Unit                          
   def write(a: Array[Byte], offset: Int, length: Int): Unit
   def writeFunc: (Array[Byte], Int, Int) => Unit
   def writeFlush: Unit
-
   def close: Unit
   def isClosed: Boolean
 }

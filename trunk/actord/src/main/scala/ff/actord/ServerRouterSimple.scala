@@ -39,8 +39,6 @@ class SRouterTarget(host: String, port: Int) extends MRouterTarget { // A simple
   protected var os = s.getOutputStream
   protected var bs = new BufferedOutputStream(os)
 
-  def write(m: String): Unit                                = bs.write(stringToArray(m))
-  def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
   def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
 
   def writeFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
