@@ -25,7 +25,8 @@ trait MSession {
   def close: Unit
 
   def read: Byte
-  def read(bytes: Array[Byte]): Unit
+  def read(bytes: Array[Byte]): Unit = read(bytes, 0, bytes.length)
+  def read(bytes: Array[Byte], offset: Int, length: Int): Unit
   def write(bytes: Array[Byte]): Unit = write(bytes, 0, bytes.length)
   def write(bytes: Array[Byte], offset: Int, length: Int): Unit
 
