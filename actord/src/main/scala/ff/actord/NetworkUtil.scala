@@ -59,8 +59,10 @@ trait MNetworkReader {
     // Only do a connRead if nothing remaining from last time around.
     //      
     val lastRead = if (available <= availablePrev) connRead(buf, available, buf.length - available) else 0
-    if (lastRead <= -1)
+    if (lastRead <= -1) {
       connClose
+      return false
+    }
      
     availablePrev = available
     available += lastRead
@@ -112,8 +114,8 @@ trait MNetworkReader {
       }
     }
 
-    false // Returns false if we haven't successfully read and processed 
-  }       // a message, and the caller should invoke us again.
+    false // Returns false if we haven't successfully read and processed a message.
+  }       // The caller might invoke us again, though, in a loop.
   
   private def bufIndexOf(n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
     val b = buf
