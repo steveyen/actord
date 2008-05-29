@@ -142,13 +142,13 @@ trait MServerRouter extends MProtocol {
                                 cmdArr: Array[Byte], // Target response bytes.
                                 cmdArrLen: Int,
                                 cmdLen: Int): Int = {
+      clientSession.write(cmdArr, 0, cmdArrLen)
+
       // We got a full response if the downstream target server responded
       // with anything but STAT, such as END, STORED, NOT_STORED, etc.
       //
       if (!arrayStartsWith(cmdArr, cmdArrLen, STATBytes))
         close // Stop the go/messageRead loop.
-
-      clientSession.write(cmdArr, 0, cmdArrLen)
 
       GOOD
     }
