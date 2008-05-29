@@ -75,7 +75,7 @@ trait MNetworkReader {
       val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
                              available == availablePrev + 1) { // the entire buf again for a CR.
                            if (buf(available - 2) == CR) {     // TODO: Assuming incorrectly that connRead doesn't chop up messages!
-                             available - 2                 
+                             available - 2                     // TODO: Assuming incorrectly that we get one message at a time!
                            } else
                              -1
                          } else
