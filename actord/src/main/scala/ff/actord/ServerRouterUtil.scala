@@ -89,8 +89,8 @@ trait MServerRouter extends MProtocol {
           m = new mutable.HashMap[MRouterTarget, TargetResponse]
           clientSession.attachment_!(m)
       }
-      var r = if (m.contains(target)) 
-                m(target) 
+      val r = if (m.contains(target)) // NOTE: Avoiding the usual getOrElse/closure/Option approach
+                m(target)             //       in order to prevent throwaway garbage in the core router loop.
               else {
                 val rr = new TargetResponse(target, clientSession)
                 m += (target -> rr)
