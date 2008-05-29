@@ -186,7 +186,7 @@ trait MProtocol {
                      cmdLen: Int): Int = {
     val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
     if (spec.checkArgs(cmdArgs))
-      spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs, null))
+      spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs, null))
     else
       session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, cmdArrLen)))
     GOOD
@@ -211,7 +211,7 @@ trait MProtocol {
       if (cid == -1L)
           cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
 
-      spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs,
+      spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs,
                             MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
                                    parseLong(cmdArgs(1), 0L),
                                    if (expTime != 0L &&
@@ -422,7 +422,8 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
 /**
  * Represents an incoming command or request from a (remote) client.
  */
-case class MCommand(session: MSession, cmdArr: Array[Byte], cmdLen: Int, args: Seq[String], entry: MEntry) {
+case class MCommand(session: MSession, cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int, 
+                    args: Seq[String], entry: MEntry) {
   val noReply = args.length > 0 && args.last == "noreply"
   
   def argToLong(at: Int) = itemToLong(args, at)
