@@ -132,7 +132,7 @@ trait MServerRouter extends MProtocol {
     def go  = while (!end) messageRead
 
     override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-      if (arrayStartsWith(x, xLen, VALUEBytes))
+      if (arrayStartsWith(x, xLen, VALUEBytes)) // Only VALUE responses are two-lines.
         twoLineResponseMarker
       else
         oneLineResponseMarker
@@ -142,11 +142,11 @@ trait MServerRouter extends MProtocol {
                                 cmdArr: Array[Byte], // Target response bytes.
                                 cmdArrLen: Int,
                                 cmdLen: Int): Int = {
-      // See if need to stop the messageRead loop, if the downstream target server 
-      // responded with anything but STAT, such as END, STORED, NOT_STORED, etc.
+      // We got a full response if the downstream target server responded
+      // with anything but STAT, such as END, STORED, NOT_STORED, etc.
       //
       if (!arrayStartsWith(cmdArr, cmdArrLen, STATBytes))
-        close 
+        close // Stop the go/messageRead loop.
 
       clientSession.write(cmdArr, 0, cmdArrLen)
 
