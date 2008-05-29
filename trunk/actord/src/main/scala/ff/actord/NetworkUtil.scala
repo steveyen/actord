@@ -154,5 +154,12 @@ trait MNetworkReader {
     Array.copy(buf, readPos, bytes, offset, length)
     readPos += length
   }
+
+  def readDirect(length: Int, recv: (Array[Byte], Int, Int) => Unit): Unit = {
+    if (readPos + length > available)
+      throw new RuntimeException("reading more bytes than available in readDirect: " + available)
+    recv(buf, readPos, length)
+    readPos += length
+  }
 }
 
