@@ -164,33 +164,7 @@ trait MProtocol {
           if (dataSize >= 0) {
             val totalNeeded = cmdArrLen + dataSize + CRNL.length
             if (totalNeeded <= readyCount) {
-              val data = new Array[Byte](dataSize)
-            
-              session.read(data)
-            
-              if (session.read == CR &&
-                  session.read == NL) {
-                val expTime = spec.expTimeParse(cmdArgs)
-
-                var cid = spec.casParse(cmdArgs)
-                if (cid == -1L)
-                    cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
-
-                spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs,
-                                      MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
-                                             parseLong(cmdArgs(1), 0L),
-                                             if (expTime != 0L &&
-                                                 expTime <= SECONDS_IN_30_DAYS)
-                                                 expTime + nowInSeconds
-                                             else
-                                                 expTime,
-                                             data,
-                                             cid)))
-                GOOD
-              } else {
-                session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
-                GOOD
-              }
+              processTwoLine(spec, session, cmdArr, cmdArrLen, cmdLen, cmdArgs, dataSize)
             } else {
               totalNeeded
             }
@@ -207,6 +181,42 @@ trait MProtocol {
     ) getOrElse {
       session.write(stringToArray("ERROR " + arrayToString(cmdArr, 0, cmdLen) + CRNL)) 
       GOOD // Saw an unknown command, but keep going and process the next command.
+    }
+  }
+
+  def processTwoLine(spec: MSpec, 
+                     session: MSession, 
+                     cmdArr: Array[Byte],
+                     cmdArrLen: Int,
+                     cmdLen: Int,
+                     cmdArgs: Seq[String],
+                     dataSize: Int): Int = { // Called when we have all the incoming bytes of a two-lined message.
+    val data = new Array[Byte](dataSize)
+
+    session.read(data)
+
+    if (session.read == CR &&
+        session.read == NL) {
+      val expTime = spec.expTimeParse(cmdArgs)
+
+      var cid = spec.casParse(cmdArgs)
+      if (cid == -1L)
+          cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
+
+      spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs,
+                            MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
+                                   parseLong(cmdArgs(1), 0L),
+                                   if (expTime != 0L &&
+                                       expTime <= SECONDS_IN_30_DAYS)
+                                       expTime + nowInSeconds
+                                   else
+                                       expTime,
+                                   data,
+                                   cid)))
+      GOOD
+    } else {
+      session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
+      GOOD
     }
   }
 }
