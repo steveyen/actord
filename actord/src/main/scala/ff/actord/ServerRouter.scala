@@ -58,7 +58,7 @@ class MServerRouter(host: String, port: Int)
     targetWrite(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
     targetFlush
     if (!noReply(cmdArr, cmdArrLen))  // Forward response(s) from downstream server to the client, if needed.
-      (new Response(clientSession)).go
+      processTargetResponse(clientSession)
     GOOD
   }
 
@@ -69,8 +69,17 @@ class MServerRouter(host: String, port: Int)
     clientSession.readDirect(dataSize + CRNL.length, targetWriteFunc)
     targetFlush
     if (!noReply(cmdArr, cmdArrLen))
-      (new Response(clientSession)).go
+      processTargetResponse(clientSession)
     GOOD
+  }
+
+  def processTargetResponse(clientSession: MSession): Unit = {
+    var r = clientSession.attachment.asInstanceOf[Response]
+    if (r == null) {
+        r = new Response(clientSession)
+        clientSession.attachment_!(r)
+    }
+    r.go
   }
 
   // -----------------------------------------------

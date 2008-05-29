@@ -33,6 +33,10 @@ trait MSession {
   def write(bytes: Array[Byte], offset: Int, length: Int): Unit
 
   def numMessages: Long // Number of messages processed on this session so far.
+
+  protected var attachment_i: AnyRef = null
+  def attachment              = attachment_i
+  def attachment_!(x: AnyRef) = attachment_i = x
 }
 
 /**
