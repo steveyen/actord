@@ -20,6 +20,10 @@ import java.net._
 
 import ff.actord.Util._
 
+/**
+ * Low level reader of the memcached protocol, chopping up incoming bytes
+ * into messages by looking for CRNL markers.
+ */
 trait MNetworkReader {
   def connRead(buf: Array[Byte], offset: Int, length: Int): Int
   def connClose: Unit
@@ -38,18 +42,19 @@ trait MNetworkReader {
   def numMessages: Long = nMessages
 
   /**
-   * Called by messageRead() when there's incoming bytes ready for processing.
-   * Should return the number of bytes (> 0) that messageRead needs to receive 
-   * before calling messageProcess again.  Or, should return zero if one message 
-   * was successfuly processed from the bytes available.
-   * The bufLen is the number of bytes to the first CRNL.
+   * Called by messageRead() when there's incoming bytes ready for processing,
+   * or when a CRNL is seen.  The messageProcess implementation should
+   * return the number of bytes (> 0) that messageRead needs to receive 
+   * before calling messageProcess again.  Or, messageProcess should return zero 
+   * if one message was successfuly processed from the incoming bytes available.
+   * The bufLen is the number of bytes to the first CRNL (inclusive of the CRNL).
    * The available is the number of bytes (sometimes > bufLen) already received.
    */
   def messageProcess(buf: Array[Byte], bufLen: Int, available: Int): Int
 
   /**
-   * Meant to be called by a driver loop to continually process incoming bytes.
-   * Invokes connRead() to get the input bytes, and when we think there's a 
+   * Meant to be called by an external driver loop to continually process incoming bytes.
+   * Invokes connRead() to get more input bytes, and when it think there's a 
    * complete message ready for processing, invokes messageProcess().  
    * Invokes connClose() when there's an error.
    */
