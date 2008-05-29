@@ -110,7 +110,7 @@ class Router {
 
 class MServerRouter(host: String, port: Int) 
   extends MProtocol {
-  // These are the one and two-lined protocol messages from the client that we will route...
+  // Register the protocol messages from the client that we will route...
   //
   override def oneLineSpecs = List(
     "get <key>*",
@@ -125,7 +125,7 @@ class MServerRouter(host: String, port: Int)
     "quit",
     "range <key_from> <key_to>"
   ).map(s => MSpec(s, (cmd) => { throw new RuntimeException("unexpected") }))
-           
+
   override def twoLineSpecs = List( 
     "set <key> <flags> <expTime> <dataSize> [noreply]",
     "add <key> <flags> <expTime> <dataSize> [noreply]",
@@ -138,63 +138,27 @@ class MServerRouter(host: String, port: Int)
 
   // -----------------------------------------------
 
-  override def processOneLine(spec: MSpec, session: MSession, 
+  override def processOneLine(spec: MSpec, clientSession: MSession, 
                               cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
-    write(cmdArr, 0, cmdArrLen)      // Forward incoming message from client to downstream server.
-    flush
-    if (!noReply(cmdArr, cmdArrLen)) // Forward to the client any responses, if needed.
-      processResponse(session).go
+    targetWrite(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
+    targetFlush
+    if (!noReply(cmdArr, cmdArrLen))  // Forward response(s) from downstream server to the client, if needed.
+      (new Response(clientSession)).go
     GOOD
   }
 
-  override def processTwoLine(spec: MSpec, session: MSession, 
+  override def processTwoLine(spec: MSpec, clientSession: MSession, 
                               cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int,
                               cmdArgs: Seq[String], dataSize: Int): Int = {
-    write(cmdArr, 0, cmdArrLen)
-    session.readDirect(dataSize + CRNL.length, writeFunc)
-    flush                      
+    targetWrite(cmdArr, 0, cmdArrLen)
+    clientSession.readDirect(dataSize + CRNL.length, targetWriteFunc)
+    targetFlush
     if (!noReply(cmdArr, cmdArrLen))
-      processResponse(session).go
+      (new Response(clientSession)).go
     GOOD
   }
 
   // -----------------------------------------------
-
-  def processResponse(clientSession: MSession) = // Forward any responses back to the client.
-    new Response(new MProtocol {
-      override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-        if (arrayCompare(VALUEBytes, x) == 0)
-          twoLineResponseMarker
-        else
-          oneLineResponseMarker
-
-      override def processOneLine(spec: MSpec, 
-                                  session: MSession, 
-                                  cmdArr: Array[Byte],
-                                  cmdArrLen: Int,
-                                  cmdLen: Int): Int = {
-        clientSession.write(cmdArr, 0, cmdArrLen)
-        close // Response.this.close -- stop reading responses, since we got our one-line response like END, STORED, etc.
-        GOOD
-      }
-
-      override def processTwoLine(spec: MSpec, 
-                                  session: MSession, 
-                                  cmdArr: Array[Byte],
-                                  cmdArrLen: Int,
-                                  cmdLen: Int,
-                                  cmdArgs: Seq[String],
-                                  dataSize: Int): Int = {
-        clientSession.write(cmdArr, 0, cmdArrLen)
-        session.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
-        GOOD
-      }
-
-      val clientSessionWriteFunc = (a: Array[Byte], offset: Int, length: Int) => clientSession.write(a, offset, length)
-    })
-
-  val oneLineResponseMarker = Some(MSpec("oneLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
-  val twoLineResponseMarker = Some(MSpec("twoLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
 
   val VALUEBytes   = stringToArray("VALUE ")
   val NOREPLYBytes = stringToArray(" noreply" + CRNL)
@@ -209,7 +173,7 @@ class MServerRouter(host: String, port: Int)
   /**
    * Processes the response/reply from the server.
    */
-  class Response(protocol: MProtocol) extends MNetworkReader with MSession { 
+  class Response(clientSession: MSession) extends MNetworkReader with MSession with MProtocol { 
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = 
       try {
         is.read(buf, offset, length)
@@ -220,7 +184,7 @@ class MServerRouter(host: String, port: Int)
     def connClose: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
 
     def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
-      protocol.process(this, cmdArr, cmdLen, available)
+      this.process(this, cmdArr, cmdLen, available)
 
     def ident: Long = 0L
     def close: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
@@ -230,22 +194,55 @@ class MServerRouter(host: String, port: Int)
 
     var end = false
     def go  = while (!end) messageRead
+
+    override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
+      if (arrayCompare(VALUEBytes, x) == 0)
+        twoLineResponseMarker
+      else
+        oneLineResponseMarker
+
+    override def processOneLine(spec: MSpec, 
+                                targetSession: MSession, 
+                                cmdArr: Array[Byte], // Target response bytes.
+                                cmdArrLen: Int,
+                                cmdLen: Int): Int = {
+      clientSession.write(cmdArr, 0, cmdArrLen)
+      close // Stop messageRead loop, as we got a one-line response like END, STORED, etc, from the downstream target server.
+      GOOD
+    }
+
+    override def processTwoLine(spec: MSpec, 
+                                targetSession: MSession, 
+                                cmdArr: Array[Byte], // Target response bytes.
+                                cmdArrLen: Int,
+                                cmdLen: Int,
+                                cmdArgs: Seq[String],
+                                dataSize: Int): Int = {
+      clientSession.write(cmdArr, 0, cmdArrLen)
+      targetSession.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
+      GOOD
+    }
+
+    val clientSessionWriteFunc = (a: Array[Byte], offset: Int, length: Int) => clientSession.write(a, offset, length)
   }
 
-  protected var s  = new Socket(host, port) // The target server to route to.
+  val oneLineResponseMarker = Some(MSpec("oneLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
+  val twoLineResponseMarker = Some(MSpec("twoLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
+
+  protected var s  = new Socket(host, port) // The downstream target server to route to.
   protected var is = s.getInputStream
   protected var os = s.getOutputStream
   protected var bs = new BufferedOutputStream(os)
 
-  def write(m: String): Unit                                = bs.write(stringToArray(m))
-  def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
-  def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
+  def targetWrite(m: String): Unit                                = bs.write(stringToArray(m))
+  def targetWrite(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
+  def targetWrite(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
 
-  def writeFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
+  def targetWriteFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
 
-  def isClosed = s == null
+  def isTargetClosed = s == null
 
-  def close: Unit = {
+  def targetClose: Unit = {
     if (s != null)
         s.close
     s  = null
@@ -254,11 +251,11 @@ class MServerRouter(host: String, port: Int)
     bs = null
   }
 
-  def flush: Unit = 
+  def targetFlush: Unit = 
     try {
       bs.flush
     } catch {
-      case _ => close
+      case _ => targetClose
     }
 
   // unfinished: 
