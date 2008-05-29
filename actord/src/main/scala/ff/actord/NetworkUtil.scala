@@ -148,11 +148,11 @@ trait MNetworkReader {
     b
   }
      
-  def read(bytes: Array[Byte]): Unit = {
-    if (readPos + bytes.length > available)
+  def read(bytes: Array[Byte], offset: Int, length: Int): Unit = {
+    if (readPos + length > available)
       throw new RuntimeException("reading more bytes than available: " + available)
-    Array.copy(buf, readPos, bytes, 0, bytes.length)
-    readPos += bytes.length
+    Array.copy(buf, readPos, bytes, offset, length)
+    readPos += length
   }
 }
 

@@ -117,11 +117,14 @@ class MMinaDecoder(protocol: MProtocol) extends MessageDecoder {
   }
   
   case class WrapIoSession(sess: IoSession, buf: IoBuffer) extends MSession {
-    def ident: Long  = sess.getId
+    def ident: Long = sess.getId
     def close: Unit = sess.close
 
-    def read: Byte                     = buf.get
-    def read(bytes: Array[Byte]): Unit = buf.get(bytes)
+    def read: Byte = 
+      buf.get
+
+    def read(bytes: Array[Byte], offset: Int, length: Int): Unit = 
+      buf.get(bytes, offset, length)
   
     def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
       sess.write(IoBuffer.wrap(bytes, offset, length))
