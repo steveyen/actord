@@ -125,6 +125,12 @@ class MMinaDecoder(protocol: MProtocol) extends MessageDecoder {
 
     def read(bytes: Array[Byte], offset: Int, length: Int): Unit = 
       buf.get(bytes, offset, length)
+
+    def readDirect(length: Int, recv: (Array[Byte], Int, Int) => Unit): Unit = {
+      val buf = new Array[Byte](length) // TODO: An inefficient implementation with throwaway extra copy.
+      read(buf)
+      recv(buf, 0, length)
+    }
   
     def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
       sess.write(IoBuffer.wrap(bytes, offset, length))

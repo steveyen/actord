@@ -27,6 +27,8 @@ trait MSession {
   def read: Byte
   def read(bytes: Array[Byte]): Unit = read(bytes, 0, bytes.length)
   def read(bytes: Array[Byte], offset: Int, length: Int): Unit
+  def readDirect(length: Int, recv: (Array[Byte], Int, Int) => Unit): Unit
+
   def write(bytes: Array[Byte]): Unit = write(bytes, 0, bytes.length)
   def write(bytes: Array[Byte], offset: Int, length: Int): Unit
 
