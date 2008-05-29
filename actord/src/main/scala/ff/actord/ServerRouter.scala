@@ -136,6 +136,11 @@ class MServerRouter(host: String, port: Int)
     }
 
   val oneLineRouter = (cmd: MCommand) => { 
+    write(cmd.cmdArr, 0, cmd.cmdArrLen)
+    flush
+
+//    if (cmd.
+
 //    svr.get(cmd.args).
 //        foreach(el => cmd.write(el, false))
     cmd.reply(END)
@@ -196,6 +201,25 @@ class MServerRouter(host: String, port: Int)
     var end = false
     def go  = while (!end) messageRead
   }
+
+/*
+  val responseProtocol = new MProtocol {
+    override def twoLineSpecs = List(
+      new MSpec("VALUE <key> <flags> <dataSize> [cid]", (cmd) => { xs = cmd.entry :: xs }) {
+        override def casParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_cas, 0L)
+      })
+    override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
+      super.findSpec(x, xLen, lookup).
+            orElse(oneLineResponse)
+  }
+*/
+
+  val oneLineResponse = Some(
+    MSpec("N/A", 
+          (cmd) => { 
+//            cmd.reply(cmd.cmdArr) 
+    })
+  )
 
   def responseValues: Iterator[MEntry] = {
     var xs: List[MEntry] = Nil
