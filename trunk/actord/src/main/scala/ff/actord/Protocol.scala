@@ -82,18 +82,18 @@ trait MProtocol {
    * Commands defined with a single line.
    * More popular commands should be listed first.
    */
-  def singleLineSpecs: List[MSpec] = Nil
+  def oneLineSpecs: List[MSpec] = Nil
            
   /**
-   * Commands that use a multiple lines, such as a line followed by byte data.
+   * Commands that use a two lines, such as a line followed by byte data.
    * More popular commands should be listed first.
    */
-  def multiLineSpecs: List[MSpec] = Nil
+  def twoLineSpecs: List[MSpec] = Nil
       
   // ----------------------------------------
 
-  val singleLineSpecLookup = indexSpecs(singleLineSpecs)
-  val multiLineSpecLookup  = indexSpecs(multiLineSpecs)
+  val oneLineSpecLookup = indexSpecs(oneLineSpecs)
+  val twoLineSpecLookup = indexSpecs(twoLineSpecs)
                           
   // ----------------------------------------
 
@@ -142,7 +142,7 @@ trait MProtocol {
     val cmdArgsLen = Math.max(length - (cmdLen + 1), 0)
     val cmdArgs    = arraySplit(cmdArr, cmdLen + 1, cmdArgsLen, SPACE)
 
-    findSpec(cmdArr, cmdLen, singleLineSpecLookup).map(
+    findSpec(cmdArr, cmdLen, oneLineSpecLookup).map(
       spec => {
         if (spec.checkArgs(cmdArgs)) {
           spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs, null))
@@ -152,9 +152,9 @@ trait MProtocol {
           GOOD
         }
       }
-    ) orElse findSpec(cmdArr, cmdLen, multiLineSpecLookup).map(
+    ) orElse findSpec(cmdArr, cmdLen, twoLineSpecLookup).map(
       spec => {
-        // Handle multiLine message:
+        // Handle two line message:
         //   <cmdName> <key> <flags> <expTime> <dataSize> [noreply]\r\n
         //         cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]\r\n
         //       VALUE <key> <flags> <dataSize> [cid]\r\n
@@ -164,14 +164,14 @@ trait MProtocol {
           if (dataSize >= 0) {
             val totalNeeded = cmdArrLen + dataSize + CRNL.length
             if (totalNeeded <= readyCount) {
-              val expTime = spec.expTimeParse(cmdArgs)
-
               val data = new Array[Byte](dataSize)
             
               session.read(data)
             
               if (session.read == CR &&
                   session.read == NL) {
+                val expTime = spec.expTimeParse(cmdArgs)
+
                 var cid = spec.casParse(cmdArgs)
                 if (cid == -1L)
                     cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
@@ -214,7 +214,7 @@ trait MProtocol {
 // -------------------------------------------
 
 class MProtocolServer(svr: MServer) extends MProtocol {
-  override def singleLineSpecs = List( 
+  override def oneLineSpecs = List( 
       MSpec("get <key>*",
             (cmd) => { 
 if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
@@ -267,7 +267,7 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
               cmd.reply(END)
             }))
            
-  override def multiLineSpecs = List( 
+  override def twoLineSpecs = List( 
       MSpec("set <key> <flags> <expTime> <dataSize> [noreply]",
             (cmd) => 
                cmd.reply(svr.set(cmd.entry, cmd.noReply), 
