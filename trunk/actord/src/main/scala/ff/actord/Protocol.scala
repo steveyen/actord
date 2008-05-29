@@ -116,6 +116,9 @@ trait MProtocol {
   final val GOOD               = 0
   final val SECONDS_IN_30_DAYS = 60*60*24*30
 
+  def processArgs(cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Seq[String] = 
+    arraySplit(cmdArr, cmdLen + 1, Math.max(cmdArrLen - CRNL.length - (cmdLen + 1), 0), SPACE)
+
   /**
    * This function is called by the networking implementation
    * when there is incoming data/message that needs to be processed.
@@ -136,29 +139,20 @@ trait MProtocol {
     if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) 
        return GOOD
 
-    val length     = cmdArrLen - CRNL.length
-    val spcPos     = arrayIndexOf(cmdArr, 0, length, SPACE)
-    val cmdLen     = if (spcPos > 0) spcPos else length
-    val cmdArgsLen = Math.max(length - (cmdLen + 1), 0)
-    val cmdArgs    = arraySplit(cmdArr, cmdLen + 1, cmdArgsLen, SPACE)
+    val length = cmdArrLen - CRNL.length
+    val spcPos = arrayIndexOf(cmdArr, 0, length, SPACE)
+    val cmdLen = if (spcPos > 0) spcPos else length
 
     findSpec(cmdArr, cmdLen, oneLineSpecLookup).map(
-      spec => {
-        if (spec.checkArgs(cmdArgs)) {
-          spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs, null))
-          GOOD
-        } else {
-          session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, length) + CRNL))
-          GOOD
-        }
-      }
+      spec => processOneLine(spec, session, cmdArr, cmdArrLen, cmdLen)
     ) orElse findSpec(cmdArr, cmdLen, twoLineSpecLookup).map(
       spec => {
-        // Handle two line message:
+        // Handle two line message, such as:
         //   <cmdName> <key> <flags> <expTime> <dataSize> [noreply]\r\n
         //         cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]\r\n
         //       VALUE <key> <flags> <dataSize> [cid]\r\n
         //
+        val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
         if (spec.checkArgs(cmdArgs)) {
           var dataSize = spec.dataSizeParse(cmdArgs)
           if (dataSize >= 0) {
@@ -182,6 +176,19 @@ trait MProtocol {
       session.write(stringToArray("ERROR " + arrayToString(cmdArr, 0, cmdLen) + CRNL)) 
       GOOD // Saw an unknown command, but keep going and process the next command.
     }
+  }
+
+  def processOneLine(spec: MSpec, 
+                     session: MSession, 
+                     cmdArr: Array[Byte],
+                     cmdArrLen: Int,
+                     cmdLen: Int): Int = {
+    val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
+    if (spec.checkArgs(cmdArgs))
+      spec.process(MCommand(session, cmdArr, cmdLen, cmdArgs, null))
+    else
+      session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, cmdArrLen)))
+    GOOD
   }
 
   def processTwoLine(spec: MSpec, 
@@ -213,11 +220,9 @@ trait MProtocol {
                                        expTime,
                                    data,
                                    cid)))
-      GOOD
-    } else {
+    } else
       session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
-      GOOD
-    }
+    GOOD
   }
 }
 
