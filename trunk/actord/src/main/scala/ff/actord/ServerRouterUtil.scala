@@ -24,7 +24,7 @@ import ff.actord.Util._
 import ff.actord.MProtocol._
 
 /**
- * An MProtocol implementation that routes messages to downstream target server(s).
+ * An MProtocol implementation that routes messages to a remote, downstream target server(s).
  */
 trait MServerRouter extends MProtocol {
   def chooseTarget(spec: MSpec, clientSession: MSession, 
