@@ -23,8 +23,11 @@ import java.net._
 import ff.actord.Util._
 import ff.actord.MProtocol._
 
-class MServerRouter(host: String, port: Int) 
+trait MServerRouter
   extends MProtocol {
+  def chooseTarget(spec: MSpec, clientSession: MSession, 
+                   cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): MRouterTarget
+
   // Register the protocol messages from the client that we will route...
   //
   override def oneLineSpecs = List(
@@ -55,25 +58,31 @@ class MServerRouter(host: String, port: Int)
 
   override def processOneLine(spec: MSpec, clientSession: MSession, 
                               cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
-    targetWrite(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
-    targetWriteFlush
-    processTargetResponse(clientSession, cmdArr, cmdArrLen)
+    val target = chooseTarget(spec, clientSession, cmdArr, cmdArrLen, cmdLen)
+
+    target.write(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
+    target.writeFlush
+
+    processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
   }
 
   override def processTwoLine(spec: MSpec, clientSession: MSession, 
                               cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int,
                               cmdArgs: Seq[String], dataSize: Int): Int = {
-    targetWrite(cmdArr, 0, cmdArrLen)
-    clientSession.readDirect(dataSize + CRNL.length, targetWriteFunc)
-    targetWriteFlush
-    processTargetResponse(clientSession, cmdArr, cmdArrLen)
+    val target = chooseTarget(spec, clientSession, cmdArr, cmdArrLen, cmdLen)
+
+    target.write(cmdArr, 0, cmdArrLen)
+    clientSession.readDirect(dataSize + CRNL.length, target.writeFunc)
+    target.writeFlush
+
+    processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
   }
 
-  def processTargetResponse(clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Int = {
+  def processTargetResponse(target: MRouterTarget, clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Int = {
     if (!noReply(cmdArr, cmdArrLen)) {
       var r = clientSession.attachment.asInstanceOf[Response]
       if (r == null) {
-          r = new Response(clientSession)
+          r = new Response(target, clientSession)
           clientSession.attachment_!(r)
       }
       r.go
@@ -94,10 +103,10 @@ class MServerRouter(host: String, port: Int)
   /**
    * Processes the response/reply from the server.
    */
-  class Response(clientSession: MSession) extends MNetworkReader with MSession with MProtocol { 
+  class Response(target: MRouterTarget, clientSession: MSession) extends MNetworkReader with MSession with MProtocol { 
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = 
       try {
-        is.read(buf, offset, length)
+        target.readResponse(buf, offset, length)
       } catch {
         case _ => close; -1
       }
@@ -149,21 +158,55 @@ class MServerRouter(host: String, port: Int)
 
   val oneLineResponseMarker = Some(MSpec("oneLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
   val twoLineResponseMarker = Some(MSpec("twoLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
+}
+
+// --------------------------------------------------
+
+trait MRouterTarget {
+  def readResponse(buf: Array[Byte], offset: Int, length: Int): Int
+
+  def write(m: String): Unit                               
+  def write(a: Array[Byte]): Unit                          
+  def write(a: Array[Byte], offset: Int, length: Int): Unit
+
+  def writeFunc: (Array[Byte], Int, Int) => Unit
+
+  def isClosed: Boolean
+
+  def close: Unit
+
+  def writeFlush: Unit
+}
+
+// --------------------------------------------------
+
+class SServerRouter(host: String, port: Int) extends MServerRouter {
+  val target = new SRouterTarget(host, port)                   
+
+  def chooseTarget(spec: MSpec, clientSession: MSession, 
+                   cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): MRouterTarget = target
+}
+
+// --------------------------------------------------
+
+class SRouterTarget(host: String, port: Int) extends MRouterTarget { // A simple router target.
+  def readResponse(buf: Array[Byte], offset: Int, length: Int): Int =
+    is.read(buf, offset, length)
 
   protected var s  = new Socket(host, port) // The downstream target server to route to.
   protected var is = s.getInputStream
   protected var os = s.getOutputStream
   protected var bs = new BufferedOutputStream(os)
 
-  def targetWrite(m: String): Unit                                = bs.write(stringToArray(m))
-  def targetWrite(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
-  def targetWrite(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
+  def write(m: String): Unit                                = bs.write(stringToArray(m))
+  def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
+  def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
 
-  def targetWriteFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
+  def writeFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
 
-  def isTargetClosed = s == null
+  def isClosed = s == null
 
-  def targetClose: Unit = {
+  def close: Unit = {
     if (s != null)
         s.close
     s  = null
@@ -172,12 +215,13 @@ class MServerRouter(host: String, port: Int)
     bs = null
   }
 
-  def targetWriteFlush: Unit = 
+  def writeFlush: Unit = 
     try {
       bs.flush
     } catch {
-      case _ => targetClose
+      case _ => close
     }
+}
 
   // unfinished: 
   //  also can do a tee here, replicator, two-level cache
@@ -219,6 +263,8 @@ class MServerRouter(host: String, port: Int)
    // The primary might be the local store.
    // The replicas might be 1 or more remote stores.
    //
+   // Analytics and remote logging might be handled as just yet another replica?
+   //
    def unifiedOp(...) = { 
      var repNBefore = _
      var repNAfter  = _
@@ -238,7 +284,6 @@ class MServerRouter(host: String, port: Int)
    MServer is a server interface
    MMainServer implements MServer, is local in-mem cache/server
    MServerProxy implements MServer, forwards msgs to a single remote server at host:port
-   MServerRouter forwards to 1 or more MServer (which might just be proxies)
-
+   MServerRouter forwards to 1 or more downstream target servers
   */
-}
+

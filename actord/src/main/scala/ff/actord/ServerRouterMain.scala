@@ -52,7 +52,7 @@ class Router {
     (new SAcceptor(createProtocol(targetHost, targetPort), 1, port)).start
 
   def createProtocol(targetHost: String, targetPort: Int): MProtocol = 
-    new MServerRouter(targetHost, targetPort)
+    new SServerRouter(targetHost, targetPort)
 
   // ------------------------------------------------------
 
