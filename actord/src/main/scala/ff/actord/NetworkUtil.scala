@@ -56,7 +56,7 @@ trait MNetworkReader {
   def messageRead: Boolean = {
     readPos = 0
 
-    // Only do a connRead if nothing remaining from last time around.
+    // Only connRead if nothing left over in our buffer from the last time around.
     //      
     val lastRead = if (available <= availablePrev) connRead(buf, available, buf.length - available) else 0
     if (lastRead <= -1) {
@@ -74,15 +74,15 @@ trait MNetworkReader {
     if (available >= waitingFor) {
       val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
                              available == availablePrev + 1) { // the entire buf again for a CR.
-                           if (buf(available - 2) == CR) {     // Assuming connRead doesn't chop up messages!
+                           if (buf(available - 2) == CR) {     // TODO: Assuming incorrectly that connRead doesn't chop up messages!
                              available - 2                 
                            } else
                              -1
                          } else
-                           bufIndexOf(available, CR)
+                           bufIndexOf(available, CR)           // TODO: Assuming incorrectly that that CR is followed by NL!
       if (indexCR < 0 ||
-          indexCR + CRNL.length > available) {
-        waitingFor += 1
+          indexCR + CRNL.length > available) { // We didn't find a CRNL in our buffer, so
+        waitingFor += 1                        // wait for more incoming bytes.
         bufEnsureSize(waitingFor)
       } else {
         val cmdLen = indexCR + CRNL.length
@@ -97,7 +97,7 @@ trait MNetworkReader {
           val bytesNeeded = messageProcess(buf, cmdLen, available)
           if (bytesNeeded <= 0) {
             if (available > readPos)
-              Array.copy(buf, readPos, buf, 0, available - readPos)
+              Array.copy(buf, readPos, buf, 0, available - readPos) // Move any unread bytes left over to the front of the buf.
             
             available -= readPos
             availablePrev = 0
