@@ -56,10 +56,8 @@ class MServerRouter(host: String, port: Int)
   override def processOneLine(spec: MSpec, clientSession: MSession, 
                               cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
     targetWrite(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
-    targetFlush
-    if (!noReply(cmdArr, cmdArrLen))  // Forward response(s) from downstream server to the client, if needed.
-      processTargetResponse(clientSession)
-    GOOD
+    targetWriteFlush
+    processTargetResponse(clientSession, cmdArr, cmdArrLen)
   }
 
   override def processTwoLine(spec: MSpec, clientSession: MSession, 
@@ -67,22 +65,21 @@ class MServerRouter(host: String, port: Int)
                               cmdArgs: Seq[String], dataSize: Int): Int = {
     targetWrite(cmdArr, 0, cmdArrLen)
     clientSession.readDirect(dataSize + CRNL.length, targetWriteFunc)
-    targetFlush
-    if (!noReply(cmdArr, cmdArrLen))
-      processTargetResponse(clientSession)
+    targetWriteFlush
+    processTargetResponse(clientSession, cmdArr, cmdArrLen)
+  }
+
+  def processTargetResponse(clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Int = {
+    if (!noReply(cmdArr, cmdArrLen)) {
+      var r = clientSession.attachment.asInstanceOf[Response]
+      if (r == null) {
+          r = new Response(clientSession)
+          clientSession.attachment_!(r)
+      }
+      r.go
+    }
     GOOD
   }
-
-  def processTargetResponse(clientSession: MSession): Unit = {
-    var r = clientSession.attachment.asInstanceOf[Response]
-    if (r == null) {
-        r = new Response(clientSession)
-        clientSession.attachment_!(r)
-    }
-    r.go
-  }
-
-  // -----------------------------------------------
 
   val VALUEBytes   = stringToArray("VALUE ")
   val NOREPLYBytes = stringToArray(" noreply" + CRNL)
@@ -105,13 +102,13 @@ class MServerRouter(host: String, port: Int)
         case _ => close; -1
       }
 
-    def connClose: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
+    def connClose: Unit = { end = true } // Overriding the meaning of 'close' to mean stop reading target responses.
 
     def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
       this.process(this, cmdArr, cmdLen, available)
 
     def ident: Long = 0L
-    def close: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
+    def close: Unit = { end = true } // Overriding the meaning of 'close' to mean stop reading target responses.
 
     def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
       println(arrayToString(bytes, offset, length)) // TODO: Log these.
@@ -175,7 +172,7 @@ class MServerRouter(host: String, port: Int)
     bs = null
   }
 
-  def targetFlush: Unit = 
+  def targetWriteFlush: Unit = 
     try {
       bs.flush
     } catch {
