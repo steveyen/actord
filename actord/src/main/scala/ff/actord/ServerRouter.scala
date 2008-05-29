@@ -110,9 +110,8 @@ class Router {
 
 class MServerRouter(host: String, port: Int) 
   extends MProtocol {
-  val oneLineRouter = (cmd: MCommand) => {} // Just a no-op, uncalled obj.
-  val twoLineRouter = (cmd: MCommand) => {} // Just a no-op, uncalled obj.
-
+  // These are the one and two-lined protocol messages from the client that we will route...
+  //
   override def oneLineSpecs = List(
     "get <key>*",
     "gets <key>*",
@@ -125,7 +124,7 @@ class MServerRouter(host: String, port: Int)
     "verbosity",
     "quit",
     "range <key_from> <key_to>"
-  ).map(s => MSpec(s, oneLineRouter))
+  ).map(s => MSpec(s, (cmd) => { throw new RuntimeException("unexpected") }))
            
   override def twoLineSpecs = List( 
     "set <key> <flags> <expTime> <dataSize> [noreply]",
@@ -135,87 +134,77 @@ class MServerRouter(host: String, port: Int)
     "prepend <key> <flags> <expTime> <dataSize> [noreply]",
     "cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]",
     "act <key> <flags> <expTime> <dataSize> [noreply]"
-  ).map(s => MSpec(s, twoLineRouter))
+  ).map(s => MSpec(s, (cmd) => { throw new RuntimeException("unexpected") }))
 
-  override def processOneLine(spec: MSpec, 
-                              session: MSession, 
-                              cmdArr: Array[Byte],
-                              cmdArrLen: Int,
-                              cmdLen: Int): Int = {
-    write(cmdArr, 0, cmdArrLen)
+  // -----------------------------------------------
+
+  override def processOneLine(spec: MSpec, session: MSession, 
+                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
+    write(cmdArr, 0, cmdArrLen)      // Forward incoming message from client to downstream server.
     flush
+    if (!noReply(cmdArr, cmdArrLen)) // Forward to the client any responses, if needed.
+      processResponse(session).go
     GOOD
   }
 
-  override def processTwoLine(spec: MSpec, 
-                              session: MSession, 
-                              cmdArr: Array[Byte],
-                              cmdArrLen: Int,
-                              cmdLen: Int,
-                              cmdArgs: Seq[String],
-                              dataSize: Int): Int = { // Called when we have all the incoming bytes of a two-lined message.
-//    session.readDirectly(data)
-
-/*
-    if (session.read == CR &&
-        session.read == NL) {
-      val expTime = spec.expTimeParse(cmdArgs)
-
-      var cid = spec.casParse(cmdArgs)
-      if (cid == -1L)
-          cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
-
-      spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs,
-                            MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
-                                   parseLong(cmdArgs(1), 0L),
-                                   if (expTime != 0L &&
-                                       expTime <= SECONDS_IN_30_DAYS)
-                                       expTime + nowInSeconds
-                                   else
-                                       expTime,
-                                   data,
-                                   cid)))
-    } else
-      session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
-*/
+  override def processTwoLine(spec: MSpec, session: MSession, 
+                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int,
+                              cmdArgs: Seq[String], dataSize: Int): Int = {
+    write(cmdArr, 0, cmdArrLen)
+    session.readDirect(dataSize + CRNL.length, writeFunc)
+    flush                      
+    if (!noReply(cmdArr, cmdArrLen))
+      processResponse(session).go
     GOOD
   }
 
-  val NOREPLY = stringToArray(" noreply" + CRNL)
+  // -----------------------------------------------
 
-  def isAsync(cmdArr: Array[Byte], cmdArrLen: Int) = 
-    if (cmdArrLen > NOREPLY.length)
-      arrayCompare(NOREPLY, 0, NOREPLY.length,
-                   cmdArr, cmdArrLen - NOREPLY.length, NOREPLY.length) == 0
+  def processResponse(clientSession: MSession) = // Forward any responses back to the client.
+    new Response(new MProtocol {
+      override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
+        if (arrayCompare(VALUEBytes, x) == 0)
+          twoLineResponseMarker
+        else
+          oneLineResponseMarker
+
+      override def processOneLine(spec: MSpec, 
+                                  session: MSession, 
+                                  cmdArr: Array[Byte],
+                                  cmdArrLen: Int,
+                                  cmdLen: Int): Int = {
+        clientSession.write(cmdArr, 0, cmdArrLen)
+        close // Response.this.close -- stop reading responses, since we got our one-line response like END, STORED, etc.
+        GOOD
+      }
+
+      override def processTwoLine(spec: MSpec, 
+                                  session: MSession, 
+                                  cmdArr: Array[Byte],
+                                  cmdArrLen: Int,
+                                  cmdLen: Int,
+                                  cmdArgs: Seq[String],
+                                  dataSize: Int): Int = {
+        clientSession.write(cmdArr, 0, cmdArrLen)
+        session.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
+        GOOD
+      }
+
+      val clientSessionWriteFunc = (a: Array[Byte], offset: Int, length: Int) => clientSession.write(a, offset, length)
+    })
+
+  val oneLineResponseMarker = Some(MSpec("oneLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
+  val twoLineResponseMarker = Some(MSpec("twoLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
+
+  val VALUEBytes   = stringToArray("VALUE ")
+  val NOREPLYBytes = stringToArray(" noreply" + CRNL)
+
+  def noReply(cmdArr: Array[Byte], cmdArrLen: Int): Boolean = 
+    if (cmdArrLen > NOREPLYBytes.length)
+      arrayCompare(NOREPLYBytes, 0, NOREPLYBytes.length,
+                   cmdArr, cmdArrLen - NOREPLYBytes.length, NOREPLYBytes.length) == 0
     else
       false
-
-  protected var s  = new Socket(host, port) // The target server to route to.
-  protected var is = s.getInputStream
-  protected var os = s.getOutputStream
-  protected var bs = new BufferedOutputStream(os)
-
-  def write(m: String): Unit                                = bs.write(stringToArray(m))
-  def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
-  def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
-
-  def isClosed = s == null
-
-  def close: Unit = {
-    if (s != null)
-        s.close
-    s  = null
-    is = null
-    os = null
-    bs = null
-  }
-
-  def flush: Unit = 
-    try {
-      bs.flush
-    } catch {
-      case _ => close
-    }
 
   /**
    * Processes the response/reply from the server.
@@ -243,222 +232,35 @@ class MServerRouter(host: String, port: Int)
     def go  = while (!end) messageRead
   }
 
-/*
-  val responseProtocol = new MProtocol {
-    override def twoLineSpecs = List(
-      new MSpec("VALUE <key> <flags> <dataSize> [cid]", (cmd) => { xs = cmd.entry :: xs }) {
-        override def casParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_cas, 0L)
-      })
-    override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-      super.findSpec(x, xLen, lookup).
-            orElse(oneLineResponse)
-  }
-*/
+  protected var s  = new Socket(host, port) // The target server to route to.
+  protected var is = s.getInputStream
+  protected var os = s.getOutputStream
+  protected var bs = new BufferedOutputStream(os)
 
-  val oneLineResponse = Some(
-    MSpec("N/A", 
-          (cmd) => { 
-//            cmd.reply(cmd.cmdArr) 
-    })
-  )
+  def write(m: String): Unit                                = bs.write(stringToArray(m))
+  def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
+  def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
 
-  def responseValues: Iterator[MEntry] = {
-    var xs: List[MEntry] = Nil
-    new Response(new MProtocol {
-      override def oneLineSpecs = List(MSpec("END", (cmd) => { cmd.session.close }))
-      override def twoLineSpecs = List(
-        new MSpec("VALUE <key> <flags> <dataSize> [cid]", (cmd) => { xs = cmd.entry :: xs }) {
-          override def casParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_cas, 0L)
-        })
-    }).go
-    xs.elements
+  def writeFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
+
+  def isClosed = s == null
+
+  def close: Unit = {
+    if (s != null)
+        s.close
+    s  = null
+    is = null
+    os = null
+    bs = null
   }
 
-  def response(good: String, fail: String, async: Boolean): Boolean = {
-    var result = true
-    if (!async) 
-      new Response(new MProtocol {
-        override def oneLineSpecs = List(
-          MSpec(good, (cmd) => { result = true;  cmd.session.close }),
-          MSpec(fail, (cmd) => { result = false; cmd.session.close }))
-      }).go
-    result
-  }
+  def flush: Unit = 
+    try {
+      bs.flush
+    } catch {
+      case _ => close
+    }
 
-  val getBytes      = stringToArray("get ")
-  val getsBytes     = stringToArray("gets ")
-  val setBytes      = stringToArray("set ")
-  val deleteBytes   = stringToArray("delete ")
-  val incrBytes     = stringToArray("incr ")
-  val decrBytes     = stringToArray("decr ")
-  val addBytes      = stringToArray("add ")
-  val replaceBytes  = stringToArray("replace ")
-  val appendBytes   = stringToArray("append ")
-  val prependBytes  = stringToArray("prepend ")
-  val casBytes      = stringToArray("cas ")
-  val rangeBytes    = stringToArray("range ")
-  val actBytes      = stringToArray("act ")
-  val flushAllBytes = stringToArray("flush_all ")
-  val noreplyBytes  = stringToArray(" noreply")
-
-  def get(keys: Seq[String]): Iterator[MEntry] = { // We send a gets, instead of a get, in order
-    write(getsBytes)                               // to receive full CAS information.
-    write(keys.mkString(" "))
-    write(CRNLBytes)
-    flush
-    responseValues
-  }
-
-  def writeNoReplyFlag(async: Boolean): Unit =
-    if (async)
-      write(noreplyBytes)
-
-  def set(el: MEntry, async: Boolean): Boolean = {
-    write(setBytes)
-    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
-    writeNoReplyFlag(async)
-    write(CRNLBytes)
-    write(el.data)
-    write(CRNLBytes)
-    flush
-    response("STORED", "NOT_STORED", async)
-  }
-
-  def delete(key: String, time: Long, async: Boolean): Boolean = {
-    write(deleteBytes)
-    write(key + " " + time)
-    writeNoReplyFlag(async)
-    write(CRNLBytes)
-    flush
-    response("DELETED", "NOT_FOUND", async)
-  }
-
-  /**
-   * A transport protocol can convert incoming incr/decr messages to delta calls.
-   */
-  def delta(key: String, mod: Long, async: Boolean): Long = {
-    if (mod > 0L) 
-      write(incrBytes)
-    else 
-      write(decrBytes)
-    write(key + " " + Math.abs(mod))
-    writeNoReplyFlag(async)
-    write(CRNLBytes)
-    flush
-
-    var result = -1L
-    if (!async) 
-      new Response(new MProtocol {
-        override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-          Some(MSpec("UNUSED", (cmd) => { 
-            val s = arrayToString(x, 0, xLen)
-            if (s != "NOT_FOUND")
-              result = parseLong(s, -1L)
-            cmd.session.close 
-          }))
-      }).go
-    result
-  }
-    
-  /**
-   * For add or replace.
-   */
-  def addRep(el: MEntry, isAdd: Boolean, async: Boolean): Boolean = {
-    if (isAdd) 
-      write(addBytes)
-    else
-      write(replaceBytes)
-    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
-    writeNoReplyFlag(async)
-    write(CRNLBytes)
-    write(el.data)
-    write(CRNLBytes)
-    flush
-    response("STORED", "NOT_STORED", async)
-  }
-
-  /**
-   * A transport protocol can convert incoming append/prepend messages to xpend calls.
-   */
-  def xpend(el: MEntry, append: Boolean, async: Boolean): Boolean = {
-    if (append) 
-      write(appendBytes)
-    else
-      write(prependBytes)
-    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
-    writeNoReplyFlag(async)
-    write(CRNLBytes)
-    write(el.data)
-    write(CRNLBytes)
-    flush
-    response("STORED", "NOT_STORED", async)
-  }
-
-  /**
-   * For CAS mutation.
-   */  
-  def checkAndSet(el: MEntry, cid: Long, async: Boolean): String = {
-    write(casBytes)
-    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length + " " + cid)
-    writeNoReplyFlag(async)
-    write(CRNLBytes)
-    write(el.data)
-    write(CRNLBytes)
-    flush
-
-    var result = ""
-    if (!async) 
-      new Response(new MProtocol {
-        override def oneLineSpecs = List(
-          MSpec("STORED",    (cmd) => { result = "STORED";    cmd.session.close }),
-          MSpec("EXISTS",    (cmd) => { result = "EXISTS";    cmd.session.close }),
-          MSpec("NOT_FOUND", (cmd) => { result = "NOT_FOUND"; cmd.session.close }))
-      }).go
-    result
-  }
-
-  /**
-   * The keys in the returned Iterator are unsorted.
-   */
-  def keys: Iterator[String] = Nil.elements
-  
-  def flushAll(expTime: Long): Unit = {
-    write(flushAllBytes)
-    write(expTime.toString)
-    write(CRNLBytes)
-    flush
-    response("OK", "NOT_OK", false)
-  }
-  
-  def stats: MServerStats = null
-
-  /**
-   * The keyFrom is the range's lower-bound, inclusive.
-   * The keyTo is the range's upper-bound, exclusive.
-   */
-  def range(keyFrom: String, keyTo: String): Iterator[MEntry] = {
-    write(rangeBytes)
-    write(keyFrom)
-    write(SPACEBytes)
-    write(keyTo)
-    write(CRNLBytes)
-    flush
-    responseValues
-  }
-
-  def act(el: MEntry, async: Boolean): Iterator[MEntry] = {
-    write(actBytes)
-    write(el.key + " " + el.flags + " " + el.expTime + " " + el.data.length)
-    writeNoReplyFlag(async)
-    write(CRNLBytes)
-    write(el.data)
-    write(CRNLBytes)
-    flush
-    responseValues
-  }
-}
-
-class RouterProtocol(targetHost: String, targetPort: Int) extends MProtocolServer(null) {
   // unfinished: 
   //  also can do a tee here, replicator, two-level cache
   /*
