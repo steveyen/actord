@@ -87,8 +87,8 @@ class MServerProxy(host: String, port: Int)
   def responseValues: Iterator[MEntry] = {
     var xs: List[MEntry] = Nil
     new Response(new MProtocol {
-      override def singleLineSpecs = List(MSpec("END", (cmd) => { cmd.session.close }))
-      override def  multiLineSpecs = List(
+      override def oneLineSpecs = List(MSpec("END", (cmd) => { cmd.session.close }))
+      override def twoLineSpecs = List(
         new MSpec("VALUE <key> <flags> <dataSize> [cid]", (cmd) => { xs = cmd.entry :: xs }) {
           override def casParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_cas, 0L)
         })
@@ -100,7 +100,7 @@ class MServerProxy(host: String, port: Int)
     var result = true
     if (!async) 
       new Response(new MProtocol {
-        override def singleLineSpecs = List(
+        override def oneLineSpecs = List(
           MSpec(good, (cmd) => { result = true;  cmd.session.close }),
           MSpec(fail, (cmd) => { result = false; cmd.session.close }))
       }).go
@@ -231,7 +231,7 @@ class MServerProxy(host: String, port: Int)
     var result = ""
     if (!async) 
       new Response(new MProtocol {
-        override def singleLineSpecs = List(
+        override def oneLineSpecs = List(
           MSpec("STORED",    (cmd) => { result = "STORED";    cmd.session.close }),
           MSpec("EXISTS",    (cmd) => { result = "EXISTS";    cmd.session.close }),
           MSpec("NOT_FOUND", (cmd) => { result = "NOT_FOUND"; cmd.session.close }))
