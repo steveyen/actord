@@ -140,6 +140,18 @@ object Util {
     aLength - bLength
   }
 
+  def arrayStartsWith(a: Array[Byte], aLength: Int, prefix: Array[Byte]): Boolean = 
+    if (aLength > prefix.length)
+      arrayCompare(prefix, 0, prefix.length, a, 0, prefix.length) == 0
+    else
+      false
+
+  def arrayEndsWith(a: Array[Byte], aLength: Int, suffix: Array[Byte]): Boolean = 
+    if (aLength > suffix.length)
+      arrayCompare(suffix, 0, suffix.length, a, aLength - suffix.length, suffix.length) == 0
+    else
+      false
+
   def arrayHash(a: Array[Byte]): Int = {
     val F32_INIT  = 2166136261L // Simple hashCode doesn't work on Array[Byte].
     val F32_PRIME = 16777619

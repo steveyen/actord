@@ -83,7 +83,7 @@ trait MServerRouter extends MProtocol {
   // -----------------------------------------------
 
   def processTargetResponse(target: MRouterTarget, clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Int = {
-    if (!noReply(cmdArr, cmdArrLen)) {
+    if (!arrayEndsWith(cmdArr, cmdArrLen, NOREPLYBytes)) {
       var m = clientSession.attachment.asInstanceOf[mutable.Map[MRouterTarget, TargetResponse]]
       if (m == null) {
           m = new mutable.HashMap[MRouterTarget, TargetResponse]
@@ -101,15 +101,9 @@ trait MServerRouter extends MProtocol {
     GOOD
   }
 
-  def noReply(cmdArr: Array[Byte], cmdArrLen: Int): Boolean = 
-    if (cmdArrLen > NOREPLYBytes.length)
-      arrayCompare(NOREPLYBytes, 0, NOREPLYBytes.length,
-                   cmdArr, cmdArrLen - NOREPLYBytes.length, NOREPLYBytes.length) == 0
-    else
-      false
-
   val NOREPLYBytes = stringToArray(" noreply" + CRNL)
   val VALUEBytes   = stringToArray("VALUE ")
+  val STATBytes    = stringToArray("STAT ")
 
   /**
    * Processes the response/reply from the downstream target server.
@@ -138,7 +132,7 @@ trait MServerRouter extends MProtocol {
     def go  = while (!end) messageRead
 
     override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-      if (arrayCompare(VALUEBytes, x) == 0)
+      if (arrayStartsWith(x, xLen, VALUEBytes))
         twoLineResponseMarker
       else
         oneLineResponseMarker
@@ -148,8 +142,14 @@ trait MServerRouter extends MProtocol {
                                 cmdArr: Array[Byte], // Target response bytes.
                                 cmdArrLen: Int,
                                 cmdLen: Int): Int = {
+      // See if need to stop the messageRead loop, if the downstream target server 
+      // responded with anything but STAT, such as END, STORED, NOT_STORED, etc.
+      //
+      if (!arrayStartsWith(cmdArr, cmdArrLen, STATBytes))
+        close 
+
       clientSession.write(cmdArr, 0, cmdArrLen)
-      close // Stop messageRead loop, as we got a one-line response like END, STORED, etc, from the downstream target server.
+
       GOOD
     }
 
