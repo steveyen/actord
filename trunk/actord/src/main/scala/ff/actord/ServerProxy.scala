@@ -20,6 +20,12 @@ import java.net._
 
 import ff.actord.Util._
 
+/**
+ * The MServerProxy is a simple proxy to a remote memcached/actord server (running at host:port).
+ * Its 'local' interface is just MServer.  As such, it's an interesting exercise in using
+ * the MNetworkReader class on the client-side, but also displays the famous fallacies of 
+ * distributed computing, such as not surfacing network errors, timeouts, etc, in its API.
+ */
 class MServerProxy(host: String, port: Int) 
   extends MServer {
   def subServerList: List[MSubServer] = Nil
@@ -94,8 +100,8 @@ class MServerProxy(host: String, port: Int)
   val flushAllBytes = stringToArray("flush_all ")
   val noreplyBytes  = stringToArray(" noreply")
 
-  def get(keys: Seq[String]): Iterator[MEntry] = {
-    write(getsBytes)
+  def get(keys: Seq[String]): Iterator[MEntry] = { // We send a gets, instead of a get, in order
+    write(getsBytes)                               // to receive full CAS information.
     write(keys.mkString(" "))
     write(CRNLBytes)
     flush
