@@ -22,30 +22,53 @@ import ff.actord.Util._
 
 /**
  * The MServerProxy is a simple proxy to a remote memcached/actord server (running at host:port).
- * Its 'local' interface is just MServer.  As such, it's an interesting exercise in using
- * the MNetworkReader class on the client-side, but also displays the famous fallacies of 
- * distributed computing, such as not surfacing network errors, timeouts, etc, in its API.
+ * Its 'local' interface is just MServer, and it's an interesting exercise in using the
+ * MNetworkReader implementation on the client-side.  But, it also displays some of the 
+ * famous fallacies of distributed computing, such as not surfacing timeouts, etc, in the API.
+ * Meant for single-threaded usage.
  */
 class MServerProxy(host: String, port: Int) 
   extends MServer {
   def subServerList: List[MSubServer] = Nil
   
-  val s  = new Socket(host, port)
-  val is = s.getInputStream
-  val os = s.getOutputStream
-  val bs = new BufferedOutputStream(os)
+  protected var s  = new Socket(host, port)
+  protected var is = s.getInputStream
+  protected var os = s.getOutputStream
+  protected var bs = new BufferedOutputStream(os)
 
   def write(m: String): Unit                                = bs.write(stringToArray(m))
   def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
   def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
 
-  def flush = bs.flush
+  def isClosed = s == null
+
+  def close: Unit = {
+    if (s != null)
+        s.close
+    s  = null
+    is = null
+    os = null
+    bs = null
+  }
+
+  def flush: Unit = 
+    try {
+      bs.flush
+    } catch {
+      case _ => close
+    }
 
   /**
    * Processes the response/reply from the server.
    */
   class Response(protocol: MProtocol) extends MNetworkReader with MSession { 
-    def connRead(buf: Array[Byte], offset: Int, length: Int): Int = is.read(buf, offset, length)
+    def connRead(buf: Array[Byte], offset: Int, length: Int): Int = 
+      try {
+        is.read(buf, offset, length)
+      } catch {
+        case _ => close; -1
+      }
+
     def connClose: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
 
     def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
