@@ -117,15 +117,25 @@ object Util {
     -1
   }
 
-  def arrayCompare(a: Array[Byte], b: Array[Byte]): Int = arrayCompare(a, a.length, b, b.length)
-  def arrayCompare(a: Array[Byte], aLength: Int, b: Array[Byte], bLength: Int): Int = { // Like memcmp.
+  def arrayCompare(a: Array[Byte], b: Array[Byte]): Int = 
+      arrayCompare(a, 0, a.length, b, 0, b.length)
+
+  def arrayCompare(a: Array[Byte], aLength: Int, b: Array[Byte], bLength: Int): Int = 
+      arrayCompare(a, 0, aLength, b, 0, bLength)
+
+  def arrayCompare(a: Array[Byte], aOffset: Int, aLength: Int, 
+                   b: Array[Byte], bOffset: Int, bLength: Int): Int = { // Like memcmp.
     val len = if (aLength < bLength) aLength else bLength
-    var i = 0
-    while (i < len) {
-      val c = a(i) - b(i)
+    var ii = 0
+    var ia = aOffset
+    var ib = bOffset
+    while (ii < len) {
+      val c = a(ia) - b(ib)
       if (c != 0)
          return c
-      i += 1
+      ii += 1
+      ia += 1
+      ib += 1
     }
     aLength - bLength
   }

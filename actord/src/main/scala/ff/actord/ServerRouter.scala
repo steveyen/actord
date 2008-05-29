@@ -106,8 +106,90 @@ class Router {
   )
 }
 
+// ------------------------------------------------------
+
 class MServerRouter(host: String, port: Int) 
   extends MProtocol {
+  val oneLineRouter = (cmd: MCommand) => {} // Just a no-op, uncalled obj.
+  val twoLineRouter = (cmd: MCommand) => {} // Just a no-op, uncalled obj.
+
+  override def oneLineSpecs = List(
+    "get <key>*",
+    "gets <key>*",
+    "delete <key> [<time>] [noreply]",
+    "incr <key> <value> [noreply]",
+    "decr <key> <value> [noreply]",
+    "stats [<arg>]",
+    "flush_all [<delay>] [noreply]",
+    "version", 
+    "verbosity",
+    "quit",
+    "range <key_from> <key_to>"
+  ).map(s => MSpec(s, oneLineRouter))
+           
+  override def twoLineSpecs = List( 
+    "set <key> <flags> <expTime> <dataSize> [noreply]",
+    "add <key> <flags> <expTime> <dataSize> [noreply]",
+    "replace <key> <flags> <expTime> <dataSize> [noreply]",
+    "append <key> <flags> <expTime> <dataSize> [noreply]",
+    "prepend <key> <flags> <expTime> <dataSize> [noreply]",
+    "cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]",
+    "act <key> <flags> <expTime> <dataSize> [noreply]"
+  ).map(s => MSpec(s, twoLineRouter))
+
+  override def processOneLine(spec: MSpec, 
+                              session: MSession, 
+                              cmdArr: Array[Byte],
+                              cmdArrLen: Int,
+                              cmdLen: Int): Int = {
+    write(cmdArr, 0, cmdArrLen)
+    flush
+    GOOD
+  }
+
+  override def processTwoLine(spec: MSpec, 
+                              session: MSession, 
+                              cmdArr: Array[Byte],
+                              cmdArrLen: Int,
+                              cmdLen: Int,
+                              cmdArgs: Seq[String],
+                              dataSize: Int): Int = { // Called when we have all the incoming bytes of a two-lined message.
+//    session.readDirectly(data)
+
+/*
+    if (session.read == CR &&
+        session.read == NL) {
+      val expTime = spec.expTimeParse(cmdArgs)
+
+      var cid = spec.casParse(cmdArgs)
+      if (cid == -1L)
+          cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
+
+      spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs,
+                            MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
+                                   parseLong(cmdArgs(1), 0L),
+                                   if (expTime != 0L &&
+                                       expTime <= SECONDS_IN_30_DAYS)
+                                       expTime + nowInSeconds
+                                   else
+                                       expTime,
+                                   data,
+                                   cid)))
+    } else
+      session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
+*/
+    GOOD
+  }
+
+  val NOREPLY = stringToArray(" noreply" + CRNL)
+
+  def isAsync(cmdArr: Array[Byte], cmdArrLen: Int) = 
+    if (cmdArrLen > NOREPLY.length)
+      arrayCompare(NOREPLY, 0, NOREPLY.length,
+                   cmdArr, cmdArrLen - NOREPLY.length, NOREPLY.length) == 0
+    else
+      false
+
   protected var s  = new Socket(host, port) // The target server to route to.
   protected var is = s.getInputStream
   protected var os = s.getOutputStream
@@ -134,47 +216,6 @@ class MServerRouter(host: String, port: Int)
     } catch {
       case _ => close
     }
-
-  val oneLineRouter = (cmd: MCommand) => { 
-    write(cmd.cmdArr, 0, cmd.cmdArrLen)
-    flush
-
-//    if (cmd.
-
-//    svr.get(cmd.args).
-//        foreach(el => cmd.write(el, false))
-    cmd.reply(END)
-  }
-
-  val twoLineRouter = (cmd: MCommand) => { 
-//    svr.get(cmd.args).
-//        foreach(el => cmd.write(el, false))
-    cmd.reply(END)
-  }
-
-  override def oneLineSpecs = List(
-    "get <key>*",
-    "gets <key>*",
-    "delete <key> [<time>] [noreply]",
-    "incr <key> <value> [noreply]",
-    "decr <key> <value> [noreply]",
-    "stats [<arg>]",
-    "flush_all [<delay>] [noreply]",
-    "version", 
-    "verbosity",
-    "quit",
-    "range <key_from> <key_to>"
-  ).map(s => MSpec(s, oneLineRouter))
-           
-  override def twoLineSpecs = List( 
-    "set <key> <flags> <expTime> <dataSize> [noreply]",
-    "add <key> <flags> <expTime> <dataSize> [noreply]",
-    "replace <key> <flags> <expTime> <dataSize> [noreply]",
-    "append <key> <flags> <expTime> <dataSize> [noreply]",
-    "prepend <key> <flags> <expTime> <dataSize> [noreply]",
-    "cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]",
-    "act <key> <flags> <expTime> <dataSize> [noreply]"
-  ).map(s => MSpec(s, twoLineRouter))
 
   /**
    * Processes the response/reply from the server.
