@@ -23,8 +23,7 @@ import java.net._
 import ff.actord.Util._
 import ff.actord.MProtocol._
 
-trait MServerRouter
-  extends MProtocol {
+trait MServerRouter extends MProtocol {
   def chooseTarget(spec: MSpec, clientSession: MSession, 
                    cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): MRouterTarget
 
@@ -180,7 +179,7 @@ trait MRouterTarget {
 
 // --------------------------------------------------
 
-class SServerRouter(host: String, port: Int) extends MServerRouter {
+class SServerRouter(host: String, port: Int) extends MServerRouter { // A simple router.
   val target = new SRouterTarget(host, port)                   
 
   def chooseTarget(spec: MSpec, clientSession: MSession, 
