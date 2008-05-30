@@ -83,11 +83,13 @@ trait MServerRouter extends MProtocol {
       target.writeFlush
       processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
     }
+
+    GOOD
   }
 
   // -----------------------------------------------
 
-  def processTargetResponse(target: MRouterTarget, clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Int = {
+  def processTargetResponse(target: MRouterTarget, clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Unit = {
     if (!arrayEndsWith(cmdArr, cmdArrLen, NOREPLYBytes)) {
       var m = clientSession.attachment.asInstanceOf[mutable.Map[MRouterTarget, TargetResponse]]
       if (m == null) {
@@ -103,7 +105,6 @@ trait MServerRouter extends MProtocol {
               }
       r.go
     }
-    GOOD
   }
 
   val NOREPLYBytes = stringToArray(" noreply" + CRNL)
