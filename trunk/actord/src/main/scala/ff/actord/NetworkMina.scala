@@ -61,7 +61,8 @@ class MMinaDecoder(protocol: MProtocol) extends MessageDecoder {
   val charsetDecoder     = Charset.forName("US-ASCII").newDecoder
   val MIN_CMD_SIZE       = "quit\r\n".length
   val WAITING_FOR        = new AttributeKey(getClass, "waiting_for")  
-  val STATS              = new AttributeKey(getClass, "stats")  
+  val ATTACHMENT         = new AttributeKey(getClass, "attachment")  
+  val STATS              = new AttributeKey(getClass, "stats")
   
   def decodable(session: IoSession, in: IoBuffer): MessageDecoderResult = {
     val waitingFor = session.getAttribute(WAITING_FOR, ZERO).asInstanceOf[java.lang.Integer].intValue
@@ -127,7 +128,7 @@ class MMinaDecoder(protocol: MProtocol) extends MessageDecoder {
       buf.get(bytes, offset, length)
 
     def readDirect(length: Int, recv: (Array[Byte], Int, Int) => Unit): Unit = {
-      val buf = new Array[Byte](length) // TODO: An inefficient implementation with throwaway extra copy.
+      val buf = new Array[Byte](length) // TODO: An inefficient implementation with a throwaway extra copy.
       read(buf)
       recv(buf, 0, length)
     }
@@ -136,6 +137,9 @@ class MMinaDecoder(protocol: MProtocol) extends MessageDecoder {
       sess.write(IoBuffer.wrap(bytes, offset, length))
   
     def numMessages: Long = sess.getReadMessages
+
+    override def attachment              = sess.getAttribute(ATTACHMENT)
+    override def attachment_!(x: AnyRef) = sess.setAttribute(ATTACHMENT, x)
   }
 }
 
