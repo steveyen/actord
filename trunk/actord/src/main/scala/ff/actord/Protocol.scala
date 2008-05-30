@@ -84,8 +84,8 @@ case class MSpec(line: String, process: (MCommand) => Unit) {
  * The text protocol is defined at:
  * http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt
  *
- * This class should be networking implementation independent.  You
- * should not find any java IO or NIO or mina or grizzly words here.
+ * The MProtocol stuff should be networking implementation independent.  
+ * You should not find any java IO or NIO or mina or grizzly words here.
  */
 object MProtocol {
   val OK           = stringToArray("OK"         + CRNL)
