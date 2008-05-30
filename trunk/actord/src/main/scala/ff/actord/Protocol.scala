@@ -59,9 +59,23 @@ case class MSpec(line: String, process: (MCommand) => Unit) {
   val pos_expTime  = argsRest.indexOf("<expTime>")
   val pos_cas      = Math.max(argsRest.indexOf("<cid>"), argsRest.indexOf("[cid]"))
 
-  def dataSizeParse(cmdArgs: Seq[String]) = itemToInt(cmdArgs, pos_dataSize, -1)
-  def expTimeParse(cmdArgs: Seq[String])  = itemToLong(cmdArgs, pos_expTime,  0L)
-  def casParse(cmdArgs: Seq[String])      = itemToLong(cmdArgs, pos_cas, -1L)
+  def dataSizeParse(cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
+    if (pos_dataSize >= 0) {
+      val spcBefore = arrayNthIndexOf(cmdArr, cmdLen, cmdArrLen - CRNL.length - cmdLen, SPACE, pos_dataSize + 1)
+      if (spcBefore >= cmdLen) {
+        val start = spcBefore + 1
+        var spcAfter = arrayIndexOf(cmdArr, start, cmdArrLen - CRNL.length - start, SPACE)
+        if (spcAfter == -1) 
+            spcAfter = cmdArrLen - CRNL.length
+        if (spcAfter > start)
+            return arrayParsePositiveInt(cmdArr, start, spcAfter - start)
+      }
+    }
+    -1
+  }
+
+  def expTimeParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_expTime,  0L)
+  def casParse(cmdArgs: Seq[String])     = itemToLong(cmdArgs, pos_cas, -1L)
 }
 
 // -------------------------------------------------------
@@ -161,7 +175,7 @@ trait MProtocol {
         //
         val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
         if (spec.checkArgs(cmdArgs)) {
-          var dataSize = spec.dataSizeParse(cmdArgs)
+          var dataSize = spec.dataSizeParse(cmdArr, cmdArrLen, cmdLen)
           if (dataSize >= 0) {
             val totalNeeded = cmdArrLen + dataSize + CRNL.length
             if (totalNeeded <= readyCount) {
