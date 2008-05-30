@@ -137,7 +137,7 @@ trait MProtocol {
   final val GOOD               = 0
   final val SECONDS_IN_30_DAYS = 60*60*24*30
 
-  def processArgs(cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Seq[String] = 
+  def processArgs(cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Seq[String] = // NOTE: Alloc's memory.
     arraySplit(cmdArr, cmdLen + 1, Math.max(cmdArrLen - CRNL.length - (cmdLen + 1), 0), SPACE)
 
   /**
@@ -147,6 +147,13 @@ trait MProtocol {
    * Returns how many bytes more need to be read before
    * the message can be processed successfully.  Or, just
    * returns 0 (or OK) to mean we've processed the message.
+   *
+   * Note that we try mightily to avoid memory alloc all the way
+   * from the network layers up to this method, and instead pass 
+   * around the reused buffer array.  So, no "new String(...).split()" here.
+   *
+   * This method eventually calls processOneLine/processTwoLine, which
+   * do the real work, and of course might alloc memory.
    *
    * cmdArr     - the incoming message command line bytes, including CRNL, and maybe more. 
    * cmdArrLen  - tells us what part of the cmdArr belongs to the command line, including CRNL.
@@ -158,12 +165,14 @@ trait MProtocol {
               cmdArrLen: Int,      // Number of command line bytes in cmdArr, including CRNL.
               readyCount: Int): Int = {
     if (BENCHMARK_NETWORK_ONLY.shortCircuit(session, cmdArr, cmdArrLen)) 
-       return GOOD
+      return GOOD
 
     val length = cmdArrLen - CRNL.length
     val spcPos = arrayIndexOf(cmdArr, 0, length, SPACE)
     val cmdLen = if (spcPos > 0) spcPos else length
 
+    // TODO: Try to remove the alloc'ed closures and Option here.
+    //
     findSpec(cmdArr, cmdLen, oneLineSpecLookup).map(
       spec => processOneLine(spec, session, cmdArr, cmdArrLen, cmdLen)
     ) orElse findSpec(cmdArr, cmdLen, twoLineSpecLookup).map(
