@@ -62,10 +62,11 @@ trait MServerRouter extends MProtocol {
                               cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
     val target = chooseTarget(spec, clientSession, cmdArr, cmdArrLen, cmdLen)
 
-    target.write(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
-    target.writeFlush
-
-    processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
+    target.synchronized {
+      target.write(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
+      target.writeFlush
+      processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
+    }
   }
 
   override def processTwoLine(spec: MSpec, clientSession: MSession, 
@@ -73,11 +74,12 @@ trait MServerRouter extends MProtocol {
                               cmdArgs: Seq[String], dataSize: Int): Int = {
     val target = chooseTarget(spec, clientSession, cmdArr, cmdArrLen, cmdLen)
 
-    target.write(cmdArr, 0, cmdArrLen)
-    clientSession.readDirect(dataSize + CRNL.length, target.writeFunc)
-    target.writeFlush
-
-    processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
+    target.synchronized {
+      target.write(cmdArr, 0, cmdArrLen)
+      clientSession.readDirect(dataSize + CRNL.length, target.writeFunc)
+      target.writeFlush
+      processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
+    }
   }
 
   // -----------------------------------------------
