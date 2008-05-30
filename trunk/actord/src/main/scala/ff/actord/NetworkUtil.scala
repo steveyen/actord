@@ -79,12 +79,12 @@ trait MNetworkReader {
     if (available >= waitingFor) {
       val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
                              available == availablePrev + 1) { // the entire buf again for a CR.
-                           if (buf(available - 2) == CR) {     // TODO: Assuming incorrectly that connRead doesn't chop up messages!
-                             available - 2                     // TODO: Assuming incorrectly that we get one message at a time!
+                           if (buf(available - 2) == CR) {     // TODO: What if connRead reads a chopped up messages?
+                             available - 2                     // TODO: What if connRead gives >1 message?
                            } else
                              -1
                          } else
-                           bufIndexOf(available, CR)           // TODO: Assuming incorrectly that that CR is followed by NL!
+                           bufIndexOf(available, CR)           // TODO: What if CR is not followed by NL?
       if (indexCR < 0 ||
           indexCR + CRNL.length > available) { // We didn't find a CRNL in our buffer, so
         waitingFor += 1                        // wait for more incoming bytes.
