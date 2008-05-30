@@ -43,8 +43,8 @@ trait MSession {
  * Represents a specification, of a command in the protocol.
  *
  * TODO: Need a better process() signature if we want to handle async streaming?
- * TODO: Research how mina allows request and response streaming.
- * TODO: Is there an equivalent of writev/readv in mina?
+ * TODO: Research how networking stacks allow request and response streaming.
+ * TODO: Is there an equivalent of writev/readv in mina, grizzly, socket I/O?
  */
 case class MSpec(line: String, process: (MCommand) => Unit) {
   val args      = line.split(" ")
