@@ -70,6 +70,21 @@ object Util {
     dest
   }
 
+  /**
+   * For example, arrayParsePositiveInt("1234".getBytes, 0, 4) == 1234.
+   * Does not work on negatives.
+   */
+  def arrayParsePositiveInt(a: Array[Byte], offset: Int, length: Int): Int = { 
+    var x: Int = a(offset).toInt - '0'
+    var i: Int = offset + 1
+    val j: Int = offset + length
+    while (i < j) {
+      x = (x * 10) + (a(i).toInt - '0')
+      i += 1
+    }
+    x
+  }
+
   def arrayEnsureSize[T](a: Array[T], length: Int): Array[T] = {
     if (length <= a.length)
       a
