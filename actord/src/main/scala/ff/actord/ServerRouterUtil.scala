@@ -63,8 +63,7 @@ trait MServerRouter extends MProtocol {
     routeClientMessage(spec, clientSession, cmdArr, cmdArrLen, cmdLen, -1)                              
 
   override def processTwoLine(spec: MSpec, clientSession: MSession, 
-                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int,
-                              cmdArgs: Seq[String], dataSize: Int): Int = 
+                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int, dataSize: Int): Int = 
     routeClientMessage(spec, clientSession, cmdArr, cmdArrLen, cmdLen, dataSize)
 
   // -----------------------------------------------
@@ -164,7 +163,6 @@ trait MServerRouter extends MProtocol {
                                 cmdArr: Array[Byte], // Target response bytes.
                                 cmdArrLen: Int,
                                 cmdLen: Int,
-                                cmdArgs: Seq[String],
                                 dataSize: Int): Int = {
       clientSession.write(cmdArr, 0, cmdArrLen)
       targetSession.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
