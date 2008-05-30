@@ -128,9 +128,16 @@ class MMinaDecoder(protocol: MProtocol) extends MessageDecoder {
       buf.get(bytes, offset, length)
 
     def readDirect(length: Int, recv: (Array[Byte], Int, Int) => Unit): Unit = {
-      val buf = new Array[Byte](length) // TODO: An inefficient implementation with a throwaway extra copy.
-      read(buf)
-      recv(buf, 0, length)
+      if (buf.hasArray) {
+        if (length > buf.remaining)
+          throw new RuntimeException("readDirect of more bytes than available")
+        recv(buf.array, buf.arrayOffset + buf.position, length)
+        buf.position(buf.position + length)
+      } else {
+        val buf = new Array[Byte](length) // Default to inefficient implementation with a throwaway extra copy.
+        read(buf)
+        recv(buf, 0, length)
+      }
     }
   
     def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
