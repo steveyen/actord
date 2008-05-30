@@ -117,6 +117,25 @@ object Util {
     -1
   }
 
+  /**
+   * Find the n'th index of a given search value x in an array.
+   * The n'th parameter is 1-based.  
+   */
+  def arrayNthIndexOf(a: Array[Byte], offset: Int, length: Int, x: Byte, nth: Int): Int = {
+    var n = nth
+    var i = offset
+    val j = offset + length
+    while (i < j) {
+      if (a(i) == x) {
+        n = n - 1
+        if (n <= 0)
+          return i
+      }
+      i += 1
+    }
+    -1
+  }
+
   def arrayCompare(a: Array[Byte], b: Array[Byte]): Int = 
       arrayCompare(a, 0, a.length, b, 0, b.length)
 
