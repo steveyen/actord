@@ -59,24 +59,27 @@ trait MServerRouter extends MProtocol {
   // -----------------------------------------------
 
   override def processOneLine(spec: MSpec, clientSession: MSession, 
-                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
-    val target = chooseTarget(spec, clientSession, cmdArr, cmdArrLen, cmdLen)
-
-    target.synchronized {
-      target.write(cmdArr, 0, cmdArrLen) // Forward incoming message from client to downstream target server.
-      target.writeFlush
-      processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
-    }
-  }
+                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = 
+    routeClientMessage(spec, clientSession, cmdArr, cmdArrLen, cmdLen, -1)                              
 
   override def processTwoLine(spec: MSpec, clientSession: MSession, 
                               cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int,
-                              cmdArgs: Seq[String], dataSize: Int): Int = {
+                              cmdArgs: Seq[String], dataSize: Int): Int = 
+    routeClientMessage(spec, clientSession, cmdArr, cmdArrLen, cmdLen, dataSize)
+
+  // -----------------------------------------------
+
+  def routeClientMessage(spec: MSpec, clientSession: MSession, 
+                         cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int, dataSize: Int): Int = {
     val target = chooseTarget(spec, clientSession, cmdArr, cmdArrLen, cmdLen)
 
+    // The big synchronized block is because only one client may 
+    // forward to a downstream target server at a time.
+    //
     target.synchronized {
       target.write(cmdArr, 0, cmdArrLen)
-      clientSession.readDirect(dataSize + CRNL.length, target.writeFunc)
+      if (dataSize >= 0)
+        clientSession.readDirect(dataSize + CRNL.length, target.writeFunc)
       target.writeFlush
       processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
     }
