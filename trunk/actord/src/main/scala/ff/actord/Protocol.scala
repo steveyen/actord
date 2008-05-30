@@ -173,23 +173,17 @@ trait MProtocol {
         //         cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]\r\n
         //       VALUE <key> <flags> <dataSize> [cid]\r\n
         //
-        val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
-        if (spec.checkArgs(cmdArgs)) {
-          var dataSize = spec.dataSizeParse(cmdArr, cmdArrLen, cmdLen)
-          if (dataSize >= 0) {
-            val totalNeeded = cmdArrLen + dataSize + CRNL.length
-            if (totalNeeded <= readyCount) {
-              processTwoLine(spec, session, cmdArr, cmdArrLen, cmdLen, cmdArgs, dataSize)
-            } else {
-              totalNeeded
-            }
+        var dataSize = spec.dataSizeParse(cmdArr, cmdArrLen, cmdLen)
+        if (dataSize >= 0) {
+          val totalNeeded = cmdArrLen + dataSize + CRNL.length
+          if (totalNeeded <= readyCount) {
+            processTwoLine(spec, session, cmdArr, cmdArrLen, cmdLen, dataSize)
           } else {
-            session.write(stringToArray("CLIENT_ERROR missing dataSize at " + spec.pos_dataSize + 
-                                        " in: " + arrayToString(cmdArr) + CRNL))
-            GOOD
+            totalNeeded
           }
         } else {
-          session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, length) + CRNL))
+          session.write(stringToArray("CLIENT_ERROR missing dataSize at " + spec.pos_dataSize + 
+                                      " in: " + arrayToString(cmdArr, 0, cmdArrLen)))
           GOOD
         }
       }
@@ -217,32 +211,35 @@ trait MProtocol {
                      cmdArr: Array[Byte],
                      cmdArrLen: Int,
                      cmdLen: Int,
-                     cmdArgs: Seq[String],
                      dataSize: Int): Int = { // Called when we have all the incoming bytes of a two-lined message.
-    val data = new Array[Byte](dataSize)
+    val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
+    if (spec.checkArgs(cmdArgs)) {
+      val data = new Array[Byte](dataSize)
 
-    session.read(data)
+      session.read(data)
 
-    if (session.read == CR &&
-        session.read == NL) {
-      val expTime = spec.expTimeParse(cmdArgs)
+      if (session.read == CR &&
+          session.read == NL) {
+        val expTime = spec.expTimeParse(cmdArgs)
 
-      var cid = spec.casParse(cmdArgs)
-      if (cid == -1L)
-          cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
+        var cid = spec.casParse(cmdArgs)
+        if (cid == -1L)
+            cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
 
-      spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs,
-                            MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
-                                   parseLong(cmdArgs(1), 0L),
-                                   if (expTime != 0L &&
-                                       expTime <= SECONDS_IN_30_DAYS)
-                                       expTime + nowInSeconds
-                                   else
-                                       expTime,
-                                   data,
-                                   cid)))
+        spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs,
+                              MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
+                                     parseLong(cmdArgs(1), 0L),
+                                     if (expTime != 0L &&
+                                         expTime <= SECONDS_IN_30_DAYS)
+                                         expTime + nowInSeconds
+                                     else
+                                         expTime,
+                                     data,
+                                     cid)))
+      } else
+        session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
     } else
-      session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
+      session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, cmdArrLen)))
     GOOD
   }
 }
