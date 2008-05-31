@@ -114,7 +114,17 @@ trait MServerRouter extends MProtocol {
    * Processes the response/reply from the downstream target server.
    */
   class TargetResponse(target: MRouterTarget, clientSession: MSession) 
-    extends MNetworkReader with MSession { 
+    extends MNetworkReader with MSession {
+    protected var goEnd = false
+
+    def go = {
+      goEnd = false
+      while (!goEnd) 
+        messageRead
+    }
+
+    // MNetworkReader part...
+    //
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = 
       try {
         target.readResponse(buf, offset, length)
@@ -127,20 +137,16 @@ trait MServerRouter extends MProtocol {
     def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
       protocol.process(this, cmdArr, cmdLen, available)
 
+    // MSession part...
+    //
     def ident: Long = 0L
     def close: Unit = { goEnd = true } // Overriding the meaning of 'close' to mean stop reading target responses.
 
     def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
       println(arrayToString(bytes, offset, length)) // TODO: Log these.
 
-    protected var goEnd = false
-
-    def go = {
-      goEnd = false
-      while (!goEnd) 
-        messageRead
-    }
-
+    // MProtocol part...
+    //
     val protocol = new MProtocol() {
       override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] =  {
         if (lookup eq oneLineSpecLookup) {
