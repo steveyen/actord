@@ -27,11 +27,11 @@ import ff.actord.Util._
  * famous fallacies of distributed computing, such as not surfacing timeouts, etc, in the API.
  * Meant for single-threaded usage.
  */
-class MServerProxy(host: String, port: Int) 
-  extends MServer {
+class MServerProxy(s: Socket) extends MServer {
+  def this(host: String, port: Int) = this(new Socket(host, port))
+
   def subServerList: List[MSubServer] = Nil
   
-  protected var s  = new Socket(host, port)
   protected var is = s.getInputStream
   protected var os = s.getOutputStream
   protected var bs = new BufferedOutputStream(os)
@@ -40,12 +40,11 @@ class MServerProxy(host: String, port: Int)
   def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
   def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
 
-  def isClosed = s == null
+  def isClosed = s == null || s.isClosed
 
   def close: Unit = {
     if (s != null)
         s.close
-    s  = null
     is = null
     os = null
     bs = null
