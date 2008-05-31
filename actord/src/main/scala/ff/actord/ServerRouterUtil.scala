@@ -107,14 +107,14 @@ trait MServerRouter extends MProtocol {
   }
 
   val NOREPLYBytes = stringToArray(" noreply" + CRNL)
-  val VALUEBytes   = stringToArray("VALUE ")
-  val STATBytes    = stringToArray("STAT ")
+  val VALUEBytes   = stringToArray("VALUE")
+  val STATBytes    = stringToArray("STAT")
 
   /**
    * Processes the response/reply from the downstream target server.
    */
   class TargetResponse(target: MRouterTarget, clientSession: MSession) 
-    extends MNetworkReader with MSession with MProtocol { 
+    extends MNetworkReader with MSession { 
     def connRead(buf: Array[Byte], offset: Int, length: Int): Int = 
       try {
         target.readResponse(buf, offset, length)
@@ -122,58 +122,75 @@ trait MServerRouter extends MProtocol {
         case _ => close; -1
       }
 
-    def connClose: Unit = { end = true } // Overriding the meaning of 'close' to mean stop reading target responses.
+    def connClose: Unit = { goEnd = true } // Overriding the meaning of 'close' to mean stop reading target responses.
 
     def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = 
-      this.process(this, cmdArr, cmdLen, available)
+      protocol.process(this, cmdArr, cmdLen, available)
 
     def ident: Long = 0L
-    def close: Unit = { end = true } // Overriding the meaning of 'close' to mean stop reading target responses.
+    def close: Unit = { goEnd = true } // Overriding the meaning of 'close' to mean stop reading target responses.
 
     def write(bytes: Array[Byte], offset: Int, length: Int): Unit = 
       println(arrayToString(bytes, offset, length)) // TODO: Log these.
 
-    var end = false
-    def go  = while (!end) messageRead
+    protected var goEnd = false
 
-    override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-      if (arrayStartsWith(x, xLen, VALUEBytes)) // Only VALUE responses are two-lines.
-        twoLineResponseMarker
-      else
-        oneLineResponseMarker
+    def go = {
+      goEnd = false
+      while (!goEnd) 
+        messageRead
+    }
 
-    override def processOneLine(spec: MSpec, 
-                                targetSession: MSession, 
-                                cmdArr: Array[Byte], // Target response bytes.
-                                cmdArrLen: Int,
-                                cmdLen: Int): Int = {
-      clientSession.write(cmdArr, 0, cmdArrLen)
+    val protocol = new MProtocol() {
+      override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] =  {
+        if (lookup eq oneLineSpecLookup) {
+          if (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) == 0)
+            None
+          else
+            findSpecOk
+        } else {
+          if (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) == 0)
+            findSpecOk
+          else
+            None
+        }
+      }
 
-      // We got a full response if the downstream target server responded
-      // with anything but STAT, such as END, STORED, NOT_STORED, etc.
+      // The findSpecOk object is used like an opaque marker/sentinel value.
       //
-      if (!arrayStartsWith(cmdArr, cmdArrLen, STATBytes))
-        close // Stop the go/messageRead loop.
+      val findSpecOk = Some(MSpec("VALUE <key> <flags> <dataSize> [cid]", 
+                                  (cmd) => { throw new RuntimeException("cmd not expected to be used") }))
 
-      GOOD
+      override def processOneLine(spec: MSpec, 
+                                  targetSession: MSession, 
+                                  cmdArr: Array[Byte], // Target response bytes.
+                                  cmdArrLen: Int,
+                                  cmdLen: Int): Int = {
+        clientSession.write(cmdArr, 0, cmdArrLen)
+
+        // We got a full response if the downstream target server responded
+        // with anything but STAT, such as END, STORED, NOT_STORED, etc.
+        //
+        if (arrayCompare(cmdArr, cmdLen, STATBytes, STATBytes.length) != 0)
+          close // Stop the go/messageRead loop.
+
+        GOOD
+      }
+
+      override def processTwoLine(spec: MSpec, 
+                                  targetSession: MSession, 
+                                  cmdArr: Array[Byte], // Target response bytes.
+                                  cmdArrLen: Int,
+                                  cmdLen: Int,
+                                  dataSize: Int): Int = {
+        clientSession.write(cmdArr, 0, cmdArrLen)
+        targetSession.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
+        GOOD
+      }
+
+      val clientSessionWriteFunc = (a: Array[Byte], offset: Int, length: Int) => clientSession.write(a, offset, length)
     }
-
-    override def processTwoLine(spec: MSpec, 
-                                targetSession: MSession, 
-                                cmdArr: Array[Byte], // Target response bytes.
-                                cmdArrLen: Int,
-                                cmdLen: Int,
-                                dataSize: Int): Int = {
-      clientSession.write(cmdArr, 0, cmdArrLen)
-      targetSession.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
-      GOOD
-    }
-
-    val clientSessionWriteFunc = (a: Array[Byte], offset: Int, length: Int) => clientSession.write(a, offset, length)
   }
-
-  val oneLineResponseMarker = Some(MSpec("oneLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
-  val twoLineResponseMarker = Some(MSpec("twoLineResponseMarker", (cmd) => { throw new RuntimeException("not expected") }))
 }
 
 // --------------------------------------------------
