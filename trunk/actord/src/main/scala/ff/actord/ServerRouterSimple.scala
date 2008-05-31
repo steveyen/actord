@@ -30,11 +30,16 @@ class SServerRouter(host: String, port: Int) extends MServerRouter { // A simple
                    cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): MRouterTarget = target
 }
 
-class SRouterTarget(host: String, port: Int) extends MRouterTarget { // A simple router target.
+/**
+ * A simple router target, constructed with a connected Socket 
+ * to a downstream target server.
+ */
+class SRouterTarget(s: Socket) extends MRouterTarget {
+  def this(host: String, port: Int) = this(new Socket(host, port))
+
   def readResponse(buf: Array[Byte], offset: Int, length: Int): Int =
     is.read(buf, offset, length)
 
-  protected var s  = new Socket(host, port) // The downstream target server to route to.
   protected var is = s.getInputStream
   protected var os = s.getOutputStream
   protected var bs = new BufferedOutputStream(os)
@@ -43,12 +48,11 @@ class SRouterTarget(host: String, port: Int) extends MRouterTarget { // A simple
 
   def writeFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
 
-  def isClosed = s == null
+  def isClosed = s == null || s.isClosed
 
   def close: Unit = {
     if (s != null)
         s.close
-    s  = null
     is = null
     os = null
     bs = null
