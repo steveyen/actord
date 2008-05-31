@@ -20,10 +20,10 @@ import scala.collection._
 import ff.actord.Util._
 
 object Router {
-  def main(args: Array[String]): Unit = (new SRouter).start(args)
+  def main(args: Array[String]): Unit = (new RouterMain).start(args)
 }
 
-class SRouter {
+class RouterMain {
   def default_port   = "11222"
   def default_target = "127.0.0.1:11211"
 
