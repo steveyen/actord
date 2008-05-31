@@ -148,19 +148,11 @@ trait MServerRouter extends MProtocol {
     // MProtocol part...
     //
     val protocol = new MProtocol() {
-      override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] =  {
-        if (lookup eq oneLineSpecLookup) {
-          if (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) == 0)
-            None
-          else
-            findSpecOk
-        } else {
-          if (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) == 0)
-            findSpecOk
-          else
-            None
-        }
-      }
+      override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
+        if ((lookup eq oneLineSpecLookup) == (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) != 0))
+          findSpecOk
+        else
+          None
 
       // The findSpecOk object is used like an opaque marker/sentinel value.
       //
