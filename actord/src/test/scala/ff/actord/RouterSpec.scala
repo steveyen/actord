@@ -32,11 +32,26 @@ object RouterWireSpec extends Specification with MTestUtil {
   def address = InetAddress.getByName("127.0.0.1")
   def port    = 11222
 
-  // Fire up a router that connects to a target server started already in a previous test (ServerWireSpec).
-  //
-  ff.actord.Router.main(new Array[String](0)) 
-  
-  def prep = {
+  var initted = false
+
+   def prep = {
+    if (!initted) {
+      try {
+        // Fire up a router that connects to a running target server that 
+        // was started already in a previous test (ServerWireSpec).
+        //
+        ff.actord.Router.main(new Array[String](0)) 
+      } catch {
+        case ce: ConnectException => 
+          // Try spinning up a new target server and then try again to connect a new router to it.
+          //
+          ff.actord.Main.main(new Array[String](0))
+          ff.actord.Router.main(new Array[String](0))
+      }
+      Thread.sleep(200) // Let the new servers stabilize.
+      initted = true
+    }
+
     val s = new Socket(address, port)
     val in = new BufferedReader(new InputStreamReader(s.getInputStream))
     val out = new PrintWriter(s.getOutputStream, true)
