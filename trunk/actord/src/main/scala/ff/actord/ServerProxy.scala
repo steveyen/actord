@@ -54,7 +54,7 @@ class MServerProxy(s: Socket) extends MServer {
     try {
       bs.flush
     } catch {
-      case _ => close
+      case ex @ _ => close; throw ex
     }
 
   /**
@@ -65,7 +65,7 @@ class MServerProxy(s: Socket) extends MServer {
       try {
         is.read(buf, offset, length)
       } catch {
-        case _ => close; -1
+        case ex @ _ => close; throw ex
       }
 
     def connClose: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
