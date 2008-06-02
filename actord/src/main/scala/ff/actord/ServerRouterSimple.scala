@@ -62,7 +62,7 @@ class SRouterTarget(s: Socket) extends MRouterTarget {
     try {
       bs.flush
     } catch {
-      case _ => close
+      case ex @ _ => close; throw ex
     }
 }
 

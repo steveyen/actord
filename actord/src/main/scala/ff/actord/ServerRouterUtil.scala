@@ -128,8 +128,8 @@ class MRouterTargetResponse(target: MRouterTarget, clientSession: MSession)
       messageRead
   }
 
-  val VALUEBytes   = stringToArray("VALUE")
-  val STATBytes    = stringToArray("STAT")
+  val VALUEBytes = stringToArray("VALUE")
+  val STATBytes  = stringToArray("STAT")
 
   // MNetworkReader part...
   //
@@ -137,7 +137,7 @@ class MRouterTargetResponse(target: MRouterTarget, clientSession: MSession)
     try {
       target.readResponse(buf, offset, length)
     } catch {
-      case _ => close; -1
+      case ex @ _ => close; target.close; clientSession.close; throw ex
     }
 
   def connClose: Unit = { goEnd = true } // Overriding the meaning of 'close' to mean stop reading target responses.

@@ -65,7 +65,7 @@ class MServerProxy(s: Socket) extends MServer {
       try {
         is.read(buf, offset, length)
       } catch {
-        case ex @ _ => close; throw ex
+        case ex @ _ => close; MServerProxy.this.close; throw ex
       }
 
     def connClose: Unit = { end = true } // Overriding the meaning of 'close' for the proxy/client-side.
