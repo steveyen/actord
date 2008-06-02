@@ -80,12 +80,16 @@ trait MServerRouter extends MProtocol {
     // The big synchronized block is because only one client may 
     // forward to a downstream target server at a time.
     //
-    target.synchronized {
-      target.write(cmdArr, 0, cmdArrLen)
-      if (dataSize >= 0)
-        clientSession.readDirect(dataSize + CRNL.length, target.writeFunc)
-      target.writeFlush
-      processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
+    try {
+      target.synchronized {
+        target.write(cmdArr, 0, cmdArrLen)
+        if (dataSize >= 0)
+          clientSession.readDirect(dataSize + CRNL.length, target.writeFunc)
+        target.writeFlush
+        processTargetResponse(target, clientSession, cmdArr, cmdArrLen)
+      }
+    } catch {
+      case ex @ _ => clientSession.close; throw ex // Not closing target, as it still might be ok.
     }
 
     GOOD
