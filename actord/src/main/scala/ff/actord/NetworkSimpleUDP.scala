@@ -42,33 +42,37 @@ class UAcceptor(protocol: MProtocol, numProcessors: Int, port: Int)
   var seqId  = 0
 
   override def run =
-    while (true) {
-      s.receive(pIn)
-      if (pIn.getLength >= UDP_FRAME_HEADER_SIZE) {
-        // From memcached protocol.txt: The frame header is 
-        // 8 bytes long, as follows (all values are 16-bit integers 
-        // in network byte order, high byte first):
-        // 
-        // 0-1 Request ID
-        // 2-3 Sequence number
-        // 4-5 Total number of datagrams in this message
-        // 6-7 Reserved for future use; must be 0
-        // 
-        // Drop any multi-packet request for now.
-        //
-        if (bufIn(4) == 0 && bufIn(5) == 1) {
-          reqId     = (bufIn(0) * 256) + bufIn(1)
-          seqId     = 0
-          bufInPos  = UDP_FRAME_HEADER_SIZE
-          bufOutPos = UDP_FRAME_HEADER_SIZE // Already reserve output header to avoid memcpy.
+    try {
+      while (true) {
+        s.receive(pIn)
+        if (pIn.getLength >= UDP_FRAME_HEADER_SIZE) {
+          // From memcached protocol.txt: The frame header is 
+          // 8 bytes long, as follows (all values are 16-bit integers 
+          // in network byte order, high byte first):
+          // 
+          // 0-1 Request ID
+          // 2-3 Sequence number
+          // 4-5 Total number of datagrams in this message
+          // 6-7 Reserved for future use; must be 0
+          // 
+          // Drop any multi-packet request for now.
+          //
+          if (bufIn(4) == 0 && bufIn(5) == 1) {
+            reqId     = (bufIn(0) * 256) + bufIn(1)
+            seqId     = 0
+            bufInPos  = UDP_FRAME_HEADER_SIZE
+            bufOutPos = UDP_FRAME_HEADER_SIZE // Already reserve output header to avoid memcpy.
 
-          messageRead
-        } else {
-          val m = "SERVER_ERROR multi-packet request not supported\r\n".getBytes
-          write(m, 0, m.length)
-          flush
+            messageRead
+          } else {
+            val m = "SERVER_ERROR multi-packet request not supported\r\n".getBytes
+            write(m, 0, m.length)
+            flush
+          }
         }
       }
+    } finally {
+      s.close
     }
 
   override val minMessageLength = "quit\r\n".length
