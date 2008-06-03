@@ -30,6 +30,10 @@ import ff.actord.Util._
 class MServerProxy(s: Socket) extends MServer {
   def this(host: String, port: Int) = this(new Socket(host, port))
 
+  def initSocket(s: Socket): Unit = s.setTcpNoDelay(true)
+
+  initSocket(s)
+
   def subServerList: List[MSubServer] = Nil
   
   protected var is = s.getInputStream
@@ -170,13 +174,13 @@ class MServerProxy(s: Socket) extends MServer {
     var result = -1L
     if (!async) 
       new Response(new MProtocol {
-        override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-          Some(MSpec("UNUSED", (cmd) => { 
+        override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[Seq[MSpec]]): MSpec = 
+          MSpec("UNUSED", (cmd) => { // Always returns this MSpec to process incr/decr response.
             val s = arrayToString(x, 0, xLen)
             if (s != "NOT_FOUND")
               result = parseLong(s, -1L)
             cmd.session.close 
-          }))
+          })
       }).go
     result
   }

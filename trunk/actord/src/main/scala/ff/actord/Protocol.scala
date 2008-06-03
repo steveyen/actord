@@ -118,19 +118,28 @@ trait MProtocol {
                           
   // ----------------------------------------
 
-  def indexSpecs(specs: List[MSpec]): Array[List[MSpec]] = {
-    val lookup = new Array[List[MSpec]](256) // A lookup table by first character of spec.name.
+  def indexSpecs(specs: List[MSpec]): Array[Seq[MSpec]] = {
+    val lookup = new Array[mutable.ArrayBuffer[MSpec]](256) // A lookup table by first character of spec.name.
     for (i <- 0 until lookup.length)
-      lookup(i) = Nil                        // Buckets in the lookup table are just Lists.
-    for (spec <- specs) {
-      val index = spec.name(0) - 'A'
-      lookup(index) = lookup(index) ::: List(spec) // Concat so that more popular commands come first.
-    }
-    lookup
+      lookup(i) = new mutable.ArrayBuffer[MSpec]            // Buckets in the lookup table.
+    for (spec <- specs) 
+      lookup(spec.name(0) - 'A') += spec                    // More popular commands come first.
+    lookup.asInstanceOf[Array[Seq[MSpec]]]
   }
 
-  def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
-    lookup(x(0) - 'A').find(spec => arrayCompare(spec.nameBytes, spec.nameBytes.length, x, xLen) == 0)
+  def findSpec(x: Array[Byte], xLen: Int, lookup: Array[Seq[MSpec]]): MSpec = {
+    val a = lookup(x(0) - 'A') // Avoiding Seq.find, as it alloc's closures and Options.
+    var i = 0
+    val j = a.length
+    while (i < j) {
+      val spec = a(i)
+      if (spec == null ||
+          arrayCompare(spec.nameBytes, spec.nameBytes.length, x, xLen) == 0)
+        return spec
+      i += 1
+    }
+    null
+  }
 
   // ----------------------------------------
 
@@ -171,34 +180,35 @@ trait MProtocol {
     val spcPos = arrayIndexOf(cmdArr, 0, length, SPACE)
     val cmdLen = if (spcPos > 0) spcPos else length
 
-    // TODO: Try to remove the alloc'ed closures and Option here.
+    // Avoiding scala map/option/getOrElse idioms to avoid implicit closure creation.
     //
-    findSpec(cmdArr, cmdLen, oneLineSpecLookup).map(
-      spec => processOneLine(spec, session, cmdArr, cmdArrLen, cmdLen)
-    ) orElse findSpec(cmdArr, cmdLen, twoLineSpecLookup).map(
-      spec => {
+    val oneLineSpec = findSpec(cmdArr, cmdLen, oneLineSpecLookup)
+    if (oneLineSpec != null) {
+      processOneLine(oneLineSpec, session, cmdArr, cmdArrLen, cmdLen)
+    } else {
+      val twoLineSpec = findSpec(cmdArr, cmdLen, twoLineSpecLookup)
+      if (twoLineSpec != null) {
         // Handle two line message, such as:
         //   <cmdName> <key> <flags> <expTime> <dataSize> [noreply]\r\n
         //         cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]\r\n
         //       VALUE <key> <flags> <dataSize> [cid]\r\n
         //
-        var dataSize = spec.dataSizeParse(cmdArr, cmdArrLen, cmdLen)
+        var dataSize = twoLineSpec.dataSizeParse(cmdArr, cmdArrLen, cmdLen)
         if (dataSize >= 0) {
           val totalNeeded = cmdArrLen + dataSize + CRNL.length
-          if (totalNeeded <= readyCount) {
-            processTwoLine(spec, session, cmdArr, cmdArrLen, cmdLen, dataSize)
-          } else {
+          if (totalNeeded <= readyCount)
+            processTwoLine(twoLineSpec, session, cmdArr, cmdArrLen, cmdLen, dataSize)
+          else
             totalNeeded
-          }
         } else {
-          session.write(stringToArray("CLIENT_ERROR missing dataSize at " + spec.pos_dataSize + 
+          session.write(stringToArray("CLIENT_ERROR missing dataSize at " + twoLineSpec.pos_dataSize + 
                                       " in: " + arrayToString(cmdArr, 0, cmdArrLen)))
           GOOD
         }
+      } else {
+        session.write(stringToArray("ERROR " + arrayToString(cmdArr, 0, cmdLen) + CRNL)) 
+        GOOD // Saw an unknown command, but keep going and process the next command.
       }
-    ) getOrElse {
-      session.write(stringToArray("ERROR " + arrayToString(cmdArr, 0, cmdLen) + CRNL)) 
-      GOOD // Saw an unknown command, but keep going and process the next command.
     }
   }
 
