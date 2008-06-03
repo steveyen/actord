@@ -20,7 +20,7 @@ import java.net._
 
 object Slap {
   val address = InetAddress.getByName("127.0.0.1")
-  val port    = 11211
+  var port    = 11211
   val CRNL    = "\r\n"
 
   def main(args: Array[String]) {
@@ -28,9 +28,11 @@ object Slap {
 
     val n = if (args.length >= 1) args(0).toInt else 10000
     val c = if (args.length >= 2) args(1).toInt else 1
+    port  = if (args.length >= 3) args(2).toInt else port
 
     println("reads per client  : " + n)
     println("number of clients : " + c)
+    println("targetting port   : " + port)
 
     val startingLine  = new Line
     val finishingLine = new Line
