@@ -99,18 +99,16 @@ trait MServerRouter extends MProtocol {
 
   def processTargetResponse(target: MRouterTarget, clientSession: MSession, cmdArr: Array[Byte], cmdArrLen: Int): Unit = {
     if (!arrayEndsWith(cmdArr, cmdArrLen, NOREPLYBytes)) {
-      var m = clientSession.attachment.asInstanceOf[mutable.Map[MRouterTarget, MRouterTargetResponse]]
+      var m = clientSession.attachment.asInstanceOf[java.util.HashMap[MRouterTarget, MRouterTargetResponse]]
       if (m == null) {
-          m = new mutable.HashMap[MRouterTarget, MRouterTargetResponse]
+          m = new java.util.HashMap[MRouterTarget, MRouterTargetResponse]
           clientSession.attachment_!(m)
       }
-      val r = if (m.contains(target)) // NOTE: Avoiding the usual getOrElse/closure/Option approach
-                m(target)             //       in order to prevent throwaway garbage in the core router loop.
-              else {
-                val rr = new MRouterTargetResponse(target, clientSession)
-                m += (target -> rr)
-                rr
-              }
+      var r = m.get(target) // NOTE: Avoiding the idiomatic scala Map/getOrElse/closure/Option approach
+      if (r == null) {      //       in order to prevent throwaway garbage in the core router loop.
+          r = new MRouterTargetResponse(target, clientSession)
+          m.put(target, r)
+      }
       r.go
     }
   }
