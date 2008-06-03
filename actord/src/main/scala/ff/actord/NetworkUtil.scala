@@ -41,6 +41,11 @@ trait MNetworkReader {
 
   def numMessages: Long = nMessages
 
+  protected def updateAvailable(avail: Int, availPrev: Int): Unit = {
+    available     = avail
+    availablePrev = availPrev
+  }
+
   /**
    * Called by messageRead() when there's incoming bytes ready for processing,
    * or when a CRNL is seen.  The messageProcess implementation should
@@ -61,35 +66,41 @@ trait MNetworkReader {
   def messageRead: Boolean = {
     readPos = 0
 
+    var avail     = available     // Get local-var snapshot to avoid property accesses,
+    var availPrev = availablePrev // othewise available/availablePrev is a profile hotspot.
+     
     // Only connRead if nothing left over in our buffer from the last time around.
     //      
-    val lastRead = if (available <= availablePrev) connRead(buf, available, buf.length - available) else 0
+    val lastRead = if (avail <= availPrev) connRead(buf, avail, buf.length - avail) else 0
     if (lastRead <= -1) {
       connClose
       return false
     }
-     
-    availablePrev = available
-    available += lastRead
-    if (available > buf.length) {
+
+    availPrev = avail
+    avail += lastRead
+    if (avail > buf.length) {
       connClose
+      updateAvailable(avail, availPrev)
       throw new RuntimeException("available larger than buf somehow")
     }
 
-    if (available >= waitingFor) {
-      val indexCR: Int = if (available >= 2 &&                 // Optimization to avoid scanning 
-                             available == availablePrev + 1) { // the entire buf again for a CR.
-                           if (buf(available - 2) == CR) {     // TODO: What if connRead reads a chopped up messages?
-                             available - 2                     // TODO: What if connRead gives >1 message?
+    if (avail >= waitingFor) {
+      val indexCR: Int = if (avail >= 2 &&             // Optimization to avoid scanning 
+                             avail == availPrev + 1) { // the entire buf again for a CR.
+                           if (buf(avail - 2) == CR) { // TODO: What if connRead reads a chopped up messages?
+                             avail - 2                 // TODO: What if connRead gives >1 message?
                            } else
                              -1
                          } else
-                           bufIndexOf(available, CR)           // TODO: What if CR is not followed by NL?
+                           bufIndexOf(avail, CR)       // TODO: What if CR is not followed by NL?
       if (indexCR < 0 ||
-          indexCR + CRNL.length > available) { // We didn't find a CRNL in our buffer, so
-        waitingFor += 1                        // wait for more incoming bytes.
+          indexCR + CRNL.length > avail) { // We didn't find a CRNL in our buffer, so
+        waitingFor += 1                    // wait for more incoming bytes.
         bufEnsureSize(waitingFor)
       } else {
+        updateAvailable(avail, availPrev)
+
         val cmdLen = indexCR + CRNL.length
 
         if (buf(cmdLen - 2) != CR ||
@@ -99,16 +110,19 @@ trait MNetworkReader {
         } else {
           readPos = cmdLen
 
-          val bytesNeeded = messageProcess(buf, cmdLen, available)
+          val bytesNeeded = messageProcess(buf, cmdLen, avail)
           if (bytesNeeded <= 0) {
-            if (available > readPos)
-              Array.copy(buf, readPos, buf, 0, available - readPos) // Move any unread bytes left over to the front of the buf.
+            var readP = readPos
+            if (readP < avail)
+              Array.copy(buf, readP, buf, 0, avail - readP) // Move leftover, unread bytes to buf's front.
             
-            available -= readPos
-            availablePrev = 0
+            avail -= readP
+            availPrev = 0
             waitingFor = minMessageLength
 
             nMessages += 1L
+
+            updateAvailable(avail, availPrev)
 
             return true // We've successfully read and processed a message.
           } else {
@@ -118,6 +132,8 @@ trait MNetworkReader {
         }
       }
     }
+
+    updateAvailable(avail, availPrev)
 
     false // Returns false if we haven't successfully read and processed a message.
   }       // The caller might invoke us again, though, in a loop.
