@@ -21,7 +21,7 @@ import ff.actord.Util._
 import ff.actord.MProtocol._
 
 class MProtocolServer(svr: MServer) extends MProtocol {
-  override def oneLineSpecs = List( 
+  override def specs = List( 
       MSpec("get <key>*",
             (cmd) => { 
 if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
@@ -42,6 +42,35 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
             (cmd) => 
               cmd.reply(svr.delete(cmd.args(0), cmd.argToLong(1), cmd.noReply), 
                         DELETED, NOT_FOUND)),
+
+      MSpec("set <key> <flags> <expTime> <dataSize> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.set(cmd.entry, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("add <key> <flags> <expTime> <dataSize> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.addRep(cmd.entry, true, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("replace <key> <flags> <expTime> <dataSize> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.addRep(cmd.entry, false, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("append <key> <flags> <expTime> <dataSize> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.xpend(cmd.entry, true, cmd.noReply), 
+                         STORED, NOT_STORED)),
+
+      MSpec("prepend <key> <flags> <expTime> <dataSize> [noreply]",
+            (cmd) => 
+               cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
+                         STORED, NOT_STORED)),
+           
+      MSpec("cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]", // Using <cid_unique>, not <cid>, for generated cid.
+            (cmd) => 
+               cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
 
       MSpec("incr <key> <value> [noreply]",
             (cmd) => cmd.reply(svr.delta(cmd.args(0),  cmd.argToLong(1), cmd.noReply))),
@@ -72,40 +101,7 @@ if (!BENCHMARK_NETWORK_ONLY.shortCircuitGet(cmd)) {
               svr.range(cmd.args(0), cmd.args(1)).
                   foreach(el => cmd.write(el, false))
               cmd.reply(END)
-            }))
-           
-  override def twoLineSpecs = List( 
-      MSpec("set <key> <flags> <expTime> <dataSize> [noreply]",
-            (cmd) => 
-               cmd.reply(svr.set(cmd.entry, cmd.noReply), 
-                         STORED, NOT_STORED)),
-
-      MSpec("add <key> <flags> <expTime> <dataSize> [noreply]",
-            (cmd) => 
-               cmd.reply(svr.addRep(cmd.entry, true, cmd.noReply), 
-                         STORED, NOT_STORED)),
-
-      MSpec("replace <key> <flags> <expTime> <dataSize> [noreply]",
-            (cmd) => 
-               cmd.reply(svr.addRep(cmd.entry, false, cmd.noReply), 
-                         STORED, NOT_STORED)),
-
-      MSpec("append <key> <flags> <expTime> <dataSize> [noreply]",
-            (cmd) => 
-               cmd.reply(svr.xpend(cmd.entry, true, cmd.noReply), 
-                         STORED, NOT_STORED)),
-
-      MSpec("prepend <key> <flags> <expTime> <dataSize> [noreply]",
-            (cmd) => 
-               cmd.reply(svr.xpend(cmd.entry, false, cmd.noReply), 
-                         STORED, NOT_STORED)),
-           
-      MSpec("cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]", // Using <cid_unique>, not <cid>, for generated cid.
-            (cmd) => 
-               cmd.reply(stringToArray(svr.checkAndSet(cmd.entry, cmd.argToLong(4), cmd.noReply) + CRNL))),
-
-      // Extensions to basic protocol.
-      //
+            }),
       MSpec("act <key> <flags> <expTime> <dataSize> [noreply]", // Like RPC, but meant to call a registered actor.
             (cmd) => {
                svr.act(cmd.entry, cmd.noReply).

@@ -32,10 +32,16 @@ trait MServerRouter extends MProtocol {
 
   // Register the protocol messages from the client that we will route...
   //
-  override def oneLineSpecs = List(
+  override def specs = List(
     "get <key>*",
     "gets <key>*",
     "delete <key> [<time>] [noreply]",
+    "set <key> <flags> <expTime> <dataSize> [noreply]",
+    "add <key> <flags> <expTime> <dataSize> [noreply]",
+    "replace <key> <flags> <expTime> <dataSize> [noreply]",
+    "append <key> <flags> <expTime> <dataSize> [noreply]",
+    "prepend <key> <flags> <expTime> <dataSize> [noreply]",
+    "cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]",
     "incr <key> <value> [noreply]",
     "decr <key> <value> [noreply]",
     "stats [<arg>]",
@@ -43,33 +49,20 @@ trait MServerRouter extends MProtocol {
     "version", 
     "verbosity",
     "quit",
-    "range <key_from> <key_to>"
-  ).map(s => MSpec(s, (cmd) => { throw new RuntimeException("unexpected") }))
-
-  override def twoLineSpecs = List( 
-    "set <key> <flags> <expTime> <dataSize> [noreply]",
-    "add <key> <flags> <expTime> <dataSize> [noreply]",
-    "replace <key> <flags> <expTime> <dataSize> [noreply]",
-    "append <key> <flags> <expTime> <dataSize> [noreply]",
-    "prepend <key> <flags> <expTime> <dataSize> [noreply]",
-    "cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]",
+    "range <key_from> <key_to>",
     "act <key> <flags> <expTime> <dataSize> [noreply]"
   ).map(s => MSpec(s, (cmd) => { throw new RuntimeException("unexpected") }))
 
   // -----------------------------------------------
 
-  override def processOneLine(spec: MSpec, clientSession: MSession, 
-                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = 
+  override def processCommand(spec: MSpec, clientSession: MSession, 
+                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int, dataSize: Int): Int = 
     if (arrayCompare(cmdArr, cmdLen, QUITBytes, QUITBytes.length) != 0) {
-      routeClientMessage(spec, clientSession, cmdArr, cmdArrLen, cmdLen, -1)
+      routeClientMessage(spec, clientSession, cmdArr, cmdArrLen, cmdLen, dataSize)
     } else {
       clientSession.close
       GOOD
     }
-
-  override def processTwoLine(spec: MSpec, clientSession: MSession, 
-                              cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int, dataSize: Int): Int = 
-    routeClientMessage(spec, clientSession, cmdArr, cmdArrLen, cmdLen, dataSize)
 
   // -----------------------------------------------
 
@@ -158,40 +151,37 @@ class MRouterTargetResponse(target: MRouterTarget, clientSession: MSession)
   // MProtocol part...
   //
   val protocol = new MProtocol() {
-    override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[Seq[MSpec]]): MSpec = 
-      if ((lookup eq oneLineSpecLookup) == (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) != 0))
-        findSpecOk
+    override def findSpec(x: Array[Byte], xLen: Int): MSpec = 
+      if (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) != 0)
+        specReplyOneLine
       else
-        null
+        specReplyTwoLine
 
-    // The findSpecOk object is used like an opaque marker/sentinel value.
-    //
-    val findSpecOk = MSpec("VALUE <key> <flags> <dataSize> [cid]", 
-                           (cmd) => { throw new RuntimeException("cmd not expected to be used") })
-    override def processOneLine(spec: MSpec, 
-                                targetSession: MSession, 
-                                cmdArr: Array[Byte], // Target response bytes.
-                                cmdArrLen: Int,
-                                cmdLen: Int): Int = {
-      clientSession.write(cmdArr, 0, cmdArrLen)
+    val specReplyOneLine = MSpec("UNUSED", 
+                                 (cmd) => { throw new RuntimeException("cmd not expected to be used") })
 
-      // We got a full response if the downstream target server responded
-      // with anything but STAT, such as END, STORED, NOT_STORED, etc.
-      //
-      if (arrayCompare(cmdArr, cmdLen, STATBytes, STATBytes.length) != 0)
-        close // Stop the go/messageRead loop.
+    val specReplyTwoLine = MSpec("VALUE <key> <flags> <dataSize> [cid]", 
+                                 (cmd) => { throw new RuntimeException("cmd not expected to be used") })
 
-      GOOD
-    }
-
-    override def processTwoLine(spec: MSpec, 
+    override def processCommand(spec: MSpec, 
                                 targetSession: MSession, 
                                 cmdArr: Array[Byte], // Target response bytes.
                                 cmdArrLen: Int,
                                 cmdLen: Int,
                                 dataSize: Int): Int = {
       clientSession.write(cmdArr, 0, cmdArrLen)
-      targetSession.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
+
+      if (dataSize >= 0)
+        targetSession.readDirect(dataSize + CRNL.length, clientSessionWriteFunc)
+      else {
+        // We got a full response if the downstream target server responded
+        // with a no-data message, such as END, ERROR, STORED, NOT_STORED, etc,
+        // except for STAT.
+        //
+        if (arrayCompare(cmdArr, cmdLen, STATBytes, STATBytes.length) != 0)
+          close // Stop the go/messageRead loop.
+      }
+
       GOOD
     }
 

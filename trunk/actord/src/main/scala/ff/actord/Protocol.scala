@@ -60,22 +60,22 @@ case class MSpec(line: String, process: (MCommand) => Unit) {
   val pos_cas      = Math.max(argsRest.indexOf("<cid>"), argsRest.indexOf("[cid]"))
 
   def dataSizeParse(cmdArr: Array[Byte], cmdArrLen: Int, cmdLen: Int): Int = {
-    if (pos_dataSize >= 0) {
-      val spcBefore = arrayNthIndexOf(cmdArr, cmdLen, cmdArrLen - CRNL.length - cmdLen, SPACE, pos_dataSize + 1)
-      if (spcBefore >= cmdLen) {
-        val start = spcBefore + 1
-        var spcAfter = arrayIndexOf(cmdArr, start, cmdArrLen - CRNL.length - start, SPACE)
-        if (spcAfter == -1) 
-            spcAfter = cmdArrLen - CRNL.length
-        if (spcAfter > start)
-            return arrayParsePositiveInt(cmdArr, start, spcAfter - start)
-      }
+    val spcBefore = arrayNthIndexOf(cmdArr, cmdLen, cmdArrLen - CRNL.length - cmdLen, SPACE, pos_dataSize + 1)
+    if (spcBefore >= cmdLen) {
+      val start = spcBefore + 1
+      var spcAfter = arrayIndexOf(cmdArr, start, cmdArrLen - CRNL.length - start, SPACE)
+      if (spcAfter == -1) 
+          spcAfter = cmdArrLen - CRNL.length
+      if (spcAfter > start)
+          return arrayParsePositiveInt(cmdArr, start, spcAfter - start)
     }
     -1
   }
 
   def expTimeParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_expTime,  0L)
   def casParse(cmdArgs: Seq[String])     = itemToLong(cmdArgs, pos_cas, -1L)
+
+  val noData = pos_dataSize < 0
 }
 
 // -------------------------------------------------------
@@ -100,25 +100,11 @@ trait MProtocol {
   val createdAt = System.currentTimeMillis
 
   /**
-   * Commands defined with a single line.
    * More popular commands should be listed first.
    */
-  def oneLineSpecs: List[MSpec] = Nil
+  def specs: List[MSpec] = Nil
            
-  /**
-   * Commands that use a two lines, such as a line followed by byte data.
-   * More popular commands should be listed first.
-   */
-  def twoLineSpecs: List[MSpec] = Nil
-      
-  // ----------------------------------------
-
-  val oneLineSpecLookup = indexSpecs(oneLineSpecs)
-  val twoLineSpecLookup = indexSpecs(twoLineSpecs)
-                          
-  // ----------------------------------------
-
-  def indexSpecs(specs: List[MSpec]): Array[Seq[MSpec]] = {
+  val specLookup: Array[Seq[MSpec]] = {
     val lookup = new Array[mutable.ArrayBuffer[MSpec]](256) // A lookup table by first character of spec.name.
     for (i <- 0 until lookup.length)
       lookup(i) = new mutable.ArrayBuffer[MSpec]            // Buckets in the lookup table.
@@ -127,8 +113,8 @@ trait MProtocol {
     lookup.asInstanceOf[Array[Seq[MSpec]]]
   }
 
-  def findSpec(x: Array[Byte], xLen: Int, lookup: Array[Seq[MSpec]]): MSpec = {
-    val a = lookup(x(0) - 'A') // Avoiding Seq.find, as it alloc's closures and Options.
+  def findSpec(x: Array[Byte], xLen: Int): MSpec = {
+    val a = specLookup(x(0) - 'A') // Avoiding Seq.find, as it allocs closures and Options.
     var i = 0
     val j = a.length
     while (i < j) {
@@ -161,7 +147,7 @@ trait MProtocol {
    * from the network layers up to this method, and instead pass 
    * around the reused buffer array.  So, no "new String(...).split()" here.
    *
-   * This method eventually calls processOneLine/processTwoLine, which
+   * On success, this method eventually calls processCommand, which
    * do the real work, and of course might alloc memory.
    *
    * cmdArr     - the incoming message command line bytes, including CRNL, and maybe more. 
@@ -182,81 +168,71 @@ trait MProtocol {
 
     // Avoiding scala map/option/getOrElse idioms to avoid implicit closure creation.
     //
-    val oneLineSpec = findSpec(cmdArr, cmdLen, oneLineSpecLookup)
-    if (oneLineSpec != null) {
-      processOneLine(oneLineSpec, session, cmdArr, cmdArrLen, cmdLen)
-    } else {
-      val twoLineSpec = findSpec(cmdArr, cmdLen, twoLineSpecLookup)
-      if (twoLineSpec != null) {
-        // Handle two line message, such as:
+    val spec = findSpec(cmdArr, cmdLen)
+    if (spec != null) {
+      if (spec.noData) {
+        processCommand(spec, session, cmdArr, cmdArrLen, cmdLen, -1)
+      } else {
+        // Handle command with data, such as:
         //   <cmdName> <key> <flags> <expTime> <dataSize> [noreply]\r\n
         //         cas <key> <flags> <expTime> <dataSize> <cid_unique> [noreply]\r\n
         //       VALUE <key> <flags> <dataSize> [cid]\r\n
         //
-        var dataSize = twoLineSpec.dataSizeParse(cmdArr, cmdArrLen, cmdLen)
+        var dataSize = spec.dataSizeParse(cmdArr, cmdArrLen, cmdLen)
         if (dataSize >= 0) {
           val totalNeeded = cmdArrLen + dataSize + CRNL.length
           if (totalNeeded <= readyCount)
-            processTwoLine(twoLineSpec, session, cmdArr, cmdArrLen, cmdLen, dataSize)
+            processCommand(spec, session, cmdArr, cmdArrLen, cmdLen, dataSize)
           else
             totalNeeded
         } else {
-          session.write(stringToArray("CLIENT_ERROR missing dataSize at " + twoLineSpec.pos_dataSize + 
+          session.write(stringToArray("CLIENT_ERROR missing dataSize at " + spec.pos_dataSize + 
                                       " in: " + arrayToString(cmdArr, 0, cmdArrLen)))
           GOOD
         }
-      } else {
-        session.write(stringToArray("ERROR " + arrayToString(cmdArr, 0, cmdLen) + CRNL)) 
-        GOOD // Saw an unknown command, but keep going and process the next command.
       }
+    } else {
+      session.write(stringToArray("ERROR " + arrayToString(cmdArr, 0, cmdLen) + CRNL)) 
+      GOOD // Saw an unknown command, but keep going and process the next command.
     }
   }
 
-  def processOneLine(spec: MSpec, 
+  def processCommand(spec: MSpec, 
                      session: MSession, 
                      cmdArr: Array[Byte],
                      cmdArrLen: Int,
-                     cmdLen: Int): Int = {
-    val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
-    if (spec.checkArgs(cmdArgs))
-      spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs, null))
-    else
-      session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, cmdArrLen)))
-    GOOD
-  }
-
-  def processTwoLine(spec: MSpec, 
-                     session: MSession, 
-                     cmdArr: Array[Byte],
-                     cmdArrLen: Int,
-                     cmdLen: Int,
-                     dataSize: Int): Int = { // Called when we have all the incoming bytes of a two-lined message.
+                     cmdLen: Int, 
+                     dataSize: Int): Int = {
     val cmdArgs = processArgs(cmdArr, cmdArrLen, cmdLen)
     if (spec.checkArgs(cmdArgs)) {
-      val data = new Array[Byte](dataSize)
+      if (dataSize < 0) {
+        spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs, null))
+      } else {
+        val data = new Array[Byte](dataSize)
 
-      session.read(data)
+        session.read(data)
 
-      if (session.read == CR &&
-          session.read == NL) {
-        val expTime = spec.expTimeParse(cmdArgs)
+        if (session.read == CR &&
+            session.read == NL) {
+          val expTime = spec.expTimeParse(cmdArgs)
 
-        var cid = spec.casParse(cmdArgs)
-        if (cid == -1L)
-            cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
+          var cid = spec.casParse(cmdArgs)
+          if (cid == -1L)
+              cid = ((session.ident << 32) + (session.numMessages & 0xFFFFFFFFL))
 
-        spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs,
-                              MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
-                                     parseLong(cmdArgs(1), 0L),
-                                     if (expTime != 0L &&
-                                         expTime <= SECONDS_IN_30_DAYS)
-                                         expTime + nowInSeconds
-                                     else
-                                         expTime,
-                                     data,
-                                     cid)))
-      } else
-        session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
+          spec.process(MCommand(session, cmdArr, cmdArrLen, cmdLen, cmdArgs,
+                                MEntry(cmdArgs(0), // The <key> == cmdArgs(0) item.
+                                       parseLong(cmdArgs(1), 0L),
+                                       if (expTime != 0L &&
+                                           expTime <= SECONDS_IN_30_DAYS)
+                                           expTime + nowInSeconds
+                                       else
+                                           expTime,
+                                       data,
+                                       cid)))
+        } else
+          session.write(stringToArray("CLIENT_ERROR missing CRNL after data" + CRNL))
+      }
     } else
       session.write(stringToArray("CLIENT_ERROR args: " + arrayToString(cmdArr, 0, cmdArrLen)))
     GOOD
