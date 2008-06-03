@@ -93,7 +93,7 @@ trait MNetworkReader {
                            } else
                              -1
                          } else
-                           bufIndexOf(avail, CR)       // TODO: What if CR is not followed by NL?
+                           bufIndexOf(0, avail, CR)    // TODO: What if CR is not followed by NL?
       if (indexCR < 0 ||
           indexCR + CRNL.length > avail) { // We didn't find a CRNL in our buffer, so
         waitingFor += 1                    // wait for more incoming bytes.
@@ -138,10 +138,10 @@ trait MNetworkReader {
     false // Returns false if we haven't successfully read and processed a message.
   }       // The caller might invoke us again, though, in a loop.
   
-  private def bufIndexOf(n: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
+  private def bufIndexOf(offset: Int, length: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
     val b = buf
-    var i = 0 
-    while (i < n) {
+    var i = offset
+    while (i < length) {
       if (b(i) == x)
         return i
       i += 1
