@@ -101,16 +101,16 @@ trait MNetworkReader {
       } else {
         updateAvailable(avail, availPrev)
 
-        val cmdLen = indexCR + CRNL.length
+        val lineLen = indexCR + CRNL.length
 
-        if (buf(cmdLen - 2) != CR ||
-            buf(cmdLen - 1) != NL) {
+        if (buf(lineLen - 2) != CR ||
+            buf(lineLen - 1) != NL) {
           connClose
           throw new RuntimeException("missing CRNL")
         } else {
-          readPos = cmdLen
+          readPos = lineLen
 
-          val bytesNeeded = messageProcess(buf, cmdLen, avail)
+          val bytesNeeded = messageProcess(buf, lineLen, avail)
           if (bytesNeeded <= 0) {
             var readP = readPos
             if (readP < avail)
