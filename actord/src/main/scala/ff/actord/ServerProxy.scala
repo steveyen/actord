@@ -90,8 +90,8 @@ class MServerProxy(s: Socket) extends MServer {
   def responseValues: Iterator[MEntry] = {
     var xs: List[MEntry] = Nil
     new Response(new MProtocol {
-      override def oneLineSpecs = List(MSpec("END", (cmd) => { cmd.session.close }))
-      override def twoLineSpecs = List(
+      override def specs = List(
+        new MSpec("END", (cmd) => { cmd.session.close }),
         new MSpec("VALUE <key> <flags> <dataSize> [cid]", (cmd) => { xs = cmd.entry :: xs }) {
           override def casParse(cmdArgs: Seq[String]) = itemToLong(cmdArgs, pos_cas, 0L)
         })
@@ -103,7 +103,7 @@ class MServerProxy(s: Socket) extends MServer {
     var result = true
     if (!async) 
       new Response(new MProtocol {
-        override def oneLineSpecs = List(
+        override def specs = List(
           MSpec(good, (cmd) => { result = true;  cmd.session.close }),
           MSpec(fail, (cmd) => { result = false; cmd.session.close }))
       }).go
@@ -174,7 +174,7 @@ class MServerProxy(s: Socket) extends MServer {
     var result = -1L
     if (!async) 
       new Response(new MProtocol {
-        override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[Seq[MSpec]]): MSpec = 
+        override def findSpec(x: Array[Byte], xLen: Int): MSpec = 
           MSpec("UNUSED", (cmd) => { // Always returns this MSpec to process incr/decr response.
             val s = arrayToString(x, 0, xLen)
             if (s != "NOT_FOUND")
@@ -234,7 +234,7 @@ class MServerProxy(s: Socket) extends MServer {
     var result = ""
     if (!async) 
       new Response(new MProtocol {
-        override def oneLineSpecs = List(
+        override def specs = List(
           MSpec("STORED",    (cmd) => { result = "STORED";    cmd.session.close }),
           MSpec("EXISTS",    (cmd) => { result = "EXISTS";    cmd.session.close }),
           MSpec("NOT_FOUND", (cmd) => { result = "NOT_FOUND"; cmd.session.close }))
