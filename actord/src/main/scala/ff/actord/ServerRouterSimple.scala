@@ -37,6 +37,10 @@ class SServerRouter(host: String, port: Int) extends MServerRouter { // A simple
 class SRouterTarget(s: Socket) extends MRouterTarget {
   def this(host: String, port: Int) = this(new Socket(host, port))
 
+  def initSocket(s: Socket): Unit = s.setTcpNoDelay(true)
+
+  initSocket(s)
+
   def readResponse(buf: Array[Byte], offset: Int, length: Int): Int =
     is.read(buf, offset, length)
 
@@ -46,7 +50,9 @@ class SRouterTarget(s: Socket) extends MRouterTarget {
 
   def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
 
-  def writeFunc = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
+  def writeFunc = writeFunc_i
+
+  val writeFunc_i = (a: Array[Byte], offset: Int, length: Int) => bs.write(a, offset, length)
 
   def isClosed = s == null || s.isClosed
 

@@ -160,16 +160,16 @@ class MRouterTargetResponse(target: MRouterTarget, clientSession: MSession)
   // MProtocol part...
   //
   val protocol = new MProtocol() {
-    override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[List[MSpec]]): Option[MSpec] = 
+    override def findSpec(x: Array[Byte], xLen: Int, lookup: Array[Seq[MSpec]]): MSpec = 
       if ((lookup eq oneLineSpecLookup) == (arrayCompare(x, xLen, VALUEBytes, VALUEBytes.length) != 0))
         findSpecOk
       else
-        None
+        null
 
     // The findSpecOk object is used like an opaque marker/sentinel value.
     //
-    val findSpecOk = Some(MSpec("VALUE <key> <flags> <dataSize> [cid]", 
-                                (cmd) => { throw new RuntimeException("cmd not expected to be used") }))
+    val findSpecOk = MSpec("VALUE <key> <flags> <dataSize> [cid]", 
+                           (cmd) => { throw new RuntimeException("cmd not expected to be used") })
     override def processOneLine(spec: MSpec, 
                                 targetSession: MSession, 
                                 cmdArr: Array[Byte], // Target response bytes.
