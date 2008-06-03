@@ -86,17 +86,10 @@ trait MNetworkReader {
     }
 
     if (avail >= waitingFor) {
-      val indexCR: Int = if (avail >= 2 &&             // Optimization to avoid scanning 
-                             avail == availPrev + 1) { // the entire buf again for a CR.
-                           if (buf(avail - 2) == CR) { // TODO: What if connRead reads a chopped up messages?
-                             avail - 2                 // TODO: What if connRead gives >1 message?
-                           } else
-                             -1
-                         } else
-                           bufIndexOf(0, avail, CR)    // TODO: What if CR is not followed by NL?
-      if (indexCR < 0 ||
-          indexCR + CRNL.length > avail) { // We didn't find a CRNL in our buffer, so
-        waitingFor += 1                    // wait for more incoming bytes.
+      val indexCR = arrayIndexOf(buf, 0, avail, CR)
+      if (indexCR < 0 ||                   // No CRNL in our buffer, so 
+          indexCR + CRNL.length > avail) { // wait for more incoming bytes.
+        waitingFor += 1  
         bufEnsureSize(waitingFor)
       } else {
         updateAvailable(avail, availPrev)
@@ -112,7 +105,7 @@ trait MNetworkReader {
 
           val bytesNeeded = messageProcess(buf, lineLen, avail)
           if (bytesNeeded <= 0) {
-            var readP = readPos
+            val readP = readPos
             if (readP < avail)
               Array.copy(buf, readP, buf, 0, avail - readP) // Move leftover, unread bytes to buf's front.
             
@@ -137,17 +130,6 @@ trait MNetworkReader {
 
     false // Returns false if we haven't successfully read and processed a message.
   }       // The caller might invoke us again, though, in a loop.
-  
-  private def bufIndexOf(offset: Int, length: Int, x: Byte): Int = { // Bounded buf.indexOf(x) method.
-    val b = buf
-    var i = offset
-    while (i < length) {
-      if (b(i) == x)
-        return i
-      i += 1
-    }
-    -1
-  }
 
   def bufEnsureSize(size: Int): Unit = 
     if (size > buf.length) {
