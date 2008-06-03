@@ -52,8 +52,12 @@ class SSession(protocol: MProtocol, s: Socket, sessionIdent: Long)
   def connClose: Unit = s.close
 
   override def run = {
-    while (s.isClosed == false)
-      messageRead
+    try {
+      while (s.isClosed == false)
+        messageRead
+    } finally {
+      close
+    }
   }
 
   def messageProcess(cmdArr: Array[Byte], cmdLen: Int, available: Int): Int = {
