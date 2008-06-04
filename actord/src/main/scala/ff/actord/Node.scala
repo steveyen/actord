@@ -148,71 +148,101 @@ nodeManager
   nodeWorkers = [Node, NodeWorker]
 */
 
+// ----------------------------------------------
+
 case class Card(base: String, more: String) {
   def ~> (msg: AnyRef): Unit = Agency.default.pend(Actor.self, this, msg)
 }
 
 object Agency {
-  val default = new ActorAgency
+  private var default_i: Agency = new LocalAgency
+
+  def default_!(a: Agency) = synchronized { default_i = a }
+  def default              = synchronized { default_i }
 }
 
 trait Agency {
-  def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = 
-      pend(cardFor(caller), callee, msg)
-
+  def pend(caller: Actor, callee: Card, msg: AnyRef): Unit
   def pend(caller: Card, callee: Card, msg: AnyRef): Unit
-
-  protected val localCards  = new mutable.HashMap[Card, Actor] 
-  protected val localActors = new mutable.HashMap[Actor, Card] 
-
-  def localRegister(c: Card, a: Actor): Unit = synchronized {
-    localActors.get(a).foreach(localUnregister _)
-    localCards  += (c -> a)
-    localActors += {a -> c}
-  }
-
-  def localUnregister(c: Card): Unit = synchronized {
-    localCards.get(c).foreach(a => localActors -= a)
-    localCards  -= c
-  }
-
-  def localLookup(c: Card): Option[Actor] = synchronized { localCards.get(c) }
-
-  def cardFor(localActor: Actor): Card = synchronized { 
-    localActors.getOrElseUpdate(localActor, {
-      nextCard += 1
-      Card("memcached://127.0.0.1:11211", nextCard.toString)
-    })
-  }
-
-  protected var nextCard: Long = 0L
 }
 
 case class Frame   (caller: Card, callee: Card, msg: AnyRef)
 case class Reply   (callee: Card, originalMsg: AnyRef, reply: AnyRef)
 case class Failure (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
 
-class ActorAgency extends Agency {
+// ----------------------------------------------
+
+class LocalAgency extends Actor with Agency {
+  trapExit = true
+
+  def act = {
+    trapExit = true
+    Actor.loop {
+      Actor.receive {
+        // We link to all the local actors that ever called this 
+        // agency to get their Exit notifications.
+        //
+        case Exit(exitingLocalActor, reason) => synchronized {
+          localCards.get(exitingLocalActor).foreach(localUnregister _)
+        }
+      }
+    }
+  }
+
+  protected var nextCard: Long = 0L
+  protected val localActors = new mutable.HashMap[Card, Actor] 
+  protected val localCards  = new mutable.HashMap[Actor, Card] 
+
+  def localRegister(c: Card, a: Actor): Unit = synchronized {
+    localCards.get(a).foreach(localUnregister _)
+    localCards  += (a -> c)
+    localActors += (c -> a)
+  }
+
+  def localUnregister(c: Card): Unit = synchronized {
+    localActors.get(c).foreach(a => localCards -= a)
+    localActors -= c
+  }
+
+  def localActorFor(c: Card): Option[Actor] = synchronized { localActors.get(c) }
+
+  def localCardFor(someLocalActor: Actor): Card = synchronized { 
+    localCards.getOrElseUpdate(someLocalActor, {
+      nextCard += 1
+      val c = Card(localBase, nextCard.toString)
+      localActors += (c -> someLocalActor)
+      link(someLocalActor) // Do a link so we'll receive the Exit of someLocalActor.
+      c
+    })
+  }
+
+  def localBase = "mc://127.0.0.1:11211/"
+
+  def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = 
+      pend(localCardFor(caller), callee, msg)
+
   def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
-    val maybeCallee = localLookup(callee)
+    val maybeCallee = localActorFor(callee)
     if (maybeCallee.isDefined)
       maybeCallee.get ! msg
     else
-      localLookup(caller).
+      localActorFor(caller).
         foreach(_ ! Failure(callee, msg, "unknown callee actor: " + callee))
+  }
+
+  start
+}
+
+// ----------------------------------------------
+
+class ActorDAgency extends LocalAgency {
+  override def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = {
+  }
+  override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
   }
 }
 
-class ActorDAgency extends Agency {
-  def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
-    val maybeCallee = localLookup(callee)
-    if (maybeCallee.isDefined)
-      maybeCallee.get ! msg
-    else
-      localLookup(caller).
-        foreach(_ ! Failure(callee, msg, "unknown callee actor: " + callee))
-  }
-}
+// ----------------------------------------------
 
 case class Node(host: String, port: Int)
 
