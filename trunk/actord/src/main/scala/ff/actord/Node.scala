@@ -50,9 +50,10 @@ memcached protocol similiarities to HTTP.
       especially if client-side is using react/async actors.
       need a design which allows switch to better protocol.
         in memcached, cannot push messages to client if it isn't reading.
-      cast becomes "set noreply"
-      call becomes "call"
-      callAsync becomes "call"
+      speaking in erlang rpc terms...
+        cast becomes "set noreply"
+        call becomes "call" or a "set"+"get"
+        callAsync becomes "call" or a "set"+doStuff+"get"
 
 agency API options...
   option 1, try to live with an agency API that looks like memcached API...
