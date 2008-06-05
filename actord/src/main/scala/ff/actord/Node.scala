@@ -226,16 +226,19 @@ class LocalAgency extends Actor with Agency {
     if (maybeCallee.isDefined)
       maybeCallee.get ! msg
     else
-      localActorFor(caller).
-        foreach(_ ! Failure(callee, msg, "unknown callee actor: " + callee))
+      failure(caller, callee, msg, "unknown callee actor: " + callee)
   }
+
+  def failure(caller: Card, callee: Card, msg: AnyRef, failReason: AnyRef): Unit = 
+    localActorFor(caller).
+      foreach(_ ! Failure(callee, msg, failReason))
 
   start
 }
 
 // ----------------------------------------------
 
-class ActorDAgency extends LocalAgency {
+class ActorDAgency(nodeManager: NodeManager) extends LocalAgency {
   override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
     if (localActorFor(callee).isDefined)
       pendLocal(caller, callee, msg)
@@ -247,25 +250,35 @@ class ActorDAgency extends LocalAgency {
     super.pend(caller, callee, msg)
 
   def pendRemote(caller: Card, callee: Card, msg: AnyRef): Unit = {
-    
+    val nodeWorker = nodeManager.worker(nodeFor(callee))
+    if (nodeWorker != null)
+      localActorFor(caller).
+        foreach(nodeWorker.pend(_, callee, msg))
+    else
+      failure(caller, callee, msg, "unknown callee node: " + callee)
   }
+
+  def nodeFor(c: Card): Node = defaultNode
+
+  def defaultNode = Node("127.0.0.1", 11211)
 }
 
 // ----------------------------------------------
 
 case class Node(host: String, port: Int)
 
-trait Request
-
 trait NodeManager {
   protected val workers = new mutable.HashMap[Node, NodeWorker]
 
-  def worker(n: Node) = synchronized { 
+  def worker(n: Node): NodeWorker = synchronized { 
+    if (n != null)
       workers.getOrElse(n, {
         val w = createNodeWorker(n)
         workers += (n -> w)
         w
       })
+    else
+      null
   }
 
   def workerDone(n: Node) = synchronized { workers -= n }
@@ -280,26 +293,8 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
 
   def createPendingRequestsQueue: BlockingQueue[PendingRequest] = new ArrayBlockingQueue[PendingRequest](60)
 
-  def pend(request: Request): Unit = 
-      pend(request, Actor.self)
-
-  def pend(request: Request, requestor: Actor): Unit = 
-    pendingRequests.put(new PendingRequest(request, List(requestor)))
-
-  def call(request: Request): AnyRef = { // Synchronous version of pend.
-    var result: AnyRef = null
-    Actor.actor {                        // Use a throwaway actor to call pend and wait for result message.
-      Actor.react {                      // TODO: Explore more efficient version with Actor.freshReplyChannel.
-        case NodePend(r) => 
-          pend(r, Actor.self)
-          Actor.self.act
-        case x: AnyRef => 
-          result = x
-          Actor.self.exit
-      }
-    } !? NodePend(request)
-    result
-  }
+  def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = 
+    pendingRequests.put(new PendingRequest(caller, callee, msg))
 
   def run {
     try {
@@ -324,10 +319,10 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
   }
 }
 
-case class NodePend(request: Request)
 case class NodeError(message: String)
 
-class PendingRequest(request: Request, protected var callbacks_i: List[Actor]) {
+class PendingRequest(protected var callbacks_i: List[Actor], callee: Card, msg: AnyRef, pendTime: Long) {
+  def this(callback: Actor, callee: Card, msg: AnyRef) = this(List(callback), callee, msg, System.currentTimeMillis)
   def addCallback(a: Actor): Unit = synchronized {
     if (a != null)
         callbacks_i = a :: callbacks_i
