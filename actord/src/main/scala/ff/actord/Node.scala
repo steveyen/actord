@@ -22,6 +22,8 @@ import java.io._
 import java.net._
 import java.util.concurrent._
 
+import ff.actord.Util._
+
 /*
 utilizes memcached protocol.  
   allows telnet (text-based) debugging and tools.
@@ -304,8 +306,10 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
       pr.failure("could not send message via dead node worker: " + node)
   }
 
-  def serialize(msg: AnyRef): Array[Byte] =
-    "fake".getBytes
+  def serialize(msg: AnyRef): Array[Byte] = msg match {
+    case s: String => stringToArray(s)
+    case _ => "TODO".getBytes
+  }
 
   def run {
     try {
