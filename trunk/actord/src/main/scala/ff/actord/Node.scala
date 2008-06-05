@@ -239,6 +239,8 @@ class LocalAgency extends Actor with Agency {
 // ----------------------------------------------
 
 class ActorDAgency(nodeManager: NodeManager) extends LocalAgency {
+  def this() = this(new SNodeManager)
+
   override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
     if (localActorFor(callee).isDefined)
       pendLocal(caller, callee, msg)
@@ -288,13 +290,22 @@ trait NodeManager {
 
 abstract class NodeWorker(manager: NodeManager, node: Node) {
   def alive: Boolean
+  def close: Unit
 
   protected val pendingRequests: BlockingQueue[PendingRequest] = createPendingRequestsQueue
 
   def createPendingRequestsQueue: BlockingQueue[PendingRequest] = new ArrayBlockingQueue[PendingRequest](60)
 
-  def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = 
-    pendingRequests.put(new PendingRequest(caller, callee, msg))
+  def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = {
+    val pr = new PendingRequest(caller, callee, msg, serialize(msg))
+    if (alive)
+      pendingRequests.put(pr)
+    else
+      pr.failure("could not send message via dead node worker: " + node)
+  }
+
+  def serialize(msg: AnyRef): Array[Byte] =
+    "fake".getBytes
 
   def run {
     try {
@@ -308,26 +319,36 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
     }
   }
 
-  def runDone: Unit =  {
+  def runDone: Unit = {
     manager.workerDone(node)
+
+    val reason = "could not send message - node worker done: " + node
 
     while (!pendingRequests.isEmpty) {
       val pr = pendingRequests.take
       if (pr != null)
-          pr.callbacks.foreach(_ ! NodeError("runDone"))
+          pr.failure(reason)
     }
   }
 }
 
-case class NodeError(message: String)
+class PendingRequest(protected var callbacks_i: List[Actor], 
+                     callee: Card, 
+                     msg: AnyRef, 
+                     msgArr: Array[Byte],
+                     pendTime: Long) {
+  def this(callback: Actor, callee: Card, msg: AnyRef, msgArr: Array[Byte]) = 
+      this(List(callback), callee, msg, msgArr, System.currentTimeMillis)
 
-class PendingRequest(protected var callbacks_i: List[Actor], callee: Card, msg: AnyRef, pendTime: Long) {
-  def this(callback: Actor, callee: Card, msg: AnyRef) = this(List(callback), callee, msg, System.currentTimeMillis)
+  def callbacks = callbacks_i
+
   def addCallback(a: Actor): Unit = synchronized {
     if (a != null)
         callbacks_i = a :: callbacks_i
   }
-  def callbacks = callbacks_i
+
+  def failure(failReason: AnyRef): Unit = 
+    callbacks.foreach(_ ! Failure(callee, msg, failReason))
 }
 
 // ----------------------------------------------
@@ -343,6 +364,7 @@ class SNodeManager extends NodeManager {
 class SNodeWorker(manager: NodeManager, node: Node) 
   extends NodeWorker(manager: NodeManager, node) with Runnable {
   val s = new Socket(node.host, node.port)
-  def alive = s.isConnected && !s.isClosed
+  def alive: Boolean = synchronized { s.isConnected && !s.isClosed }
+  def close: Unit    = synchronized { s.close }
 }
 
