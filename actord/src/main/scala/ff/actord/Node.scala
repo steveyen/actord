@@ -237,18 +237,18 @@ class LocalAgency extends Actor with Agency {
 
 class ActorDAgency extends LocalAgency {
   override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
-    val isCalleeRemote = false
-    if (isCalleeRemote)
-      pendRemote(caller, callee, msg)
-    else
+    if (localActorFor(callee).isDefined)
       pendLocal(caller, callee, msg)
+    else
+      pendRemote(caller, callee, msg)
   }
 
   def pendLocal(caller: Card, callee: Card, msg: AnyRef): Unit = 
     super.pend(caller, callee, msg)
 
-  def pendRemote(caller: Card, callee: Card, msg: AnyRef): Unit = 
-    {}
+  def pendRemote(caller: Card, callee: Card, msg: AnyRef): Unit = {
+    
+  }
 }
 
 // ----------------------------------------------
