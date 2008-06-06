@@ -169,7 +169,7 @@ trait NodeManager {
 
   def workerDone(n: Node) = synchronized { workers -= n }
 
-  def createNodeWorker(n: Node): NodeWorker
+  def createNodeWorker(n: Node): NodeWorker // Might throw exception if cannot connect.
 
   def serializer: Serializer
 }
