@@ -69,23 +69,27 @@ class LocalAgency extends Actor with Agency {
     localCards.get(a).foreach(localUnregister _)
     localCards  += (a -> c)
     localActors += (c -> a)
+    this.link(a) // Do a link so we'll hear about the Exit of the actor.
   }
 
   def localUnregister(c: Card): Unit = synchronized {
-    localActors.get(c).foreach(a => localCards -= a)
+    localActors.get(c).foreach(a => {
+      localCards -= a
+      this.unlink(a)
+    })
     localActors -= c
   }
 
   def localActorFor(c: Card): Option[Actor] = synchronized { localActors.get(c) }
 
   def localCardFor(someLocalActor: Actor): Card = synchronized { 
-    localCards.getOrElseUpdate(someLocalActor, {
-      nextCard += 1
-      val c = Card(localBase, nextCard.toString)
-      localActors += (c -> someLocalActor)
-      link(someLocalActor) // Do a link so we'll hear about the Exit of someLocalActor.
-      c
-    })
+    localCards.get(someLocalActor).
+               getOrElse({
+                 nextCard += 1
+                 val c = Card(localBase, nextCard.toString)
+                 localRegister(c, someLocalActor)
+                 c
+               })
   }
 
   def localBase = ""
@@ -98,7 +102,7 @@ class LocalAgency extends Actor with Agency {
     if (maybeCallee.isDefined)
       maybeCallee.get ! msg
     else
-      failure(caller, callee, msg, "unknown callee actor: " + callee)
+      failure(caller, callee, msg, "unknown local callee: " + callee)
   }
 
   def failure(caller: Card, callee: Card, msg: AnyRef, failReason: AnyRef): Unit = 
