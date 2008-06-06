@@ -15,13 +15,14 @@ object SampleUsingAgency {
     actor { 
       loop { 
         react {
-          case CreateActor(callee, msg, server) => callee.base.split("/")(0) match {
-            case "invoice" =>
-              val c = Card(callee.base, "")
-              val a = new InvoiceActor(c)
-              // register(server, , new InvoiceActor(c)) // TODO!
-            case _ =>
-          }
+          case CreateActor(callee, msg, server) => 
+            callee.base.split("/")(0) match {
+              case "chatRoom" =>
+                val c = Card(callee.base, "")
+                val a = new ChatRoom(c)
+                // register(server, , new ChatRoom(c)) // TODO!
+              case _ =>
+            }
           case _ =>
         }
       }
@@ -31,7 +32,7 @@ object SampleUsingAgency {
   Agency.init(agency)
 }
 
-class InvoiceActor(myCard: Card) extends Actor {
+class ChatRoom(myCard: Card) extends Actor {
   def act {
     loop {
       react {

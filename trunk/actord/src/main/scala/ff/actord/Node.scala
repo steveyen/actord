@@ -169,7 +169,7 @@ trait NodeManager {
 
   def workerDone(n: Node) = synchronized { workers -= n }
 
-  def createNodeWorker(n: Node): NodeWorker // Might throw exception if cannot connect.
+  def createNodeWorker(n: Node): NodeWorker // Throws exception if cannot connect.
 
   def serializer: Serializer
 }
@@ -179,12 +179,15 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
   def close: Unit
   def transmit(callee: Card, msgArr: Array[Byte]): Unit
 
-  protected val pendingRequests: BlockingQueue[PendingRequest] = createPendingRequestsQueue
+  protected val pendingRequests: BlockingQueue[PendingRequest] = 
+    createPendingRequestsQueue
 
-  def createPendingRequestsQueue: BlockingQueue[PendingRequest] = new ArrayBlockingQueue[PendingRequest](60)
+  def createPendingRequestsQueue: BlockingQueue[PendingRequest] = 
+    new ArrayBlockingQueue[PendingRequest](60)
 
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = {
-    val pr = new PendingRequest(caller, callee, msg, manager.serializer.serialize(msg))
+    val pr = new PendingRequest(caller, callee, msg, 
+                                manager.serializer.serialize(msg))
     if (alive)
       pendingRequests.put(pr)
     else
@@ -291,7 +294,7 @@ class SNodeWorker(manager: NodeManager, node: Node)
 }
 
 object SNode {
-  val dispatchMark  = "_ad|" // Short for "actor dispatch", "actorD", or just a unique message key prefix.
+  val dispatchMark  = "_aD|" // Tells us it's an actor dispatch message.
   val moreMark      = "?"
   val moreMarkBytes = stringToArray(moreMark)
   val setBytes      = stringToArray("set " + dispatchMark)
@@ -308,7 +311,7 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
     override def createServer(numProcessors: Int, limitMem: Long): MServer = {
       new MSubServer(0, limitMem) {
         override def set(el: MEntry, async: Boolean): Boolean = {
-          // See if we should dispatch the incoming entry data as a msg to a local actor.
+          // See if we should dispatch as a msg to a local actor.
           //
           if (el.key.startsWith(SNode.dispatchMark)) {
             val keyParts = el.key.split(SNode.moreMark)

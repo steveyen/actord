@@ -88,7 +88,8 @@ class LocalAgency extends Actor with Agency {
     localActors -= c
   }
 
-  def localActorFor(c: Card): Option[Actor] = synchronized { localActors.get(c) }
+  def localActorFor(c: Card): Option[Actor] = 
+    synchronized { localActors.get(c) }
 
   def localCardFor(someLocalActor: Actor): Card = synchronized { 
     localCards.get(someLocalActor).
