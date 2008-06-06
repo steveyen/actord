@@ -37,6 +37,7 @@ trait Agency {
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit
   def pend(caller: Card, callee: Card, msg: AnyRef): Unit
 
+  def localActorFor(c: Card): Option[Actor]
   def localCardFor(someLocalActor: Actor): Card
 }
 
@@ -123,70 +124,11 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
 
   override val localBase = actordPrefix + host + ":" + port
 
-  val receptionist = startReceptionist
-
-  def startReceptionist: AnyRef = {
-    // Start listening on the given port for memcached-speaking clients,
-    // but also understand the Agency-related memcached-protocol semantics.
-    //
-    val receptionist = new MainProgSimple() {
-      override def createServer(numProcessors: Int, limitMem: Long): MServer = {
-        new MSubServer(0, limitMem) {
-          override def set(el: MEntry, async: Boolean): Boolean = {
-            // We sometimes dispatch the incoming set data to an actor.
-            //
-            if (el.key.startsWith("ad|")) {
-              val keyParts = el.key.split("?")
-              if (keyParts.length == 2) {
-                val msg    = nodeManager.serializer.deserialize(el.data, 0, el.data.length)
-                val callee = Card(keyParts(0), keyParts(1))
-                val localA = localActorFor(callee)
-                if (localA.isDefined) {
-                    localA.get ! msg
-                    return true
-                } else if (callee.more == Agency.createActorCard.more) {
-                    val a = localActorFor(Agency.createActorCard)
-                    if (a.isDefined) {
-                        a.get ! CreateActor(callee, msg, this)
-                    } else {
-                        return false // No actor creator was registered.
-                    }
-                } else {
-                    val iter = this.get(List(el.key))
-                    for (e <- iter) {
-                      val att = e.attachment
-                      if (att != null &&
-                          att.isInstanceOf[Actor]) {
-                          att.asInstanceOf[Actor] ! msg
-                          return true
-                      }
-                    }
-                  }
-                  return false
-              }
-            }
-
-            super.set(el, async)
-          }
-        }
-      }
-    }
-
-    receptionist.start((arg: String, defaultValue: String) => {
-      arg match {
-        case "portTCP" => port.toString
-        case _         => defaultValue
-      }
-    })
-
-    receptionist
-  }
-
-  // --------------------------------------
-
   val nodeManager: NodeManager = createNodeManager
-
   def createNodeManager = new SNodeManager
+
+  val receptionist: AnyRef = startReceptionist
+  def startReceptionist = new SReceptionist(host, port, this, nodeManager.serializer)
 
   // --------------------------------------
 
