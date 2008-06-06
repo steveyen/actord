@@ -175,10 +175,10 @@ class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
     }
 
   def nodeFor(c: Card): Node = {
-    if (c.base.startsWith("actord://") {
+    if (c.base.startsWith("actord://")) {
       val hostPort = c.base.substring("actord://".length).split(":")
       if (hostPort.length == 2)
-        return Node(hostPort(0), hostPort(1))
+        return Node(hostPort(0), Integer.parseInt(hostPort(1)))
     } else {
       // TODO: Do a hash or crush into a hierarchy of servers.
     }
