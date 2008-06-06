@@ -27,11 +27,15 @@ object Agency {
 
   def default_!(a: Agency) = synchronized { default_i = a }
   def default              = synchronized { default_i }
+
+  def myCard = Agency.default.localCardFor(Actor.self)
 }
 
 trait Agency {
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit
   def pend(caller: Card, callee: Card, msg: AnyRef): Unit
+
+  def localCardFor(someLocalActor: Actor): Card
 }
 
 case class Frame   (caller: Card, callee: Card, msg: AnyRef)
@@ -84,7 +88,7 @@ class LocalAgency extends Actor with Agency {
     })
   }
 
-  def localBase = "mc://127.0.0.1:11211"
+  def localBase = ""
 
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = 
       pend(localCardFor(caller), callee, msg)
@@ -108,6 +112,8 @@ class LocalAgency extends Actor with Agency {
 
 class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
   def this(port: Int) = this(port, new SNodeManager)
+
+  override val localBase = "actord://127.0.0.1:" + port + "/"
 
   // Start listening on the given port for memcached-speaking clients,
   // but also understand the Agency-related memcached-protocol semantics.
@@ -168,8 +174,15 @@ class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
       case ex => failure(caller, callee, msg, ex)
     }
 
-  def nodeFor(c: Card): Node = defaultNode
-
-  def defaultNode = Node("127.0.0.1", 11211)
+  def nodeFor(c: Card): Node = {
+    if (c.base.startsWith("actord://") {
+      val hostPort = c.base.substring("actord://".length).split(":")
+      if (hostPort.length == 2)
+        return Node(hostPort(0), hostPort(1))
+    } else {
+      // TODO: Do a hash or crush into a hierarchy of servers.
+    }
+    null
+  }
 }
 
