@@ -372,3 +372,41 @@ class SNodeWorker(manager: NodeManager, node: Node)
   def close: Unit    = synchronized { s.close }
 }
 
+
+// ----------------------------------------------
+
+/**
+ * See original at scala.actors.remote._ by Philipp Haller & Guy Oliver.
+ */
+class CustomObjectInputStream(os: InputStream, cl: ClassLoader) extends ObjectInputStream(os) {
+  override def resolveClass(cd: ObjectStreamClass): Class[T] forSome { type T } =
+    try {
+      cl.loadClass(cd.getName)
+    } catch {
+      case cnf: ClassNotFoundException =>
+        super.resolveClass(cd)
+    }
+}
+
+/**
+ * See original at scala.actors.remote._ by Philipp Haller & Guy Oliver.
+ */
+class Serializer(cl: ClassLoader) {
+  def serialize(o: AnyRef): Array[Byte] = {
+    val bos = new ByteArrayOutputStream
+    val out = new ObjectOutputStream(bos)
+    out.writeObject(o)
+    out.flush
+    bos.toByteArray
+  }
+
+  def deserialize(bytes: Array[Byte]): AnyRef = {
+    val bs = new ByteArrayInputStream(bytes)
+    val is = if (cl != null)
+               new CustomObjectInputStream(bs, cl)
+             else
+               new ObjectInputStream(bs)
+
+    is.readObject
+  }
+}
