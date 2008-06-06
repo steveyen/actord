@@ -253,14 +253,17 @@ class ActorDAgency(nodeManager: NodeManager) extends LocalAgency {
   def pendLocal(caller: Card, callee: Card, msg: AnyRef): Unit = 
     super.pend(caller, callee, msg)
 
-  def pendRemote(caller: Card, callee: Card, msg: AnyRef): Unit = {
-    val nodeWorker = nodeManager.worker(nodeFor(callee))
-    if (nodeWorker != null)
-      localActorFor(caller).
-        foreach(nodeWorker.pend(_, callee, msg))
-    else
-      failure(caller, callee, msg, "unknown callee node: " + callee)
-  }
+  def pendRemote(caller: Card, callee: Card, msg: AnyRef): Unit = 
+    try {
+      val nodeWorker = nodeManager.workerFor(nodeFor(callee))
+      if (nodeWorker != null)
+        localActorFor(caller).
+          foreach(nodeWorker.pend(_, callee, msg))
+      else
+        failure(caller, callee, msg, "unknown callee node: " + callee)
+    } catch {
+      case ex => failure(caller, callee, msg, ex)
+    }
 
   def nodeFor(c: Card): Node = defaultNode
 
@@ -274,7 +277,7 @@ case class Node(host: String, port: Int)
 trait NodeManager {
   protected val workers = new mutable.HashMap[Node, NodeWorker]
 
-  def worker(n: Node): NodeWorker = synchronized { 
+  def workerFor(n: Node): NodeWorker = synchronized { 
     if (n != null)
       workers.getOrElse(n, {
         val w = createNodeWorker(n)
@@ -288,35 +291,37 @@ trait NodeManager {
   def workerDone(n: Node) = synchronized { workers -= n }
 
   def createNodeWorker(n: Node): NodeWorker
+
+  def serializer: Serializer
 }
 
 abstract class NodeWorker(manager: NodeManager, node: Node) {
   def alive: Boolean
   def close: Unit
+  def transmit(callee: Card, msgArr: Array[Byte]): Unit
 
   protected val pendingRequests: BlockingQueue[PendingRequest] = createPendingRequestsQueue
 
   def createPendingRequestsQueue: BlockingQueue[PendingRequest] = new ArrayBlockingQueue[PendingRequest](60)
 
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = {
-    val pr = new PendingRequest(caller, callee, msg, serialize(msg))
+    val pr = new PendingRequest(caller, callee, msg, manager.serializer.serialize(msg))
     if (alive)
       pendingRequests.put(pr)
     else
       pr.failure("could not send message via dead node worker: " + node)
   }
 
-  def serialize(msg: AnyRef): Array[Byte] = msg match {
-    case s: String => stringToArray(s)
-    case _ => "TODO".getBytes
-  }
-
   def run {
     try {
       while (alive) {
         val pr = pendingRequests.take
-        if (pr != null) {
-        }
+        if (pr != null) 
+          try {
+            transmit(pr.callee, pr.msgArr)
+          } catch {
+            case ex => pr.failure(ex)
+          }
       }
     } finally {
       runDone
@@ -337,10 +342,10 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
 }
 
 class PendingRequest(protected var callbacks_i: List[Actor], 
-                     callee: Card, 
-                     msg: AnyRef, 
-                     msgArr: Array[Byte],
-                     pendTime: Long) {
+                     val callee: Card, 
+                     val msg: AnyRef, 
+                     val msgArr: Array[Byte],
+                     val pendTime: Long) {
   def this(callback: Actor, callee: Card, msg: AnyRef, msgArr: Array[Byte]) = 
       this(List(callback), callee, msg, msgArr, System.currentTimeMillis)
 
@@ -363,35 +368,63 @@ class SNodeManager extends NodeManager {
     (new Thread(w)).start
     w
   }
+
+  val serializer: Serializer = createSerializer
+
+  def createSerializer: Serializer = new SSerializer(null)
 }
 
 class SNodeWorker(manager: NodeManager, node: Node) 
   extends NodeWorker(manager: NodeManager, node) with Runnable {
-  val s = new Socket(node.host, node.port)
+  protected val s = new Socket(node.host, node.port)
+
   def alive: Boolean = synchronized { s.isConnected && !s.isClosed }
   def close: Unit    = synchronized { s.close }
-}
 
+  protected var bs = new BufferedOutputStream(s.getOutputStream)
+
+  def write(m: String): Unit                                = bs.write(stringToArray(m))
+  def write(a: Array[Byte]): Unit                           = bs.write(a, 0, a.length)
+  def write(a: Array[Byte], offset: Int, length: Int): Unit = bs.write(a, offset, length)
+
+  def flush: Unit = 
+    try {
+      bs.flush
+    } catch {
+      case ex @ _ => close; throw ex
+    }
+
+  val qBytes       = stringToArray("?")
+  val setBytes     = stringToArray("set ")
+  val setFlagBytes = stringToArray(" 0 0 ")
+  val noReplyBytes = stringToArray(" noreply")
+
+  def transmit(callee: Card, msgArr: Array[Byte]): Unit = {
+    write(setBytes)
+    write(callee.base)
+    write(qBytes)
+    write(callee.more)
+    write(setFlagBytes)
+    write(String.valueOf(msgArr))
+    write(noReplyBytes)
+    write(CRNLBytes)
+    write(msgArr)
+    write(CRNLBytes)
+    flush
+  }
+}
 
 // ----------------------------------------------
 
-/**
- * See original at scala.actors.remote._ by Philipp Haller & Guy Oliver.
- */
-class CustomObjectInputStream(os: InputStream, cl: ClassLoader) extends ObjectInputStream(os) {
-  override def resolveClass(cd: ObjectStreamClass): Class[T] forSome { type T } =
-    try {
-      cl.loadClass(cd.getName)
-    } catch {
-      case cnf: ClassNotFoundException =>
-        super.resolveClass(cd)
-    }
+trait Serializer {
+  def serialize(o: AnyRef): Array[Byte]
+  def deserialize(bytes: Array[Byte], offset: Int, length: Int): AnyRef
 }
 
 /**
  * See original at scala.actors.remote._ by Philipp Haller & Guy Oliver.
  */
-class Serializer(cl: ClassLoader) {
+class SSerializer(cl: ClassLoader) extends Serializer {
   def serialize(o: AnyRef): Array[Byte] = {
     val bos = new ByteArrayOutputStream
     val out = new ObjectOutputStream(bos)
@@ -403,10 +436,24 @@ class Serializer(cl: ClassLoader) {
   def deserialize(bytes: Array[Byte], offset: Int, length: Int): AnyRef = {
     val bs = new ByteArrayInputStream(bytes, offset, length)
     val is = if (cl != null)
-               new CustomObjectInputStream(bs, cl)
+               new SObjectInputStream(bs, cl)
              else
                new ObjectInputStream(bs)
 
     is.readObject
   }
 }
+
+/**
+ * See original at scala.actors.remote._ by Philipp Haller & Guy Oliver.
+ */
+class SObjectInputStream(os: InputStream, cl: ClassLoader) extends ObjectInputStream(os) {
+  override def resolveClass(cd: ObjectStreamClass): Class[T] forSome { type T } =
+    try {
+      cl.loadClass(cd.getName)
+    } catch {
+      case cnf: ClassNotFoundException =>
+        super.resolveClass(cd)
+    }
+}
+
