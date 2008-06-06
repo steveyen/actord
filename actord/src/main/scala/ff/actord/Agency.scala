@@ -46,7 +46,7 @@ class LocalAgency extends Actor with Agency {
   def act = {
     trapExit = true
     Actor.loop {
-      Actor.receive {
+      Actor.react {
         // We link to all the local actors that ever invoked this 
         // agency in order to get their Exit notifications for cleanup.
         //
@@ -79,7 +79,7 @@ class LocalAgency extends Actor with Agency {
       nextCard += 1
       val c = Card(localBase, nextCard.toString)
       localActors += (c -> someLocalActor)
-      link(someLocalActor) // Do a link so we'll receive the Exit of someLocalActor.
+      link(someLocalActor) // Do a link so we'll hear about the Exit of someLocalActor.
       c
     })
   }
