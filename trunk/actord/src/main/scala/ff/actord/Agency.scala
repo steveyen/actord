@@ -57,6 +57,7 @@ class LocalAgency extends Actor with Agency {
         case Exit(exitingLocalActor, reason) => synchronized {
           localCards.get(exitingLocalActor).foreach(localUnregister _)
         }
+        case _ => /* NO-OP */
       }
     }
   }
@@ -164,9 +165,9 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
   // --------------------------------------
 
   override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
-    if (localActorFor(callee).isDefined)
+    if (callee.base == localBase) {
       pendLocal(caller, callee, msg)
-    else
+    } else
       pendRemote(caller, callee, msg)
   }
 
