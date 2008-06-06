@@ -29,6 +29,8 @@ object Agency {
   def default              = synchronized { default_i }
 
   def myCard = Agency.default.localCardFor(Actor.self)
+
+  val createActorCard = Card("", "createActor")
 }
 
 trait Agency {
@@ -38,9 +40,10 @@ trait Agency {
   def localCardFor(someLocalActor: Actor): Card
 }
 
-case class Frame   (caller: Card, callee: Card, msg: AnyRef)
-case class Reply   (callee: Card, originalMsg: AnyRef, reply: AnyRef)
-case class Failure (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
+case class Frame       (caller: Card, callee: Card, msg: AnyRef)
+case class Reply       (callee: Card, originalMsg: AnyRef, reply: AnyRef)
+case class Failure     (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
+case class CreateActor (callee: Card, msg: AnyRef)
 
 // ----------------------------------------------
 
@@ -137,6 +140,13 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
             if (localA.isDefined) {
                 localA.get ! msg
                 return true
+            } else if (callee.more == "createActor") {
+                val a = localActorFor(Agency.createActorCard)
+                if (a.isDefined) {
+                    a.get ! CreateActor(callee, msg)
+                } else {
+                    // TODO: No actor creator was registered.
+                }
             } else {
                 // TODO: Need to do a 'get' for the local actor associated with the key.
                 return true
@@ -164,12 +174,13 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
 
   // --------------------------------------
 
-  override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
-    if (callee.base == localBase) {
+  override def pend(caller: Card, callee: Card, msg: AnyRef): Unit =
+    if (callee.base == null ||
+        callee.base.length <= 0 ||
+        callee.base == localBase) {
       pendLocal(caller, callee, msg)
     } else
       pendRemote(caller, callee, msg)
-  }
 
   def pendLocal(caller: Card, callee: Card, msg: AnyRef): Unit = 
     super.pend(caller, callee, msg)
