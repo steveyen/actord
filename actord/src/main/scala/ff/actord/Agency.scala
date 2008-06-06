@@ -43,7 +43,7 @@ trait Agency {
 case class Frame       (caller: Card, callee: Card, msg: AnyRef)
 case class Reply       (callee: Card, originalMsg: AnyRef, reply: AnyRef)
 case class Failure     (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
-case class CreateActor (callee: Card, msg: AnyRef)
+case class CreateActor (callee: Card, msg: AnyRef, server: AnyRef)
 
 // ----------------------------------------------
 
@@ -143,7 +143,7 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
             } else if (callee.more == "createActor") {
                 val a = localActorFor(Agency.createActorCard)
                 if (a.isDefined) {
-                    a.get ! CreateActor(callee, msg)
+                    a.get ! CreateActor(callee, msg, this)
                 } else {
                     // TODO: No actor creator was registered.
                 }
