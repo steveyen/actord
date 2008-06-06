@@ -25,12 +25,15 @@ case class Card(base: String, more: String) {
 object Agency {
   private var default_i: Agency = new LocalAgency
 
-  def default_!(a: Agency) = synchronized { default_i = a }
+  def default_!(a: Agency) = synchronized { default_i = a}
   def default              = synchronized { default_i }
+
+  def init(defaultAgency: Agency) = default_!(defaultAgency)
 
   def myCard = Agency.default.localCardFor(Actor.self)
 
-  val createActorCard = Card("", "_createActor")
+  val createActorCard                     = Card("", "_createActor")
+  def createActorCard(base: String): Card = Card(base, createActorCard.more)
 }
 
 trait Agency {
