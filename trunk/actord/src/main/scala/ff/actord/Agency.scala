@@ -28,7 +28,7 @@ object Agency {
   def default_!(a: Agency) = synchronized { default_i = a}
   def default              = synchronized { default_i }
 
-  def init(defaultAgency: Agency) = default_!(defaultAgency)
+  def initDefault(defaultAgency: Agency) = default_!(defaultAgency)
 
   def myCard = Agency.default.localCardFor(Actor.self)
 
