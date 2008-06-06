@@ -106,8 +106,36 @@ class LocalAgency extends Actor with Agency {
 
 // ----------------------------------------------
 
-class ActorDAgency(nodeManager: NodeManager) extends LocalAgency {
-  def this() = this(new SNodeManager)
+class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
+  def this(port: Int) = this(port, new SNodeManager)
+
+  // Start a memcached-speaking server on the given port.
+  //
+  val m = new MainProgSimple() {
+    override def createServer(numProcessors: Int, limitMem: Long): MServer = {
+      new MMainServer(numProcessors, limitMem) {
+        override def set(el: MEntry, async: Boolean) = {
+          val keyParts = el.key.split("?")
+          if (keyParts.length == 2) {
+            val msg    = nodeManager.serializer.deserialize(el.data, 0, el.data.length)
+            val callee = Card(keyParts(0), keyParts(1))
+            localActorFor(callee).foreach(_ ! msg)
+            true
+          } else
+            super.set(el, async)
+        }
+      }
+    }
+  }
+
+  m.start((arg: String, defaultValue: String) => {
+    arg match {
+      case "portTCP" => port.toString
+      case _         => defaultValue
+    }
+  })
+
+  // --------------------------------------
 
   override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
     if (localActorFor(callee).isDefined)
