@@ -273,15 +273,12 @@ class SNodeWorker(manager: NodeManager, node: Node)
       case ex @ _ => close; throw ex
     }
 
-  val qBytes       = stringToArray("?")
-  val setBytes     = stringToArray("set ad|")
-  val setFlagBytes = stringToArray(" 0 0 ")
-  val noReplyBytes = stringToArray(" noreply")
-
   def transmit(callee: Card, msgArr: Array[Byte]): Unit = {
+    import SNode._
+
     write(setBytes)
     write(callee.base)
-    write(qBytes)
+    write(moreMarkBytes)
     write(callee.more)
     write(setFlagBytes)
     write(String.valueOf(msgArr))
@@ -293,3 +290,68 @@ class SNodeWorker(manager: NodeManager, node: Node)
   }
 }
 
+object SNode {
+  val dispatchMark  = "_ad|"
+  val moreMark      = "?"
+  val moreMarkBytes = stringToArray(moreMark)
+  val setBytes      = stringToArray("set " + dispatchMark)
+  val setFlagBytes  = stringToArray(" 0 0 ")
+  val noReplyBytes  = stringToArray(" noreply")
+}
+
+// Listens on the given port for memcached-speaking client connections,
+// but also understands the extra Agency-related memcached-protocol 
+// extended semantics to dispatch messages to local actors.
+//
+class SReceptionist(host: String, port: Int, agency: Agency, serializer: Serializer) {
+  val m = new MainProgSimple() {
+    override def createServer(numProcessors: Int, limitMem: Long): MServer = {
+      new MSubServer(0, limitMem) {
+        override def set(el: MEntry, async: Boolean): Boolean = {
+          // See if we should dispatch the incoming entry data as a msg to a local actor.
+          //
+          if (el.key.startsWith(SNode.dispatchMark)) {
+            val keyParts = el.key.split(SNode.moreMark)
+            if (keyParts.length == 2) {
+              val msg    = serializer.deserialize(el.data, 0, el.data.length)
+              val callee = Card(keyParts(0), keyParts(1))
+              val localA = agency.localActorFor(callee)
+              if (localA.isDefined) {
+                  localA.get ! msg
+                  return true
+              } else if (callee.more == Agency.createActorCard.more) {
+                val a = agency.localActorFor(Agency.createActorCard)
+                if (a.isDefined) {
+                    a.get ! CreateActor(callee, msg, this)
+                    return true
+                }
+                return false // No actor creator was registered or failed.
+              } else {
+                val iter = this.get(List(el.key))
+                for (e <- iter) {
+                  val att = e.attachment
+                  if (att != null &&
+                      att.isInstanceOf[Actor]) {
+                      att.asInstanceOf[Actor] ! msg
+                      return true
+                  }
+                }
+                return false
+              }
+            }
+          }
+
+          super.set(el, async)
+        }
+      }
+    }
+  }
+
+  m.start(startArg _)
+
+  def startArg(arg: String, defaultValue: String): String =
+    arg match {
+      case "portTCP" => port.toString
+      case _         => defaultValue
+    }
+}
