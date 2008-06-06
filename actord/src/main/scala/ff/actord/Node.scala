@@ -400,8 +400,8 @@ class Serializer(cl: ClassLoader) {
     bos.toByteArray
   }
 
-  def deserialize(bytes: Array[Byte]): AnyRef = {
-    val bs = new ByteArrayInputStream(bytes)
+  def deserialize(bytes: Array[Byte], offset: Int, length: Int): AnyRef = {
+    val bs = new ByteArrayInputStream(bytes, offset, length)
     val is = if (cl != null)
                new CustomObjectInputStream(bs, cl)
              else
