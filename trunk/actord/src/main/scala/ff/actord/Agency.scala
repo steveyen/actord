@@ -109,8 +109,8 @@ class LocalAgency extends Actor with Agency {
 class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
   def this(port: Int) = this(port, new SNodeManager)
 
-  // Start a memcached-speaking server on the given port, but
-  // tweaked to understand agency protocol enhancements.
+  // Start listening on the given port for memcached-speaking clients,
+  // but also understand the Agency-related memcached-protocol semantics.
   //
   val receptionist = createReceptionist
 
