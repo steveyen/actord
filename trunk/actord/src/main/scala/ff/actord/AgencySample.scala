@@ -40,8 +40,8 @@ class ChatRoom(myCard: Card) extends Actor {
         case s: ChatRoomSay => 
           if (!msgs.exists(_ == s)) // Duplicate check for idempotency.
             msgs = s :: msgs
-        case m @ ChatRoomView(v) =>
-          v ~> Reply(myCard, m, msgs)
+        case m @ ChatRoomView(viewer) =>
+          viewer ~> Reply(myCard, m, msgs)
         case _ =>
       }
     }
