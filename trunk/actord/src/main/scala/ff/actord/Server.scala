@@ -270,12 +270,12 @@ case class MEntry(key: String,
   var lru: LRUList = null
 
   /**
-   * Networking/communication layers can squirrel away memeoized data here.
+   * Networking/communication/app layers can squirrel away related data here.
    */
-  private var commObj: AnyRef = null
+  private var attachment_i: AnyRef = null
 
-  def comm                      = synchronized { commObj }
-  def comm_!(a: AnyRef): AnyRef = synchronized { commObj = a; a }
+  def attachment                      = synchronized { attachment_i }
+  def attachment_!(a: AnyRef): AnyRef = synchronized { attachment_i = a; a }
 }
 
 // -------------------------------------------------------
