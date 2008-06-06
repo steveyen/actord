@@ -29,16 +29,22 @@ object SampleUsingAgency {
     }
   )
 
-  Agency.init(agency)
+  Agency.initDefault(agency)
 }
 
 class ChatRoom(myCard: Card) extends Actor {
+  var msgs: List[ChatRoomSay] = Nil
   def act {
     loop {
       react {
-        case _ =>
+        case s: ChatRoomSay => 
+          if (!msgs.exists(_ == s)) // Duplicate check for idempotency.
+            msgs = s :: msgs
       }
     }
   }
   start
 }
+
+case class ChatRoomSay(who: String, when: Long, text: String)
+
