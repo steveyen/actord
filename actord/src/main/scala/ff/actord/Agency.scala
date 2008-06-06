@@ -109,9 +109,12 @@ class LocalAgency extends Actor with Agency {
 class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
   def this(port: Int) = this(port, new SNodeManager)
 
-  // Start a memcached-speaking server on the given port.
+  // Start a memcached-speaking server on the given port, but
+  // tweaked to understand agency protocol enhancements.
   //
-  val m = new MainProgSimple() {
+  val receptionist = createReceptionist
+
+  def createReceptionist: MainProg = new MainProgSimple() {
     override def createServer(numProcessors: Int, limitMem: Long): MServer = {
       new MSubServer(0, limitMem) {
         override def set(el: MEntry, async: Boolean): Boolean = {
@@ -134,7 +137,7 @@ class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
     }
   }
 
-  m.start((arg: String, defaultValue: String) => {
+  receptionist.start((arg: String, defaultValue: String) => {
     arg match {
       case "portTCP" => port.toString
       case _         => defaultValue
