@@ -114,10 +114,10 @@ class LocalAgency extends Actor with Agency {
 
 // ----------------------------------------------
 
-class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
-  def this(port: Int) = this(port, new SNodeManager)
+class ActorDAgency(host: String, port: Int) extends LocalAgency {
+  val actordPrefix = "actord://"
 
-  override val localBase = "actord://127.0.0.1:" + port + "/"
+  override val localBase = actordPrefix + host + ":" + port
 
   // Start listening on the given port for memcached-speaking clients,
   // but also understand the Agency-related memcached-protocol semantics.
@@ -156,6 +156,12 @@ class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
 
   // --------------------------------------
 
+  val nodeManager: NodeManager = createNodeManager
+
+  def createNodeManager = new SNodeManager
+
+  // --------------------------------------
+
   override def pend(caller: Card, callee: Card, msg: AnyRef): Unit = {
     if (localActorFor(callee).isDefined)
       pendLocal(caller, callee, msg)
@@ -179,8 +185,8 @@ class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
     }
 
   def nodeFor(c: Card): Node = {
-    if (c.base.startsWith("actord://")) {
-      val hostPort = c.base.substring("actord://".length).split(":")
+    if (c.base.startsWith(actordPrefix)) {
+      val hostPort = c.base.substring(actordPrefix.length).split(":")
       if (hostPort.length == 2)
         return Node(hostPort(0), Integer.parseInt(hostPort(1)))
     } else {
