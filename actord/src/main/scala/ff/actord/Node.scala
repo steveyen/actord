@@ -274,7 +274,7 @@ class SNodeWorker(manager: NodeManager, node: Node)
     }
 
   val qBytes       = stringToArray("?")
-  val setBytes     = stringToArray("set ")
+  val setBytes     = stringToArray("set ad|")
   val setFlagBytes = stringToArray(" 0 0 ")
   val noReplyBytes = stringToArray(" noreply")
 
