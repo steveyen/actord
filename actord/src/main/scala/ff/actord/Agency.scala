@@ -47,8 +47,8 @@ class LocalAgency extends Actor with Agency {
     trapExit = true
     Actor.loop {
       Actor.receive {
-        // We link to all the local actors that ever called this 
-        // agency to get their Exit notifications.
+        // We link to all the local actors that ever invoked this 
+        // agency in order to get their Exit notifications for cleanup.
         //
         case Exit(exitingLocalActor, reason) => synchronized {
           localCards.get(exitingLocalActor).foreach(localUnregister _)
