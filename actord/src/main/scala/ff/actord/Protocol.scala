@@ -281,12 +281,16 @@ case class MCommand(session: MSession, cmdArr: Array[Byte], cmdArrLen: Int, cmdL
   def write(entry: MEntry, withCAS: Boolean): Unit =
     if (!noReply) {
       val line: Array[Byte] = {
-        val x = entry.comm.asInstanceOf[Array[Byte]]
-        if (x != null)
-            x
-        else
-            entry.comm_!(stringToArray("VALUE " + entry.key + " " + entry.flags + " " + entry.data.size)).
-                  asInstanceOf[Array[Byte]]
+        val a = entry.attachment
+        if (a == null) {
+          val v = valueLine(entry)
+          entry.attachment_!(v)
+          v
+        } else if (a.isInstanceOf[Array[Byte]]) {
+          a.asInstanceOf[Array[Byte]]
+        } else {
+          valueLine(entry)
+        }
       }
       session.write(line)
       if (withCAS) {
@@ -297,6 +301,9 @@ case class MCommand(session: MSession, cmdArr: Array[Byte], cmdArrLen: Int, cmdL
       session.write(entry.data)
       session.write(CRNLBytes)
     }
+
+  def valueLine(entry: MEntry): Array[Byte] =
+    stringToArray("VALUE " + entry.key + " " + entry.flags + " " + entry.data.size)
 }
 
 ///////////////////////////////////////////////// 
