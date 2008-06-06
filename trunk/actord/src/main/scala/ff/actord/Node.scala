@@ -291,7 +291,7 @@ class SNodeWorker(manager: NodeManager, node: Node)
 }
 
 object SNode {
-  val dispatchMark  = "_ad|"
+  val dispatchMark  = "_ad|" // Short for "actor dispatch", "actorD", or just a unique message key prefix.
   val moreMark      = "?"
   val moreMarkBytes = stringToArray(moreMark)
   val setBytes      = stringToArray("set " + dispatchMark)
