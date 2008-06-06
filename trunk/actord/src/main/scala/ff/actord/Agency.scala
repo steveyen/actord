@@ -113,16 +113,22 @@ class ActorDAgency(port: Int, nodeManager: NodeManager) extends LocalAgency {
   //
   val m = new MainProgSimple() {
     override def createServer(numProcessors: Int, limitMem: Long): MServer = {
-      new MMainServer(numProcessors, limitMem) {
-        override def set(el: MEntry, async: Boolean) = {
+      new MSubServer(0, limitMem) {
+        override def set(el: MEntry, async: Boolean): Boolean = {
           val keyParts = el.key.split("?")
           if (keyParts.length == 2) {
             val msg    = nodeManager.serializer.deserialize(el.data, 0, el.data.length)
             val callee = Card(keyParts(0), keyParts(1))
-            localActorFor(callee).foreach(_ ! msg)
-            true
-          } else
-            super.set(el, async)
+            val localA = localActorFor(callee)
+            if (localA.isDefined) {
+                localA.get ! msg
+                return true
+            } else {
+                return true
+            }
+          }
+
+          super.set(el, async)
         }
       }
     }
