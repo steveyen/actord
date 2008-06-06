@@ -30,7 +30,7 @@ object Agency {
 
   def myCard = Agency.default.localCardFor(Actor.self)
 
-  val createActorCard = Card("", "createActor")
+  val createActorCard = Card("", "_createActor")
 }
 
 trait Agency {
@@ -123,48 +123,64 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
 
   override val localBase = actordPrefix + host + ":" + port
 
-  // Start listening on the given port for memcached-speaking clients,
-  // but also understand the Agency-related memcached-protocol semantics.
-  //
-  val receptionist = createReceptionist
+  val receptionist = startReceptionist
 
-  def createReceptionist: MainProg = new MainProgSimple() {
-    override def createServer(numProcessors: Int, limitMem: Long): MServer = {
-      new MSubServer(0, limitMem) {
-        override def set(el: MEntry, async: Boolean): Boolean = {
-          val keyParts = el.key.split("?")
-          if (keyParts.length == 2) {
-            val msg    = nodeManager.serializer.deserialize(el.data, 0, el.data.length)
-            val callee = Card(keyParts(0), keyParts(1))
-            val localA = localActorFor(callee)
-            if (localA.isDefined) {
-                localA.get ! msg
-                return true
-            } else if (callee.more == "createActor") {
-                val a = localActorFor(Agency.createActorCard)
-                if (a.isDefined) {
-                    a.get ! CreateActor(callee, msg, this)
+  def startReceptionist: AnyRef = {
+    // Start listening on the given port for memcached-speaking clients,
+    // but also understand the Agency-related memcached-protocol semantics.
+    //
+    val receptionist = new MainProgSimple() {
+      override def createServer(numProcessors: Int, limitMem: Long): MServer = {
+        new MSubServer(0, limitMem) {
+          override def set(el: MEntry, async: Boolean): Boolean = {
+            // We sometimes dispatch the incoming set data to an actor.
+            //
+            if (el.key.startsWith("ad|")) {
+              val keyParts = el.key.split("?")
+              if (keyParts.length == 2) {
+                val msg    = nodeManager.serializer.deserialize(el.data, 0, el.data.length)
+                val callee = Card(keyParts(0), keyParts(1))
+                val localA = localActorFor(callee)
+                if (localA.isDefined) {
+                    localA.get ! msg
+                    return true
+                } else if (callee.more == Agency.createActorCard.more) {
+                    val a = localActorFor(Agency.createActorCard)
+                    if (a.isDefined) {
+                        a.get ! CreateActor(callee, msg, this)
+                    } else {
+                        return false // No actor creator was registered.
+                    }
                 } else {
-                    // TODO: No actor creator was registered.
-                }
-            } else {
-                // TODO: Need to do a 'get' for the local actor associated with the key.
-                return true
+                    val iter = this.get(List(el.key))
+                    for (e <- iter) {
+                      val att = e.attachment
+                      if (att != null &&
+                          att.isInstanceOf[Actor]) {
+                          att.asInstanceOf[Actor] ! msg
+                          return true
+                      }
+                    }
+                  }
+                  return false
+              }
             }
-          }
 
-          super.set(el, async)
+            super.set(el, async)
+          }
         }
       }
     }
-  }
 
-  receptionist.start((arg: String, defaultValue: String) => {
-    arg match {
-      case "portTCP" => port.toString
-      case _         => defaultValue
-    }
-  })
+    receptionist.start((arg: String, defaultValue: String) => {
+      arg match {
+        case "portTCP" => port.toString
+        case _         => defaultValue
+      }
+    })
+
+    receptionist
+  }
 
   // --------------------------------------
 
