@@ -15,12 +15,12 @@ object SampleUsingAgency {
     actor { 
       loop { 
         react {
-          case CreateActor(callee, msg, server) => 
+          case CreateActor(callee, msg, pool) => 
             callee.base.split("/")(0) match {
               case "chatRoom" =>
                 val c = Card(callee.base, "")
                 val a = new ChatRoom(c)
-                // register(server, , new ChatRoom(c)) // TODO!
+                pool.offer(c, a)
               case _ =>
             }
           case _ =>

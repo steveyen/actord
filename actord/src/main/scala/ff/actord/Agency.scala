@@ -47,7 +47,16 @@ trait Agency {
 case class Frame       (caller: Card, callee: Card, msg: AnyRef)
 case class Reply       (callee: Card, originalMsg: AnyRef, reply: AnyRef)
 case class Failure     (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
-case class CreateActor (callee: Card, msg: AnyRef, server: AnyRef)
+case class CreateActor (callee: Card, msg: AnyRef, pool: ActorPool)
+
+// ----------------------------------------------
+
+// Represents a fluid set of actors, which the system might
+// optionally persist and/or flush under memory pressure.
+//
+trait ActorPool { 
+  def offer(card: Card, actor: Actor)
+}
 
 // ----------------------------------------------
 
