@@ -6,7 +6,7 @@ import scala.actors.Actor._
 import ff.actord._
 import ff.actord.Agency._
 
-object ChatRoomSampleUsingAgency {
+object ChatRoomServer {
   def main(args: Array[String]) {}
 
   // Starts the local process listening on port 11411...
@@ -30,7 +30,7 @@ object ChatRoomSampleUsingAgency {
             splitArr(0) match {
               case "chatRoom" =>
                 val a = new ChatRoom(Card(cardBase, ""), msg match {
-                  case title: String => title
+                  case title: String if title.length > 0 => title
                   case _ => splitArr(1)
                 })
                 pool.offer(a.myCard, a)
@@ -65,22 +65,41 @@ class ChatRoom(val myCard: Card, roomTitle: String) extends Actor {
 case class ChatRoomMessage(who: String, when: Long, text: String)
 case class ChatRoomView(viewer: Card)
 
-class ChatUser(name: String) {
-  def actor {
-    var currRoomName: String = "foyer"
-    loop {
-      react {
-        case ChatUserSay(what) =>
-          val roomCard = Card("chatRoom/" + currRoomName, "")
-          roomCard ~> ChatRoomMessage(name, System.currentTimeMillis, what)
-          roomCard ~> ChatRoomView(myCard)
+// -----------------------------------------------
 
-        case Reply(roomCard, ChatRoomView(_), msgs) => 
-          println(msgs)
+object ChatClient {
+  // Starts the local process listening on port 11422...
+  //
+  Agency.initDefault(new ActorDAgency("127.0.0.1", 11422))
+
+  def main(args: Array[String]) {
+    if (args.length != 3) {
+      println("usage: scala ff.actord.ChatRoomClient roomKey userId msg")
+      return
+    }
+
+    val roomBase = "chatRoom/" + args(0)
+
+    createActorCard(roomBase) ~> "" // Create chat room, if not already.
+
+    val roomCard = Card(roomBase, "")
+
+    val u = actor {
+      loop {
+        react {
+          case text: String =>
+            roomCard ~> ChatRoomMessage(args(1), System.currentTimeMillis, text)
+            roomCard ~> ChatRoomView(myCard)
+
+          case Reply(roomCard, ChatRoomView(_), msgs) => 
+            println(msgs)
+            exit
+        }
       }
     }
+
+    u ! args(2)
   }
 }
 
-case class ChatUserSay(what: String)
 
