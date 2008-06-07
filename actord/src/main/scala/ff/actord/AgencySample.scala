@@ -17,17 +17,22 @@ object ChatRoomSampleUsingAgency {
   // Remote clients can ask this server to create some
   // chatRoom's by doing...
   //
-  //   createActorCard("chatRoom/club23") ~> ""
-  //   createActorCard("chatRoom/hallway111") ~> ""
+  //   createActorCard("chatRoom/club23") ~> "Welcome to Club 23!"
+  //   createActorCard("chatRoom/hallway111") ~> "Hello Hallway 111"
   //
   agency.localRegister(createActorCard, 
     actor { 
       loop { 
         react {
           case CreateActor(cardBase, msg, pool) => 
-            cardBase.split("/")(0) match {
+            val splitArr = cardBase.split("/")
+
+            splitArr(0) match {
               case "chatRoom" =>
-                val a = new ChatRoom(Card(cardBase, ""))
+                val a = new ChatRoom(Card(cardBase, ""), msg match {
+                  case s: String => s
+                  case _ => splitArr(1)
+                })
                 pool.offer(a.myCard, a)
               case _ =>
             }
@@ -40,7 +45,7 @@ object ChatRoomSampleUsingAgency {
   Agency.initDefault(agency)
 }
 
-class ChatRoom(val myCard: Card) extends Actor {
+class ChatRoom(val myCard: Card, roomTitle: String) extends Actor {
   var msgs: List[ChatRoomMessage] = Nil
   def act {
     loop {
