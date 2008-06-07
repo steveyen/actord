@@ -74,11 +74,24 @@ class LocalAgency extends Actor with Agency {
         //
         case Exit(exitingLocalActor, reason) => synchronized {
           localCards.get(exitingLocalActor).foreach(localUnregister _)
+          this.unlink(exitingLocalActor)
         }
+
+        case ExitWatch(otherLocalActor) =>
+          this.link(otherLocalActor)
+          reply(true)
+
+        case ExitUnwatch(otherLocalActor) =>
+          this.unlink(otherLocalActor)
+          reply(true)
+
         case _ => /* NO-OP */
       }
     }
   }
+
+  case class ExitWatch(a: Actor)
+  case class ExitUnwatch(a: Actor)
 
   protected var nextCard: Long = 0L
   protected val localActors = new mutable.HashMap[Card, Actor] 
@@ -88,13 +101,13 @@ class LocalAgency extends Actor with Agency {
     localCards.get(a).foreach(localUnregister _)
     localCards  += (a -> c)
     localActors += (c -> a)
-    this.link(a) // Do a link so we'll hear about the Exit of the actor.
+    this !? ExitWatch(a)
   }
 
   def localUnregister(c: Card): Unit = synchronized {
     localActors.get(c).foreach(a => {
       localCards -= a
-      this.unlink(a)
+      this !? ExitUnwatch(a)
     })
     localActors -= c
   }
