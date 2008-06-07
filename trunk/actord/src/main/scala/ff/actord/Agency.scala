@@ -32,6 +32,8 @@ object Agency {
 
   def myCard = Agency.default.localCardFor(Actor.self)
 
+  // Some special cards used to reference the actor that creates more actors.
+  //
   val createActorCard                     = Card("", "_createActor")
   def createActorCard(base: String): Card = Card(base, createActorCard.more)
 }
