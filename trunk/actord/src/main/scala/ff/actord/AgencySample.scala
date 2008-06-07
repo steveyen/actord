@@ -6,11 +6,20 @@ import scala.actors.Actor._
 import ff.actord._
 import ff.actord.Agency._
 
-object SampleUsingAgency {
+object ChatRoomSampleUsingAgency {
   def main(args: Array[String]) {}
 
+  // Starts the local process listening on port 11411...
+  //
   val agency = new ActorDAgency("127.0.0.1", 11411)
 
+  // Register a local actor that can create other actors.
+  // Remote clients can ask this server to create some
+  // chatRoom's by doing...
+  //
+  //   createActorCard("chatRoom/club23") ~> ""
+  //   createActorCard("chatRoom/hallway111") ~> ""
+  //
   agency.localRegister(createActorCard, 
     actor { 
       loop { 
@@ -32,11 +41,11 @@ object SampleUsingAgency {
 }
 
 class ChatRoom(val myCard: Card) extends Actor {
-  var msgs: List[ChatRoomSay] = Nil
+  var msgs: List[ChatRoomMessage] = Nil
   def act {
     loop {
       react {
-        case s: ChatRoomSay => 
+        case s: ChatRoomMessage => 
           if (!msgs.exists(_ == s)) // Duplicate check for idempotency.
             msgs = s :: msgs
         case m @ ChatRoomView(viewer) =>
@@ -48,6 +57,25 @@ class ChatRoom(val myCard: Card) extends Actor {
   start
 }
 
-case class ChatRoomSay(who: String, when: Long, text: String)
+case class ChatRoomMessage(who: String, when: Long, text: String)
 case class ChatRoomView(viewer: Card)
+
+class ChatUser(name: String) {
+  def actor {
+    var currRoomName: String = "foyer"
+    loop {
+      react {
+        case ChatUserSay(what) =>
+          val roomCard = Card("chatRoom/" + currRoomName, "")
+          roomCard ~> ChatRoomMessage(name, System.currentTimeMillis, what)
+          roomCard ~> ChatRoomView(myCard)
+
+        case Reply(roomCard, ChatRoomView(_), msgs) => 
+          println(msgs)
+      }
+    }
+  }
+}
+
+case class ChatUserSay(what: String)
 
