@@ -279,8 +279,8 @@ class SNodeWorker(manager: NodeManager, node: Node)
   def transmit(callee: Card, msgArr: Array[Byte]): Unit = {
     import SNode._
 
-    write(setBytes)
-    write(callee.base)
+    write(setBytes)      // Emit memcached protocol "set" command,
+    write(callee.base)   // but with key generated from callee card.
     write(moreMarkBytes)
     write(callee.more)
     write(setFlagBytes)
@@ -300,24 +300,30 @@ object SNode {
   val setBytes      = stringToArray("set " + dispatchMark)
   val setFlagBytes  = stringToArray(" 0 0 ")
   val noReplyBytes  = stringToArray(" noreply")
+
+  def cardToEntryKey(c: Card): String = 
+    dispatchMark + c.base + moreMark + c.more
 }
 
 // Listens on the given port for memcached-speaking client connections,
-// but also understands the extra Agency-related memcached-protocol 
-// extended semantics to dispatch messages to local actors.
+// but also understands the extended Agency-related memcached-protocol 
+// semantics to dispatch messages to local actors.
 //
 class SReceptionist(host: String, port: Int, agency: Agency, serializer: Serializer) {
   val m = new MainProgSimple() {
     override def createServer(numProcessors: Int, limitMem: Long): MServer = {
-      new MSubServer(0, limitMem) {
+      var pool: ActorPool   = null
+      val zero: Array[Byte] = new Array[Byte](0)
+
+      val server: MServer = new MMainServer(numProcessors, limitMem) {
         override def set(el: MEntry, async: Boolean): Boolean = {
           // See if we should dispatch as a msg to a local actor.
           //
           if (el.key.startsWith(SNode.dispatchMark)) {
-            val keyParts = el.key.split(SNode.moreMark)
-            if (keyParts.length == 2) {
+            val cardParts = el.key.substring(SNode.dispatchMark.length).split(SNode.moreMark)
+            if (cardParts.length == 2) {
               val msg    = serializer.deserialize(el.data, 0, el.data.length)
-              val callee = Card(keyParts(0), keyParts(1))
+              val callee = Card(cardParts(0), cardParts(1))
               val localA = agency.localActorFor(callee)
               if (localA.isDefined) {
                   localA.get ! msg
@@ -325,7 +331,7 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
               } else if (callee.more == Agency.createActorCard.more) {
                 val a = agency.localActorFor(Agency.createActorCard)
                 if (a.isDefined) {
-                    a.get ! CreateActor(callee, msg, this)
+                    a.get ! CreateActor(callee, msg, pool)
                     return true
                 }
                 return false // No actor creator was registered or failed.
@@ -344,9 +350,25 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
             }
           }
 
+          // Otherwise, just be a normal memcached "set" command.
+          //
           super.set(el, async)
         }
       }
+
+      // Using var instead of val idiom to prevent scalac circular definition complaint.
+      //
+      pool = new ActorPool() { 
+        def offer(card: Card, actor: Actor): Unit = {
+          val el = MEntry(SNode.cardToEntryKey(card), 0, 0, zero, 0)
+          if (el != null) {
+              el.attachment_!(actor)
+              server.addRep(el, true, true)
+          }
+        }
+      }
+
+      server
     }
   }
 
