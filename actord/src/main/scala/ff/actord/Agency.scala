@@ -148,9 +148,9 @@ class LocalAgency extends Actor with Agency {
 // ----------------------------------------------
 
 class ActorDAgency(host: String, port: Int) extends LocalAgency {
-  val actordPrefix = "actord://"
+  val directPrefix = "actord://" // For directly addressed Nodes.
 
-  override val localBase = actordPrefix + host + ":" + port
+  override val localBase = directPrefix + host + ":" + port
 
   val nodeManager: NodeManager = createNodeManager
   def createNodeManager = new SNodeManager
@@ -184,13 +184,23 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
     }
 
   def nodeFor(c: Card): Node = {
-    if (c.base.startsWith(actordPrefix)) {
-      val hostPort = c.base.substring(actordPrefix.length).split(":")
+    var n = nodeForDirect(c)
+    if (n == null)
+        n = nodeForIndirect(c)
+    return n
+  }
+
+  def nodeForDirect(c: Card): Node = { // Returns a Node if it's an explicit, direct address.
+    if (c.base.startsWith(directPrefix)) {
+      val hostPort = c.base.substring(directPrefix.length).split(":")
       if (hostPort.length == 2)
         return Node(hostPort(0), Integer.parseInt(hostPort(1)))
-    } else {
-      // TODO: Do a hash or crush into a hierarchy of servers.
     }
+    null
+  }
+
+  def nodeForIndirect(c: Card): Node = {
+    // TODO: Do a hash or crush into a hierarchy of servers.
     null
   }
 }

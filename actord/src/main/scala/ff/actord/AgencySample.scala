@@ -74,7 +74,13 @@ case class ChatRoomView(viewer: Card)
 object ChatClient {
   // Starts the local process listening on port 11422...
   //
-  Agency.initDefault(new ActorDAgency("127.0.0.1", 11422))
+  Agency.initDefault(new ActorDAgency("127.0.0.1", 11422) {
+    override def nodeForIndirect(c: Card): Node = {
+      // Hardcode our expected server Node in this example.
+      //
+      return Node("127.0.0.1", 11411)
+    }
+  })
 
   def main(args: Array[String]) {
     if (args.length != 3) {
