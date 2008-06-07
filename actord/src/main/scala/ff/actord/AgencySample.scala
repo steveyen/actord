@@ -25,6 +25,7 @@ object ChatRoomServer {
       loop { 
         react {
           case CreateActor(cardBase, msg, pool) => 
+            println("CreateActor " + cardBase)
             val splitArr = cardBase.split("/")
 
             splitArr(0) match {
@@ -34,6 +35,7 @@ object ChatRoomServer {
                   case _ => splitArr(1)
                 })
                 pool.offer(a.myCard, a)
+                println("CreateActor created " + cardBase)
               case _ =>
             }
           case _ =>
@@ -51,9 +53,11 @@ class ChatRoom(val myCard: Card, roomTitle: String) extends Actor {
     loop {
       react {
         case s: ChatRoomMessage => 
+          println("got msg " + s)
           if (!msgs.exists(_ == s)) // Duplicate check for idempotency.
             msgs = s :: msgs
         case m @ ChatRoomView(viewer) =>
+          println("viewing by " + viewer)
           viewer ~> Reply(myCard, m, msgs)
         case _ =>
       }
@@ -88,17 +92,21 @@ object ChatClient {
       loop {
         react {
           case text: String =>
+            println("sending... text: " + text)
             roomCard ~> ChatRoomMessage(args(1), System.currentTimeMillis, text)
             roomCard ~> ChatRoomView(myCard)
+            println("sending... done")
 
           case Reply(roomCard, ChatRoomView(_), msgs) => 
-            println(msgs)
+            println("msgs: " + msgs)
             exit
         }
       }
     }
 
     u ! args(2)
+
+    println("running...")
   }
 }
 
