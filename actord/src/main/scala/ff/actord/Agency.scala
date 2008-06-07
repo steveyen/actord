@@ -47,7 +47,7 @@ trait Agency {
 case class Frame       (caller: Card, callee: Card, msg: AnyRef)
 case class Reply       (callee: Card, originalMsg: AnyRef, reply: AnyRef)
 case class Failure     (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
-case class CreateActor (callee: Card, msg: AnyRef, pool: ActorPool)
+case class CreateActor (cardBase: String, msg: AnyRef, pool: ActorPool)
 
 // ----------------------------------------------
 

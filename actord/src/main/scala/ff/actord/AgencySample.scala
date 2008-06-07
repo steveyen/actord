@@ -15,12 +15,11 @@ object SampleUsingAgency {
     actor { 
       loop { 
         react {
-          case CreateActor(callee, msg, pool) => 
-            callee.base.split("/")(0) match {
+          case CreateActor(cardBase, msg, pool) => 
+            cardBase.split("/")(0) match {
               case "chatRoom" =>
-                val c = Card(callee.base, "")
-                val a = new ChatRoom(c)
-                pool.offer(c, a)
+                val a = new ChatRoom(Card(cardBase, ""))
+                pool.offer(a.myCard, a)
               case _ =>
             }
           case _ =>
@@ -32,7 +31,7 @@ object SampleUsingAgency {
   Agency.initDefault(agency)
 }
 
-class ChatRoom(myCard: Card) extends Actor {
+class ChatRoom(val myCard: Card) extends Actor {
   var msgs: List[ChatRoomSay] = Nil
   def act {
     loop {
