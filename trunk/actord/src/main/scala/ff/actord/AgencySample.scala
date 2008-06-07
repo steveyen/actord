@@ -30,7 +30,7 @@ object ChatRoomSampleUsingAgency {
             splitArr(0) match {
               case "chatRoom" =>
                 val a = new ChatRoom(Card(cardBase, ""), msg match {
-                  case s: String => s
+                  case title: String => title
                   case _ => splitArr(1)
                 })
                 pool.offer(a.myCard, a)
