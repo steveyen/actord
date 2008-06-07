@@ -331,7 +331,7 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
               } else if (callee.more == Agency.createActorCard.more) {
                 val a = agency.localActorFor(Agency.createActorCard)
                 if (a.isDefined) {
-                    a.get ! CreateActor(callee, msg, pool)
+                    a.get ! CreateActor(callee.base, msg, pool)
                     return true
                 }
                 return false // No actor creator was registered or failed.
