@@ -125,7 +125,7 @@ object ChatClient {
 
           case Reply(roomCard, ChatRoomView(_), msgs) => 
             println("msgs: " + msgs)
-            exit
+            System.exit(0)
         }
       }
     }
