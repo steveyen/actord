@@ -12,8 +12,6 @@ import ff.actord.Agency._
 //   scala -cp target/classes ff.actord.ChatRoomServer [port]
 //
 object ChatRoomServer {
-  var agency: Agency = null
-
   def main(args: Array[String]) {
     val port = Integer.parseInt(args(0))
 
