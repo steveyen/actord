@@ -157,8 +157,6 @@ case class Node(host: String, port: Int)
 trait NodeManager {
   protected val workers = new mutable.HashMap[Node, NodeWorker]
 
-  def workerForRetries = 1
-
   def workerFor(n: Node): NodeWorker = 
       workerFor(n, 1)
 
@@ -261,7 +259,7 @@ class PendingRequest(protected var callbacks_i: List[Actor],
   def this(callback: Actor, callee: Card, msg: AnyRef, msgArr: Array[Byte]) = 
       this(List(callback), callee, msg, msgArr, System.currentTimeMillis)
 
-  def callbacks = callbacks_i
+  def callbacks = synchronized { callbacks_i }
 
   def addCallback(a: Actor): Unit = synchronized {
     if (a != null)
@@ -383,20 +381,28 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
             var moreMarkAt = el.key.indexOf(SNode.moreMark, beg)
             if (moreMarkAt < beg)
                 moreMarkAt = end
+
             val calleeBase = el.key.substring(beg, moreMarkAt)
             val calleeMore = el.key.substring(Math.min(moreMarkAt + 1, end), end)
             val callee = Card(calleeBase, calleeMore)
+
             val localA = agency.localActorFor(callee)
-            if (localA.isDefined) {
+            if (localA.isDefined) { // One reason why we get here is handling a Reply.
                 localA.get ! msg
                 return true
             } else if (callee.more == Agency.createActorCard.more) {
-              val a = agency.localActorFor(Agency.createActorCard)
-              if (a.isDefined) {
-                  a.get ! CreateActor(callee.base, msg, pool)
+              // Invoke our local actor that can create more local actors (LATCCMLA), if any.
+              // The LATCCMLA might add any new actors into the fluid actor pool.
+              //
+              val latccmla = agency.localActorFor(Agency.createActorCard)
+              if (latccmla.isDefined) {
+                  latccmla.get ! CreateActor(callee.base, msg, pool)
                   return true
               }
             } else {
+              // Invoke an actor that's in the fluid actor pool (stored in the MServer),
+              // that probably got into the pool originally by the LATCCMLA above.
+              //
               val iter = this.get(List(el.key))
               for (e <- iter) {
                 val att = e.attachment
