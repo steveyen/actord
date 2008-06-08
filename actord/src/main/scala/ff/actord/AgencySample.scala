@@ -82,7 +82,9 @@ case class ChatRoomView(viewer: Card)
 // -----------------------------------------------
 
 // Send a chat client message...
-//   scala -cp target/classes ff.actord.ChatRoomClient [roomKey] [userId] [some-single-word-msg]
+//   scala -cp target/classes ff.actord.ChatRoomClient [ports] [roomKey] [userId] [some-single-word-msg]
+//
+// The [ports] argment is a comman-separated list of server port numbers.
 //
 object ChatClient {
   def main(args: Array[String]) {
