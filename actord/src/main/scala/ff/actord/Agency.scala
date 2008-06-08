@@ -57,7 +57,8 @@ case class CreateActor (cardBase: String, msg: AnyRef, pool: ActorPool)
 // optionally persist and/or flush under memory pressure.
 //
 trait ActorPool { 
-  def offer(card: Card, actor: Actor, async: Boolean): Boolean
+  def offer(card: Card, actor: Actor, expiration: Long, async: Boolean): Boolean
+  def offer(key: String, data: Array[Byte], expiration: Long, attachment: AnyRef, async: Boolean): Boolean
 }
 
 // ----------------------------------------------
