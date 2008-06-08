@@ -164,19 +164,15 @@ trait NodeManager {
 
   def workerFor(n: Node, retries: Int): NodeWorker = synchronized { 
     if (n != null) {
-debugln("nmanager workerFor: " + n + " retries: " + retries)
       val w = workers.getOrElse(n, {
         val w = createNodeWorker(n)
         workers += (n -> w)
         w
       })
-debugln("nmanager workerFor: " + n + " retries: " + retries + " w: " + w + " alive: " + w.alive)
       if (w.alive == false &&
           retries >= 1) {
-debugln("nmanager workerFor DEL1: " + n + " retries: " + retries + " w: " + w + " alive: " + w.alive)
         workerDone(w)
         w.pend(NOOP)
-debugln("nmanager workerFor DEL2: " + n + " retries: " + retries + " w: " + w + " alive: " + w.alive)
         return workerFor(n, retries - 1)
       }
       w
@@ -185,16 +181,12 @@ debugln("nmanager workerFor DEL2: " + n + " retries: " + retries + " w: " + w + 
   }
 
   def workerDone(w: NodeWorker): Unit = synchronized { 
-debugln("workerDone: " + w.node)
     if (w != null &&
         w.manager == this)
       workers.get(w.node).
               foreach(curr => {
                 if (curr == w)      // Make sure we're removing w, not some 
-{
-debugln("workerDone: removing " + w.node)
                   workers -= w.node // other worker that popped up concrrently.
-}
               })
   }
 
@@ -217,33 +209,21 @@ abstract class NodeWorker(val manager: NodeManager, val node: Node) {
     new ArrayBlockingQueue[PendingRequest](60)
 
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = {
-debugln("nw pend: " + caller + " to " + callee + " alive: " + alive)
     val pr = new PendingRequest(caller, callee, msg, 
                                 manager.serializer.serialize(msg))
-debugln("nw pend serialized. " + caller + " to " + callee)
     if (alive)
-{
-debugln("nw pend put... " + caller + " to " + callee)
       pend(pr)
-debugln("nw pend put... done. " + caller + " to " + callee)
-}
     else
-{
-debugln("nw pend failure. " + caller + " to " + callee)
       pr.failure("could not send message via dead node worker: " + node)
-}
   }
 
   def pend(pr: PendingRequest): Unit =
     pendingRequests.put(pr)
 
   def run {
-debugln("nw run to node: " + node)
     try {
       while (alive) {
-debugln("nw run to node, waiting for pendingRequests...: " + node)
         val pr = pendingRequests.take
-debugln("nw run to node, waiting for pendingRequests... done: " + node)
         if (alive && 
             pr != null &&
             pr != manager.NOOP) 
@@ -261,7 +241,6 @@ debugln("nw run to node, waiting for pendingRequests... done: " + node)
   }
 
   def runDone: Unit = {
-debugln("nw runDone to node: " + node)
     manager.workerDone(this)
 
     val reason = "could not send message - node worker done: " + node
@@ -309,8 +288,6 @@ class SNodeManager extends NodeManager {
 
 class SNodeWorker(override val manager: NodeManager, override val node: Node) 
   extends NodeWorker(manager: NodeManager, node) with Runnable {
-debugln("node worker to: " + node)
-
   protected val s = new Socket(node.host, node.port)
 
   s.setTcpNoDelay(true)
@@ -332,7 +309,6 @@ debugln("node worker to: " + node)
     }
 
   def transmit(callee: Card, msgArr: Array[Byte]): Unit = synchronized {
-debugln("transmit: " + callee + ": " + msgArr.length)
     try {
       import SNode._
 
@@ -398,8 +374,6 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
 
       val server: MServer = new MMainServer(numProcessors, limitMem) {
         override def set(el: MEntry, async: Boolean): Boolean = {
-debugln("recv set: " + el.key)
-
           // See if we should dispatch as a msg to a local actor.
           //
           if (el.key.startsWith(SNode.dispatchMark)) {
@@ -411,34 +385,27 @@ debugln("recv set: " + el.key)
                 moreMarkAt = end
             val calleeBase = el.key.substring(beg, moreMarkAt)
             val calleeMore = el.key.substring(Math.min(moreMarkAt + 1, end), end)
-debugln("recv set: dispatching... " + calleeBase + " [" + calleeMore + "]")
             val callee = Card(calleeBase, calleeMore)
-debugln("recv set, callee: " + callee)
             val localA = agency.localActorFor(callee)
             if (localA.isDefined) {
-debugln("recv set, to localActor")
                 localA.get ! msg
                 return true
             } else if (callee.more == Agency.createActorCard.more) {
               val a = agency.localActorFor(Agency.createActorCard)
               if (a.isDefined) {
-debugln("recv set, to createActorCard")
                   a.get ! CreateActor(callee.base, msg, pool)
                   return true
               }
             } else {
-debugln("recv set, to pool actor")
               val iter = this.get(List(el.key))
               for (e <- iter) {
                 val att = e.attachment
                 if (att != null &&
                     att.isInstanceOf[Actor]) {
                     att.asInstanceOf[Actor] ! msg
-debugln("recv set, to pool actor, invoked")
                     return true
                 }
               }
-debugln("recv set, to pool actor, not found")
             }
             return false
           }
