@@ -6,10 +6,15 @@ import scala.actors.Actor._
 import ff.actord._
 import ff.actord.Agency._
 
+// Example of an ActorD Agency based chat room server and client.
+//
+// Start a chat server...
+//   scala -cp target/classes ff.actord.ChatRoomServer
+//
 object ChatRoomServer {
   def main(args: Array[String]) {}
 
-  // Starts the local process listening on port 11411...
+  // Starts this server process listening on port 11411...
   //
   val agency = new ActorDAgency("127.0.0.1", 11411)
 
@@ -21,20 +26,20 @@ object ChatRoomServer {
     actor { 
       loop { 
         react {
-          case CreateActor(cardBase, msg, pool) => 
+          case CreateActor(cardBase, args, pool) => 
             println("CreateActor " + cardBase)
             val splitArr = cardBase.split("/")
 
             splitArr(0) match {
               case "chatRoom" =>
-                msg match {
+                args match {
                   case AddChatRoom(roomTitle, caller) =>
                     val r = new ChatRoom(Card(cardBase, ""), roomTitle)
                     val o = pool.offer(r.myCard, r, false)
                     if (o == true)
                         r.start
                     if (caller != null)
-                        caller ~> Reply(myCard, msg, r.myCard)
+                        caller ~> Reply(myCard, args, r.myCard)
                     println("AddChatRoom: " + cardBase + " for caller: " + caller + " offer: " + o)
                   case _ =>
                 }
@@ -74,12 +79,16 @@ case class ChatRoomView(viewer: Card)
 
 // -----------------------------------------------
 
+// Send a chat client message...
+//   scala -cp target/classes ff.actord.ChatRoomClient [roomKey] [userId] [some-single-word-msg]
+//
 object ChatClient {
   // Starts the local process listening on port 11422...
   //
   Agency.initDefault(new ActorDAgency("127.0.0.1", 11422) {
     override def nodeForIndirect(c: Card): Node = {
-      // Hardcode our expected server Node in this example.
+      // Hardcode our expected one and only server Node in this example.
+      // Normally, we'd instead do some consistent-hashing or CRUSH here.
       //
       return Node("127.0.0.1", 11411)
     }
