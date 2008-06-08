@@ -102,7 +102,7 @@ object ChatClient {
     //
     Agency.initDefault(new ActorDAgency("127.0.0.1", 11422) {
       override def nodeForIndirect(c: Card): Node = {
-        // Hardcode our expected one and only server Node in this example.
+        // Simple hashing in this example.
         // Normally, we'd instead do some consistent-hashing or CRUSH here.
         //
         return Node("127.0.0.1", serverPorts(c.base.hashCode % serverPorts.length))
