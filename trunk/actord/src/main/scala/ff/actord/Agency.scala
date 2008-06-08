@@ -192,7 +192,7 @@ class ActorDAgency(host: String, port: Int) extends LocalAgency {
 
   def nodeForDirect(c: Card): Node = { // Returns a Node if it's an explicit, direct address.
     if (c.base.startsWith(directPrefix)) {
-      val hostPort = c.base.substring(directPrefix.length).split(":")
+      val hostPort = c.base.substring(directPrefix.length).split(':')
       if (hostPort.length == 2)
         return Node(hostPort(0), Integer.parseInt(hostPort(1)))
     }
