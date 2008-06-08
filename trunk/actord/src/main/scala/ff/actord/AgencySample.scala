@@ -82,32 +82,35 @@ case class ChatRoomView(viewer: Card)
 // -----------------------------------------------
 
 // Send a chat client message...
-//   scala -cp target/classes ff.actord.ChatRoomClient [ports] [roomKey] [userId] [some-single-word-msg]
+//   scala -cp target/classes ff.actord.ChatRoomClient [serverList] [roomKey] [userId] [some-single-word-msg]
 //
-// The [ports] argment is a comman-separated list of server port numbers.
+// The [serverList] argment is a comman-separated list of server host:port info,
+// such as "127.0.0.1:11511,127.0.0.1:11611"
 //
 object ChatClient {
   def main(args: Array[String]) {
     if (args.length != 4) {
-      println("usage: scala ff.actord.ChatRoomClient serverPort0,serverPort1 roomKey userId msg")
+      println("usage: scala ff.actord.ChatRoomClient serverList roomKey userId msg")
       return
     }
 
-    val serverPorts: Array[Int] = args(0).split(',').map(Integer.parseInt _)
-    if (serverPorts.length < 1) {
-      println("need at least 1 serverPort")
+    val nodes: Array[Node] = args(0).split(',').map(hostPort => {
+      val parts = hostPort.split(':')
+      Node(parts(0), Integer.parseInt(parts(1)))
+    })
+    if (nodes.length < 1) {
+      println("need at least 1 host:port in the serverList")
       return
     }
 
     // Starts the local process listening on port 11422...
     //
     Agency.initDefault(new ActorDAgency("127.0.0.1", 11422) {
-      override def nodeForIndirect(c: Card): Node = {
+      override def nodeForIndirect(c: Card): Node = 
         // Simple hashing in this example.
         // Normally, we'd instead do some consistent-hashing or CRUSH here.
         //
-        return Node("127.0.0.1", serverPorts(c.base.hashCode % serverPorts.length))
-      } 
+        nodes(c.base.hashCode % nodes.length)
     })
 
     val roomKey  = args(1)
