@@ -21,9 +21,8 @@ object ChatRoomServer {
     //
     val agency = new ActorDAgency("127.0.0.1", port)
 
-    // Register a local actor that can create other actors.
-    // Remote clients can ask this server to create some
-    // chatRoom's by doing...
+    // Register an actor that can create other actors, due
+    // to special, parametrized requests coming from remote clients.
     //
     agency.localRegister(createActorCard, 
       actor { 
