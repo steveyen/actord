@@ -353,6 +353,23 @@ debugln("transmit: " + callee + ": " + msgArr.length)
         throw ex
     }
   }
+
+  val watcher = new Thread() {
+    override def run {
+      try {
+        // We're not expecting anything to read, so this should
+        // block until there's an error, the socket closed, etc.
+        //
+        s.getInputStream.read 
+      } finally {
+        close
+        manager.workerDone(SNodeWorker.this)
+        pend(manager.NOOP)
+      }
+    }
+  }
+
+  watcher.start
 }
 
 object SNode {
