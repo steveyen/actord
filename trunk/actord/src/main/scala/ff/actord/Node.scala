@@ -415,10 +415,13 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
       // Using var instead of val idiom to prevent scalac circular definition complaint.
       //
       pool = new ActorPool() { 
-        def offer(card: Card, actor: Actor, async: Boolean): Boolean = {
-          val el = MEntry(SNode.cardToEntryKey(card), 0, 0, zero, 0)
+        def offer(card: Card, actor: Actor, expiration: Long, async: Boolean): Boolean = 
+            offer(SNode.cardToEntryKey(card), zero, expiration, actor, async)
+
+        def offer(key: String, data: Array[Byte], expiration: Long, attachment: AnyRef, async: Boolean): Boolean = {
+          val el = MEntry(key, 0, expiration, data, 0)
           if (el != null) {
-              el.attachment_!(actor)
+              el.attachment_!(attachment)
               server.addRep(el, true, async)
           } else
               false

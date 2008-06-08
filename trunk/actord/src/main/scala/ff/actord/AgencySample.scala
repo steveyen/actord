@@ -37,7 +37,7 @@ object ChatRoomServer {
                   args match {
                     case AddChatRoom(roomTitle, caller) =>
                       val r = new ChatRoom(Card(cardBase, ""), roomTitle)
-                      val o = pool.offer(r.myCard, r, false)
+                      val o = pool.offer(r.myCard, r, 0, false)
                       if (o == true)
                           r.start
                       if (caller != null)
