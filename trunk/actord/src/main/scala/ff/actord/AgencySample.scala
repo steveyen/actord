@@ -9,7 +9,7 @@ import ff.actord.Agency._
 // Example of an ActorD Agency based chat room server and client.
 //
 // Start a chat server...
-//   scala -cp target/classes ff.actord.ChatRoomServer port
+//   scala -cp target/classes ff.actord.ChatRoomServer [port]
 //
 object ChatRoomServer {
   var agency: Agency = null
