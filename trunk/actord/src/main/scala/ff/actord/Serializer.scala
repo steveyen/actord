@@ -28,11 +28,17 @@ trait Serializer {
  */
 class SSerializer(cl: ClassLoader) extends Serializer {
   def serialize(o: AnyRef): Array[Byte] = {
-    val bos = new ByteArrayOutputStream
-    val out = new ObjectOutputStream(bos)
-    out.writeObject(o)
-    out.flush
-    bos.toByteArray
+    try {
+      val bos = new ByteArrayOutputStream
+      val out = new ObjectOutputStream(bos)
+      out.writeObject(o)
+      out.flush
+      bos.toByteArray
+    } catch {
+      case ex => 
+        println("SSerializer.serialize EXCEPTION: " + ex) // TODO: Logging.
+        throw ex
+    }
   }
 
   def deserialize(bytes: Array[Byte], offset: Int, length: Int): AnyRef = {

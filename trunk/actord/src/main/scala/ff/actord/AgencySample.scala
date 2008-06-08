@@ -17,9 +17,6 @@ object ChatRoomServer {
   // Remote clients can ask this server to create some
   // chatRoom's by doing...
   //
-  //   createActorCard("chatRoom/club23") ~> "Welcome to Club 23!"
-  //   createActorCard("chatRoom/hallway111") ~> "Hello Hallway 111"
-  //
   agency.localRegister(createActorCard, 
     actor { 
       loop { 
@@ -30,12 +27,17 @@ object ChatRoomServer {
 
             splitArr(0) match {
               case "chatRoom" =>
-                val a = new ChatRoom(Card(cardBase, ""), msg match {
-                  case title: String if title.length > 0 => title
-                  case _ => splitArr(1)
-                })
-                pool.offer(a.myCard, a)
-                println("CreateActor created " + cardBase)
+                msg match {
+                  case AddChatRoom(roomTitle, caller) =>
+                    val r = new ChatRoom(Card(cardBase, ""), roomTitle)
+                    val o = pool.offer(r.myCard, r, false)
+                    if (o == true)
+                        r.start
+                    if (caller != null)
+                        caller ~> Reply(myCard, msg, r.myCard)
+                    println("AddChatRoom: " + cardBase + " for caller: " + caller + " offer: " + o)
+                  case _ =>
+                }
               case _ =>
             }
           case _ =>
@@ -46,6 +48,8 @@ object ChatRoomServer {
 
   Agency.initDefault(agency)
 }
+
+case class AddChatRoom(roomTitle: String, caller: Card)
 
 class ChatRoom(val myCard: Card, roomTitle: String) extends Actor {
   var msgs: List[ChatRoomMessage] = Nil
@@ -63,7 +67,6 @@ class ChatRoom(val myCard: Card, roomTitle: String) extends Actor {
       }
     }
   }
-  start
 }
 
 case class ChatRoomMessage(who: String, when: Long, text: String)
@@ -82,6 +85,8 @@ object ChatClient {
     }
   })
 
+  case class ChatClientGo
+
   def main(args: Array[String]) {
     if (args.length != 3) {
       println("usage: scala ff.actord.ChatRoomClient roomKey userId msg")
@@ -89,14 +94,20 @@ object ChatClient {
     }
 
     val roomBase = "chatRoom/" + args(0)
-
-    createActorCard(roomBase) ~> "" // Create chat room, if not already.
-
-    val roomCard = Card(roomBase, "")
+    var roomCard = Card(roomBase, "")
 
     val u = actor {
       loop {
         react {
+          case ChatClientGo =>
+            // Create chat room, if not already...
+            //
+            createActorCard(roomBase) ~> AddChatRoom("room " + args(0) + " is fun!", myCard)
+
+          case Reply(_, AddChatRoom(_, _), newRoomCard: Card) => 
+            roomCard = newRoomCard
+            self ! args(2)
+
           case text: String =>
             println("sending... text: " + text)
             roomCard ~> ChatRoomMessage(args(1), System.currentTimeMillis, text)
@@ -110,7 +121,7 @@ object ChatClient {
       }
     }
 
-    u ! args(2)
+    u ! ChatClientGo
 
     println("running...")
   }

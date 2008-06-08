@@ -23,6 +23,7 @@ import java.net._
 import java.util.concurrent._
 
 import ff.actord.Util._
+import ff.actord.SNode._
 
 /*
 utilizes memcached protocol.  
@@ -156,25 +157,55 @@ case class Node(host: String, port: Int)
 trait NodeManager {
   protected val workers = new mutable.HashMap[Node, NodeWorker]
 
-  def workerFor(n: Node): NodeWorker = synchronized { 
-    if (n != null)
-      workers.getOrElse(n, {
+  def workerForRetries = 1
+
+  def workerFor(n: Node): NodeWorker = 
+      workerFor(n, 1)
+
+  def workerFor(n: Node, retries: Int): NodeWorker = synchronized { 
+    if (n != null) {
+debugln("nmanager workerFor: " + n + " retries: " + retries)
+      val w = workers.getOrElse(n, {
         val w = createNodeWorker(n)
         workers += (n -> w)
         w
       })
-    else
+debugln("nmanager workerFor: " + n + " retries: " + retries + " w: " + w + " alive: " + w.alive)
+      if (w.alive == false &&
+          retries >= 1) {
+debugln("nmanager workerFor DEL1: " + n + " retries: " + retries + " w: " + w + " alive: " + w.alive)
+        workerDone(w)
+        w.pend(NOOP)
+debugln("nmanager workerFor DEL2: " + n + " retries: " + retries + " w: " + w + " alive: " + w.alive)
+        return workerFor(n, retries - 1)
+      }
+      w
+    } else
       null
   }
 
-  def workerDone(n: Node) = synchronized { workers -= n }
+  def workerDone(w: NodeWorker): Unit = synchronized { 
+debugln("workerDone: " + w.node)
+    if (w != null &&
+        w.manager == this)
+      workers.get(w.node).
+              foreach(curr => {
+                if (curr == w)      // Make sure we're removing w, not some 
+{
+debugln("workerDone: removing " + w.node)
+                  workers -= w.node // other worker that popped up concrrently.
+}
+              })
+  }
 
   def createNodeWorker(n: Node): NodeWorker // Throws exception if cannot connect.
 
   def serializer: Serializer
+
+  val NOOP = new PendingRequest(null, null, null, null) // Sent to help workers wakeup.
 }
 
-abstract class NodeWorker(manager: NodeManager, node: Node) {
+abstract class NodeWorker(val manager: NodeManager, val node: Node) {
   def alive: Boolean
   def close: Unit
   def transmit(callee: Card, msgArr: Array[Byte]): Unit
@@ -186,23 +217,42 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
     new ArrayBlockingQueue[PendingRequest](60)
 
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit = {
+debugln("nw pend: " + caller + " to " + callee + " alive: " + alive)
     val pr = new PendingRequest(caller, callee, msg, 
                                 manager.serializer.serialize(msg))
+debugln("nw pend serialized. " + caller + " to " + callee)
     if (alive)
-      pendingRequests.put(pr)
+{
+debugln("nw pend put... " + caller + " to " + callee)
+      pend(pr)
+debugln("nw pend put... done. " + caller + " to " + callee)
+}
     else
+{
+debugln("nw pend failure. " + caller + " to " + callee)
       pr.failure("could not send message via dead node worker: " + node)
+}
   }
 
+  def pend(pr: PendingRequest): Unit =
+    pendingRequests.put(pr)
+
   def run {
+debugln("nw run to node: " + node)
     try {
       while (alive) {
+debugln("nw run to node, waiting for pendingRequests...: " + node)
         val pr = pendingRequests.take
-        if (pr != null) 
+debugln("nw run to node, waiting for pendingRequests... done: " + node)
+        if (alive && 
+            pr != null &&
+            pr != manager.NOOP) 
           try {
             transmit(pr.callee, pr.msgArr)
           } catch {
-            case ex => pr.failure(ex)
+            case ex => 
+              pr.failure(ex)
+              println("transmit failure to node: " + node)
           }
       }
     } finally {
@@ -211,7 +261,8 @@ abstract class NodeWorker(manager: NodeManager, node: Node) {
   }
 
   def runDone: Unit = {
-    manager.workerDone(node)
+debugln("nw runDone to node: " + node)
+    manager.workerDone(this)
 
     val reason = "could not send message - node worker done: " + node
 
@@ -256,9 +307,13 @@ class SNodeManager extends NodeManager {
   def createSerializer: Serializer = new SSerializer(null)
 }
 
-class SNodeWorker(manager: NodeManager, node: Node) 
+class SNodeWorker(override val manager: NodeManager, override val node: Node) 
   extends NodeWorker(manager: NodeManager, node) with Runnable {
+debugln("node worker to: " + node)
+
   protected val s = new Socket(node.host, node.port)
+
+  s.setTcpNoDelay(true)
 
   def alive: Boolean = synchronized { s.isConnected && !s.isClosed }
   def close: Unit    = synchronized { s.close }
@@ -273,23 +328,30 @@ class SNodeWorker(manager: NodeManager, node: Node)
     try {
       bs.flush
     } catch {
-      case ex @ _ => close; throw ex
+      case ex => close; throw ex
     }
 
-  def transmit(callee: Card, msgArr: Array[Byte]): Unit = {
-    import SNode._
+  def transmit(callee: Card, msgArr: Array[Byte]): Unit = synchronized {
+debugln("transmit: " + callee + ": " + msgArr.length)
+    try {
+      import SNode._
 
-    write(setBytes)      // Emit memcached protocol "set" command,
-    write(callee.base)   // but with key generated from callee card.
-    write(moreMarkBytes)
-    write(callee.more)
-    write(setFlagBytes)
-    write(String.valueOf(msgArr))
-    write(noReplyBytes)
-    write(CRNLBytes)
-    write(msgArr)
-    write(CRNLBytes)
-    flush
+      write(setBytes)      // Emit memcached protocol "set" command,
+      write(callee.base)   // but with key generated from callee card.
+      write(moreMarkBytes)
+      write(callee.more)
+      write(setFlagBytes)
+      write(String.valueOf(msgArr.length))
+      write(noReplyBytes)
+      write(CRNLBytes)
+      write(msgArr)
+      write(CRNLBytes)
+      flush
+    } catch {
+      case ex =>
+        println("transmit failure to: " + node + " alive: " + alive)
+        throw ex
+    }
   }
 }
 
@@ -303,6 +365,8 @@ object SNode {
 
   def cardToEntryKey(c: Card): String = 
     dispatchMark + c.base + moreMark + c.more
+
+  def debugln(m: String): Unit = println(m)
 }
 
 // Listens on the given port for memcached-speaking client connections,
@@ -317,37 +381,49 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
 
       val server: MServer = new MMainServer(numProcessors, limitMem) {
         override def set(el: MEntry, async: Boolean): Boolean = {
+debugln("recv set: " + el.key)
+
           // See if we should dispatch as a msg to a local actor.
           //
           if (el.key.startsWith(SNode.dispatchMark)) {
-            val cardParts = el.key.substring(SNode.dispatchMark.length).split(SNode.moreMark)
-            if (cardParts.length == 2) {
-              val msg    = serializer.deserialize(el.data, 0, el.data.length)
-              val callee = Card(cardParts(0), cardParts(1))
-              val localA = agency.localActorFor(callee)
-              if (localA.isDefined) {
-                  localA.get ! msg
+            val msg = serializer.deserialize(el.data, 0, el.data.length)
+            val beg = SNode.dispatchMark.length
+            val end = el.key.length
+            var moreMarkAt = el.key.indexOf(SNode.moreMark, beg)
+            if (moreMarkAt < beg)
+                moreMarkAt = end
+            val calleeBase = el.key.substring(beg, moreMarkAt)
+            val calleeMore = el.key.substring(Math.min(moreMarkAt + 1, end), end)
+debugln("recv set: dispatching... " + calleeBase + " [" + calleeMore + "]")
+            val callee = Card(calleeBase, calleeMore)
+debugln("recv set, callee: " + callee)
+            val localA = agency.localActorFor(callee)
+            if (localA.isDefined) {
+debugln("recv set, to localActor")
+                localA.get ! msg
+                return true
+            } else if (callee.more == Agency.createActorCard.more) {
+              val a = agency.localActorFor(Agency.createActorCard)
+              if (a.isDefined) {
+debugln("recv set, to createActorCard")
+                  a.get ! CreateActor(callee.base, msg, pool)
                   return true
-              } else if (callee.more == Agency.createActorCard.more) {
-                val a = agency.localActorFor(Agency.createActorCard)
-                if (a.isDefined) {
-                    a.get ! CreateActor(callee.base, msg, pool)
+              }
+            } else {
+debugln("recv set, to pool actor")
+              val iter = this.get(List(el.key))
+              for (e <- iter) {
+                val att = e.attachment
+                if (att != null &&
+                    att.isInstanceOf[Actor]) {
+                    att.asInstanceOf[Actor] ! msg
+debugln("recv set, to pool actor, invoked")
                     return true
                 }
-                return false // No actor creator was registered or failed.
-              } else {
-                val iter = this.get(List(el.key))
-                for (e <- iter) {
-                  val att = e.attachment
-                  if (att != null &&
-                      att.isInstanceOf[Actor]) {
-                      att.asInstanceOf[Actor] ! msg
-                      return true
-                  }
-                }
-                return false
               }
+debugln("recv set, to pool actor, not found")
             }
+            return false
           }
 
           // Otherwise, just be a normal memcached "set" command.
@@ -359,12 +435,13 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
       // Using var instead of val idiom to prevent scalac circular definition complaint.
       //
       pool = new ActorPool() { 
-        def offer(card: Card, actor: Actor): Unit = {
+        def offer(card: Card, actor: Actor, async: Boolean): Boolean = {
           val el = MEntry(SNode.cardToEntryKey(card), 0, 0, zero, 0)
           if (el != null) {
               el.attachment_!(actor)
-              server.addRep(el, true, true)
-          }
+              server.addRep(el, true, async)
+          } else
+              false
         }
       }
 
