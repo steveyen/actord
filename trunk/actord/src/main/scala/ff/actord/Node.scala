@@ -157,23 +157,13 @@ case class Node(host: String, port: Int)
 trait NodeManager {
   protected val workers = new mutable.HashMap[Node, NodeWorker]
 
-  def workerFor(n: Node): NodeWorker = 
-      workerFor(n, 1)
-
-  def workerFor(n: Node, retries: Int): NodeWorker = synchronized { 
+  def workerFor(n: Node): NodeWorker = synchronized { 
     if (n != null) {
-      val w = workers.getOrElse(n, {
+      workers.getOrElse(n, {
         val w = createNodeWorker(n)
         workers += (n -> w)
         w
       })
-      if (w.alive == false &&
-          retries >= 1) {
-        workerDone(w)
-        w.pend(NOOP)
-        return workerFor(n, retries - 1)
-      }
-      w
     } else
       null
   }
@@ -192,7 +182,7 @@ trait NodeManager {
 
   def serializer: Serializer
 
-  val NOOP = new PendingRequest(null, null, null, null) // Sent to help workers wakeup.
+  val NOOP = new PendingRequest(Nil, null, null, null, 0L) // Sent to help workers wakeup.
 }
 
 abstract class NodeWorker(val manager: NodeManager, val node: Node) {
