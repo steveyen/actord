@@ -80,42 +80,18 @@ case class ChatRoomView(viewer: Card)
 // -----------------------------------------------
 
 // Send a chat client message...
-//   scala -cp target/classes ff.actord.ChatRoomClient [serverList] [roomKey] [userId] [some-single-word-msg]
+//   scala -cp target/classes ff.actord.ChatRoomClient [serverList] [roomKey] [userId] [msg]
 //
-// The [serverList] argment is a comman-separated list of server host:port info,
+// The [serverList] argment is a comma-separated list of server host:port info,
 // such as "127.0.0.1:11511,127.0.0.1:11611"
 //
 object ChatClient {
   def main(args: Array[String]) {
-    if (args.length != 4) {
-      println("usage: scala ff.actord.ChatRoomClient serverList roomKey userId msg")
-      return
-    }
+    val (roomKey, roomBase, roomCard, userId, msg) = 
+      init(args, 11422,
+           "usage: scala ff.actord.ChatRoomClient serverList roomKey userId msg")
 
-    val nodes: Array[Node] = args(0).split(',').map(hostPort => {
-      val parts = hostPort.split(':')
-      Node(parts(0), Integer.parseInt(parts(1)))
-    })
-    if (nodes.length < 1) {
-      println("need at least 1 host:port in the serverList")
-      return
-    }
-
-    // Starts the local process listening on port 11422...
-    //
-    Agency.initDefault(new ActorDAgency("127.0.0.1", 11422) {
-      override def nodeForIndirect(c: Card): Node = 
-        // Simple hashing in this example.
-        // Normally, we'd instead do some consistent-hashing or CRUSH here.
-        //
-        nodes(c.base.hashCode % nodes.length)
-    })
-
-    val roomKey  = args(1)
-    val roomBase = "chatRoom/" + roomKey
-    var roomCard = Card(roomBase, "")
-    val userId   = args(2)
-    val msg      = args(3)
+    var currRoomCard: Card = roomCard
 
     // Here we have a stateless programming style, where the 
     // react case statements are all flat or at the same level.
@@ -131,16 +107,16 @@ object ChatClient {
             createActorCard(roomBase) ~> AddChatRoom("room " + roomKey + " is fun!", myCard)
 
           case Reply(_, AddChatRoom(_, _), newRoomCard: Card) => 
-            roomCard = newRoomCard
+            currRoomCard = newRoomCard
             self ! msg
 
           case text: String =>
             println("sending... text: " + text)
-            roomCard ~> ChatRoomMessage(userId, System.currentTimeMillis, text)
-            roomCard ~> ChatRoomView(myCard)
+            currRoomCard ~> ChatRoomMessage(userId, System.currentTimeMillis, text)
+            currRoomCard ~> ChatRoomView(myCard)
             println("sending... done")
 
-          case Reply(roomCard, ChatRoomView(_), msgs) => 
+          case Reply(currRoomCard, ChatRoomView(_), msgs) => 
             println("msgs: " + msgs)
             System.exit(0)
         }
@@ -150,6 +126,40 @@ object ChatClient {
     u ! ChatClientGo
 
     println("running...")
+  }
+
+  def init(args: Array[String], myPort: Int, usage: String) = {
+    if (args.length != 4) {
+      println(usage)
+      System.exit(0)
+    }
+
+    val nodes: Array[Node] = args(0).split(',').map(hostPort => {
+      val parts = hostPort.split(':')
+      Node(parts(0), Integer.parseInt(parts(1)))
+    })
+    if (nodes.length < 1) {
+      println("need at least 1 host:port in the serverList")
+      System.exit(0)
+    }
+
+    // Starts the local process listening on port [myPort]...
+    //
+    Agency.initDefault(new ActorDAgency("127.0.0.1", myPort) {
+      override def nodeForIndirect(c: Card): Node = 
+        // Simple hashing in this example.
+        // Normally, we'd instead do some consistent-hashing or CRUSH here.
+        //
+        nodes(c.base.hashCode % nodes.length)
+    })
+
+    val roomKey  = args(1)
+    val roomBase = "chatRoom/" + roomKey
+    val roomCard = Card(roomBase, "")
+    val userId   = args(2)
+    val msg      = args(3)
+
+    (roomKey, roomBase, roomCard, userId, msg)
   }
 }
 
