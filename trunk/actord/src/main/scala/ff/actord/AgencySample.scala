@@ -120,7 +120,7 @@ object ChatClient {
     // Here we have a stateless programming style, where the 
     // react case statements are all flat or at the same level.
     // So, more info needs to be passed around in request and 
-    // reply messages.
+    // reply messages, similar to classic event-driven programming.
     //
     val u = actor {
       loop {
