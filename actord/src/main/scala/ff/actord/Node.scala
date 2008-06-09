@@ -163,7 +163,7 @@ trait NodeManager {
       if (w.isDefined)
           w.get
       else {
-        // TODO: Althought we're creating the node worker outside synchronized, 
+        // TODO: Although we're creating the node worker outside synchronized, 
         // we might have a stampede of wasted new workers or connections 
         // to a node, because only one will win.
         //
