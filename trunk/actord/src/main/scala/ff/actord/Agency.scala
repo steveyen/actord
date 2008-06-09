@@ -19,7 +19,12 @@ import scala.actors._
 import scala.collection._
 
 case class Card(base: String, more: String) {
-  def ~> (msg: AnyRef): Unit = Agency.default.pend(Actor.self, this, msg)
+  def ~> (msg: AnyRef): Unit = 
+    Agency.default.pend(Actor.self, this, msg)
+
+  def ~> (msg: AnyRef, continuation: PartialFunction[AnyRef, Unit]): Unit = {
+    // TODO
+  }
 }
 
 object Agency {

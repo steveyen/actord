@@ -95,8 +95,14 @@ object ChatClient {
 
     // Here we have a stateless programming style, where the 
     // react case statements are all flat or at the same level.
+    //
     // So, more info needs to be passed around in request and 
-    // reply messages, similar to classic event-driven programming.
+    // reply messages, with the benefits and problems similar 
+    // to classic message-event-driven programming.
+    //
+    // While messages are in-flight and being processed on a 
+    // remote server, the stateless programming style 
+    // allows the client to keep minimal state.
     //
     val u = actor {
       loop {
@@ -110,14 +116,26 @@ object ChatClient {
             currRoomCard = newRoomCard
             self ! msg
 
+          case Failure(_, AddChatRoom(_, _), failReason) =>
+            println("failure: could not add chat room: " + failReason)
+            System.exit(0)
+
           case text: String =>
             println("sending... text: " + text)
             currRoomCard ~> ChatRoomMessage(userId, System.currentTimeMillis, text)
             currRoomCard ~> ChatRoomView(myCard)
             println("sending... done")
 
-          case Reply(currRoomCard, ChatRoomView(_), msgs) => 
+          case Reply(fromRoomCard, ChatRoomView(_), msgs) => 
             println("msgs: " + msgs)
+            System.exit(0)
+
+          case Failure(fromRoomCard, ChatRoomView(_), failReason) => 
+            println("failure: could not view chat room: " + fromRoomCard + " reason: " + failReason)
+            System.exit(0)
+
+          case Failure(fromRoomCard, ChatRoomMessage(_, _, _), failReason) => 
+            println("failure: could post to chat room: " + fromRoomCard + " reason: " + failReason)
             System.exit(0)
         }
       }
@@ -165,3 +183,70 @@ object ChatClient {
 
 case class ChatClientGo
 
+// -----------------------------------------------
+
+object ChatClientV2 {
+  def main(args: Array[String]) {
+    val (roomKey, roomBase, roomCard, userId, msg) = 
+      ChatClient.init(args, 11422,
+                      "usage: scala ff.actord.ChatRoomClientV2 serverList roomKey userId msg")
+
+    var currRoomCard: Card = roomCard
+
+    // Here we have a statefull programming style, where
+    // we have nested case statements (partial functions).
+    // 
+    // This allows for increased readability and apparent linearity of the code,
+    // at the cost of more state tracking in the client (in the platform code).
+    //
+    // Underneath the hood, all the below case clause closures are hoisted
+    // into the enclosing, top-most react loop, even though they look like
+    // they're nested with apparent linearity.
+    //
+    val u = actor {
+      loop {
+        react {
+          case ChatClientGo =>
+            // Create chat room, if not already...
+            //
+            createActorCard(roomBase) ~> (
+              AddChatRoom("room " + roomKey + " is fun!", myCard), {
+                case OnFailure(_, AddChatRoom(_, _), failReason) =>
+                  println("failure: could not add chat room: " + failReason)
+                  System.exit(0)
+
+                case OnReply(_, AddChatRoom(_, _), newRoomCard: Card) => 
+                  currRoomCard = newRoomCard
+                  self ! msg
+              })
+
+          case text: String =>
+            currRoomCard ~> (
+              ChatRoomMessage(userId, System.currentTimeMillis, text), {
+                case OnFailure(fromRoomCard, ChatRoomMessage(_, _, _), failReason) => 
+                  println("failure: could post to chat room: " + fromRoomCard + " reason: " + failReason)
+                  System.exit(0)
+              })
+
+            currRoomCard ~> (
+              ChatRoomView(myCard), {
+                case OnFailure(fromRoomCard, ChatRoomView(_), failReason) => 
+                  println("failure: could not view chat room: " + fromRoomCard + " reason: " + failReason)
+                  System.exit(0)
+
+                case OnReply(fromRoomCard, ChatRoomView(_), msgs) => 
+                  println("msgs: " + msgs)
+                  System.exit(0)
+              })
+        }
+      }
+    }
+
+    u ! ChatClientGo
+
+    println("running...")
+  }
+}
+
+case class OnReply   (callee: Card, originalMsg: AnyRef, reply: AnyRef)
+case class OnFailure (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
