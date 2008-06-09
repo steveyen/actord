@@ -117,6 +117,11 @@ object ChatClient {
     val userId   = args(2)
     val msg      = args(3)
 
+    // Here we have a stateless programming style, where the 
+    // react case statements are all flat or at the same level.
+    // So, more info needs to be passed around in request and 
+    // reply messages.
+    //
     val u = actor {
       loop {
         react {
