@@ -213,11 +213,11 @@ object ChatClientV2 {
             //
             createActorCard(roomBase) ~> (
               AddChatRoom("room " + roomKey + " is fun!", myCard), {
-                case OnFailure(_, AddChatRoom(_, _), failReason) =>
+                case OnFailure(failReason) =>
                   println("failure: could not add chat room: " + failReason)
                   System.exit(0)
 
-                case OnReply(_, AddChatRoom(_, _), newRoomCard: Card) => 
+                case OnReply(newRoomCard: Card) => 
                   currRoomCard = newRoomCard
                   self ! msg
               })
@@ -225,18 +225,18 @@ object ChatClientV2 {
           case text: String =>
             currRoomCard ~> (
               ChatRoomMessage(userId, System.currentTimeMillis, text), {
-                case OnFailure(fromRoomCard, ChatRoomMessage(_, _, _), failReason) => 
-                  println("failure: could post to chat room: " + fromRoomCard + " reason: " + failReason)
+                case OnFailure(failReason) => 
+                  println("failure: could post to chat room: " + currRoomCard + " reason: " + failReason)
                   System.exit(0)
               })
 
             currRoomCard ~> (
               ChatRoomView(myCard), {
-                case OnFailure(fromRoomCard, ChatRoomView(_), failReason) => 
-                  println("failure: could not view chat room: " + fromRoomCard + " reason: " + failReason)
+                case OnFailure(failReason) => 
+                  println("failure: could not view chat room: " + currRoomCard + " reason: " + failReason)
                   System.exit(0)
 
-                case OnReply(fromRoomCard, ChatRoomView(_), msgs) => 
+                case OnReply(msgs) => 
                   println("msgs: " + msgs)
                   System.exit(0)
               })
@@ -250,5 +250,5 @@ object ChatClientV2 {
   }
 }
 
-case class OnReply   (callee: Card, originalMsg: AnyRef, reply: AnyRef)
-case class OnFailure (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
+case class OnReply   (reply: AnyRef)
+case class OnFailure (failReason: AnyRef)
