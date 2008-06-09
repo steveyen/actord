@@ -203,6 +203,8 @@ object ChatClientV2 {
     // into the enclosing, top-most react loop, even though they look like
     // they're nested with apparent linearity.
     //
+    // Note that the ~> invocations remain completely asynchronous.
+    //
     val u = actor {
       loop {
         react {
