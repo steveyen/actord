@@ -207,12 +207,12 @@ object ChatClientV2 {
     //
     val u = actor {
       loop {
-        react {
+        reactToAgency {
           case ChatClientGo =>
             // Create chat room, if not already...
             //
             createActorCard(roomBase) ~> (
-              AddChatRoom("room " + roomKey + " is fun!", myCard), {
+              AddChatRoom("room " + roomKey + " is fun!", myCard), 2000, {
                 case OnFailure(failReason) =>
                   println("failure: could not add chat room: " + failReason)
                   System.exit(0)
@@ -224,14 +224,14 @@ object ChatClientV2 {
 
           case text: String =>
             currRoomCard ~> (
-              ChatRoomMessage(userId, System.currentTimeMillis, text), {
+              ChatRoomMessage(userId, System.currentTimeMillis, text), 2000, {
                 case OnFailure(failReason) => 
                   println("failure: could post to chat room: " + currRoomCard + " reason: " + failReason)
                   System.exit(0)
               })
 
             currRoomCard ~> (
-              ChatRoomView(myCard), {
+              ChatRoomView(myCard), 2000, {
                 case OnFailure(failReason) => 
                   println("failure: could not view chat room: " + currRoomCard + " reason: " + failReason)
                   System.exit(0)
@@ -247,6 +247,16 @@ object ChatClientV2 {
     u ! ChatClientGo
 
     println("running...")
+  }
+
+  // ---------------------------------
+
+  def reactToAgency(body: PartialFunction[Any, Unit]): Unit = {
+    val a = Actor.self
+    a.react(body)
+  }
+
+  def pend(caller: Actor, callee: Card, msg: AnyRef, timeout: Long, continuation: PartialFunction[Any, Unit]): Unit = {
   }
 }
 
