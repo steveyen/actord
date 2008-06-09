@@ -22,9 +22,10 @@ case class Card(base: String, more: String) {
   def ~> (msg: AnyRef): Unit = 
     Agency.default.pend(Actor.self, this, msg)
 
-  def ~> (msg: AnyRef, timeout: Long, continuation: PartialFunction[AnyRef, Unit]): Unit = {
-    // TODO
-  }
+  def ~> (msg: AnyRef, timeout: Long, cont: PartialFunction[Any, Unit]): Unit = 
+{ /*
+    Agency.default.pend(Actor.self, this, msg, timeout, cont)
+*/ }
 }
 
 object Agency {
@@ -41,20 +42,84 @@ object Agency {
   //
   val createActorCard                     = Card("", "_createActor")
   def createActorCard(base: String): Card = Card(base, createActorCard.more)
+
+  /**
+   * Instead of using react(), an actor can use the reactToAgency() alternative 
+   * which allows a more natural, apparently linear style of programming with 
+   * nested case statements.
+   */
+  def reactToAgency(body: PartialFunction[Any, Unit]): Unit = 
+{ /*
+    Actor.self.react(default.reactToAgencyPF orElse body)
+*/ }
 }
 
 trait Agency {
+  def localActorFor(c: Card): Option[Actor]
+  def localCardFor(someLocalActor: Actor): Card
+
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit
   def pend(caller: Card, callee: Card, msg: AnyRef): Unit
 
-  def localActorFor(c: Card): Option[Actor]
-  def localCardFor(someLocalActor: Actor): Card
+/*
+  def pend(callerActor: Actor, callee: Card, msg: AnyRef, timeout: Long, 
+           cont: PartialFunction[Any, Unit]): Unit = {
+    val caller = localCardFor(callerActor)
+    val frame  = Frame(caller, callee, msg)
+
+    reactToAgencyContinuations += (frame -> cont)
+
+    pend(callerActor, callee, msg)
+  }
+
+  protected val reactToAgencyContinuations = 
+    new mutable.HashMap[Frame, PartialFunction[Any, Unit]] with
+        mutable.SynchronizedMap[Frame, PartialFunction[Any, Unit]]
+
+  val reactToAgencyPF = new PartialFunction[Any, Unit] {
+    def isDefinedAt(x: Any): Boolean = 
+      x match {
+        case Reply(callee: Card, originalMsg: AnyRef, reply: AnyRef) =>
+          reactToAgencyContinuations.contains(Frame(localCardFor(Actor.self), callee, originalMsg))
+
+        case Failure(callee: Card, originalMsg: AnyRef, failReason: AnyRef) =>
+          reactToAgencyContinuations.contains(Frame(localCardFor(Actor.self), callee, failReason))
+
+        case _ =>
+          false
+      }
+
+    def apply(x: Any): Unit = 
+      x match {
+        case Reply(callee: Card, originalMsg: AnyRef, reply: AnyRef) =>
+          val f = Frame(localCardFor(Actor.self), callee, originalMsg)
+          val c = reactToAgencyContinuations.get(f)
+          if (c.isDefined) {
+            reactToAgencyContinuations -= f
+            c.get.apply(OnReply(reply))
+          }
+
+        case Failure(callee: Card, originalMsg: AnyRef, failReason: AnyRef) =>
+          val f = Frame(localCardFor(Actor.self), callee, originalMsg)
+          val c = reactToAgencyContinuations.get(f)
+          if (c.isDefined) {
+            reactToAgencyContinuations -= f
+            c.get.apply(OnFailure(failReason))
+          }
+
+        case _ =>
+      }
+  }
+*/
 }
 
 case class Frame       (caller: Card, callee: Card, msg: AnyRef)
 case class Reply       (callee: Card, originalMsg: AnyRef, reply: AnyRef)
 case class Failure     (callee: Card, originalMsg: AnyRef, failReason: AnyRef)
 case class CreateActor (cardBase: String, msg: AnyRef, pool: ActorPool)
+
+case class OnReply   (reply: AnyRef)
+case class OnFailure (failReason: AnyRef)
 
 // ----------------------------------------------
 

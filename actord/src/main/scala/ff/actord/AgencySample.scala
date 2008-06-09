@@ -211,8 +211,8 @@ object ChatClientV2 {
           case ChatClientGo =>
             // Create chat room, if not already...
             //
-            createActorCard(roomBase) ~> (
-              AddChatRoom("room " + roomKey + " is fun!", myCard), 2000, {
+            createActorCard(roomBase) ~> 
+              (AddChatRoom("room " + roomKey + " is fun!", myCard), 2000, {
                 case OnFailure(failReason) =>
                   println("failure: could not add chat room: " + failReason)
                   System.exit(0)
@@ -223,15 +223,15 @@ object ChatClientV2 {
               })
 
           case text: String =>
-            currRoomCard ~> (
-              ChatRoomMessage(userId, System.currentTimeMillis, text), 2000, {
+            currRoomCard ~> 
+              (ChatRoomMessage(userId, System.currentTimeMillis, text), 2000, {
                 case OnFailure(failReason) => 
                   println("failure: could post to chat room: " + currRoomCard + " reason: " + failReason)
                   System.exit(0)
               })
 
-            currRoomCard ~> (
-              ChatRoomView(myCard), 2000, {
+            currRoomCard ~> 
+              (ChatRoomView(myCard), 2000, {
                 case OnFailure(failReason) => 
                   println("failure: could not view chat room: " + currRoomCard + " reason: " + failReason)
                   System.exit(0)
@@ -248,43 +248,5 @@ object ChatClientV2 {
 
     println("running...")
   }
-
-  // ---------------------------------
-
-  import scala.collection._
-
-  def reactToAgency(body: PartialFunction[Any, Unit]): Unit = {
-    reactToAgencyBody = body
-
-    Actor.self.react(reactToAgencyMain)
-  }
-
-  var reactToAgencyBody: PartialFunction[Any, Unit] = null
-
-  val reactToAgencyMain: PartialFunction[Any, Unit] = {
-    case RTARequest(f @ RTAFrame(caller, callee, createdAt, expiresAt, rid), requestMsg) =>
-    case RTAReply(f @ RTAFrame(caller, callee, createdAt, expiresAt, rid), replyMsg) =>
-  }
-
-  def pend(callerActor: Actor, callee: Card, msg: AnyRef, timeout: Long, 
-           continuation: PartialFunction[Any, Unit]): Unit = {
-    val agency = Agency.default
-    val nowRid = synchronized { rid += 1; rid }
-    val now    = System.currentTimeMillis
-
-    val caller = agency.localCardFor(callerActor)
-
-    agency.pend(callerActor, callee, RTARequest(RTAFrame(caller, callee, now, now + timeout, nowRid), msg))
-  }
-
-  val inflight = new mutable.HashMap[RTAFrame, PartialFunction[Any, Unit]]
-
-  var rid = 0L
 }
 
-case class RTAFrame   (caller: Card, callee: Card, createdAt: Long, expiresAt: Long, rid: Long)
-case class RTARequest (frame: RTAFrame, requestMsg: AnyRef)
-case class RTAReply   (frame: RTAFrame, replyMsg: AnyRef)
-
-case class OnReply   (reply: AnyRef)
-case class OnFailure (failReason: AnyRef)
