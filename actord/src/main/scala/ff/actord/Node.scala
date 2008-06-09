@@ -160,7 +160,7 @@ trait NodeManager {
   def workerFor(n: Node): NodeWorker = synchronized { 
     if (n != null) {
       workers.getOrElse(n, {
-        val w = createNodeWorker(n)
+        val w = createNodeWorker(n) // TODO: Do worker creation outside synchronized.
         workers += (n -> w)
         w
       })
