@@ -157,16 +157,34 @@ case class Node(host: String, port: Int)
 trait NodeManager {
   protected val workers = new mutable.HashMap[Node, NodeWorker]
 
-  def workerFor(n: Node): NodeWorker = synchronized { 
+  def workerFor(n: Node): NodeWorker = 
     if (n != null) {
-      workers.getOrElse(n, {
-        val w = createNodeWorker(n) // TODO: Do worker creation outside synchronized.
-        workers += (n -> w)
-        w
-      })
+      val w = synchronized { workers.get(n) }
+      if (w.isDefined)
+          w.get
+      else {
+        // TODO: Althought we're creating the node worker outside synchronized, 
+        // we might have a stampede of wasted new workers or connections 
+        // to a node, because only one will win.
+        //
+        // TODO: Allow for multiple workers per node.
+        //
+        val workerNew = createNodeWorker(n)
+
+        synchronized {
+          val w = workers.get(n)
+          if (w.isEmpty) {
+            workers += (n -> workerNew)
+            workerNew
+          } else {
+            workerNew.close
+            workerNew.pend(NOOP)
+            w.get
+          }
+        }
+      }
     } else
       null
-  }
 
   def workerDone(w: NodeWorker): Unit = synchronized { 
     if (w != null &&
