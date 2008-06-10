@@ -207,14 +207,13 @@ object ChatClientV2 {
     // Note that the ~> invocations remain completely asynchronous.
     //
     val u = new Actor with AgencyActor {
+     start
      def act {
       println("V2 client act...")
 
       loop {
         reactToAgency {
           case ChatClientGo =>
-            println("ChatClientGo...")
-
             // Create chat room, if not already...
             //
             createActorCard(roomBase) ~> 
@@ -227,8 +226,6 @@ object ChatClientV2 {
                   currRoomCard = newRoomCard
                   self ! msg
               })
-
-            println("ChatClientGo... done")
 
           case text: String =>
             currRoomCard ~> 
@@ -251,8 +248,6 @@ object ChatClientV2 {
         }
       }
      }
-
-     start
     }
 
     u ! ChatClientGo

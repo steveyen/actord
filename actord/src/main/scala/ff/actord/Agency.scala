@@ -64,16 +64,6 @@ trait AgencyActor { self: Actor =>
                            cont: PartialFunction[Any, Unit]): Unit = {
     val frame = Frame(caller, callee, msg)
 
-lastFrame = frame
-
-println("pend 1: " + reactToAgencyContinuations.contains(frame))
-println("pend 2: " + reactToAgencyContinuations.contains(Frame(caller, callee, msg)))
-val s = Agency.default.asInstanceOf[ActorDAgency].nodeManager.serializer
-val f2a = s.serialize(frame)
-val f2  = s.deserialize(f2a, 0, f2a.length)
-println("f2: " + f2 + " " + f2.isInstanceOf[Frame])
-println("pend 3: " + reactToAgencyContinuations.contains(f2.asInstanceOf[Frame]))
-
     reactToAgencyContinuations += (frame -> cont)
   }
 
@@ -93,47 +83,18 @@ var lastFrame: Frame = null
 
   val reactToAgencyPF = new PartialFunction[Any, Unit] {
     def isDefinedAt(x: Any): Boolean = 
-{
-println("rtaPF ca: " + this + " " + Agency.default.localCardFor(AgencyActor.this))
-println("rtaPF.isDefinedAt: " + x)
-println("rtaConts: " + reactToAgencyContinuations.keys.toList)
       x match {
         case Reply(callee: Card, originalMsg: AnyRef, reply: AnyRef) =>
-{
-val x =
           reactToAgencyContinuations.contains(Frame(Agency.default.localCardFor(AgencyActor.this), callee, originalMsg))
-println("rtaPF.ida Reply: " + x)
-println(reactToAgencyContinuations.get(Frame(Agency.default.localCardFor(AgencyActor.this), callee, originalMsg)))
-println("lastFrame: " + lastFrame)
-val f = Frame(Agency.default.localCardFor(AgencyActor.this), callee, originalMsg)
-println("f: " + f)
-println("qqq: " + (lastFrame == Frame(Agency.default.localCardFor(AgencyActor.this), callee, originalMsg)))
-println("qq2: " + lastFrame.hashCode + " " + Frame(Agency.default.localCardFor(AgencyActor.this), callee, originalMsg).hashCode)
-println("qq3: " + (lastFrame.caller == f.caller))
-println("qq4: " + (lastFrame.callee == f.callee))
-println("qq5: " + (lastFrame.msg == f.msg))
-x
-}
 
         case Failure(callee: Card, originalMsg: AnyRef, failReason: AnyRef) =>
-{
-val x =
           reactToAgencyContinuations.contains(Frame(Agency.default.localCardFor(AgencyActor.this), callee, originalMsg))
-println("rtaPF.ida Failure: " + x)
-x
-}
 
         case _ =>
-{
-println("no match")
           false
-}
       }
-}
 
     def apply(x: Any): Unit = 
-{
-println("rtaPF.apply: " + x)
       x match {
         case Reply(callee: Card, originalMsg: AnyRef, reply: AnyRef) =>
           val f = Frame(Agency.default.localCardFor(AgencyActor.this), callee, originalMsg)
@@ -153,7 +114,6 @@ println("rtaPF.apply: " + x)
 
         case _ =>
       }
-}
   }
 }
 
