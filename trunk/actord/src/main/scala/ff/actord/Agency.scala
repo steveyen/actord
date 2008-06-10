@@ -23,9 +23,7 @@ case class Card(base: String, more: String) {
     Agency.default.pend(Actor.self, this, msg)
 
   def ~> (msg: AnyRef, timeout: Long, cont: PartialFunction[Any, Unit]): Unit = 
-{ /*
     Agency.default.pend(Actor.self, this, msg, timeout, cont)
-*/ }
 }
 
 object Agency {
@@ -49,9 +47,7 @@ object Agency {
    * nested case statements.
    */
   def reactToAgency(body: PartialFunction[Any, Unit]): Unit = 
-{ /*
     Actor.self.react(default.reactToAgencyPF orElse body)
-*/ }
 }
 
 trait Agency {
@@ -61,7 +57,6 @@ trait Agency {
   def pend(caller: Actor, callee: Card, msg: AnyRef): Unit
   def pend(caller: Card, callee: Card, msg: AnyRef): Unit
 
-/*
   def pend(callerActor: Actor, callee: Card, msg: AnyRef, timeout: Long, 
            cont: PartialFunction[Any, Unit]): Unit = {
     val caller = localCardFor(callerActor)
@@ -110,7 +105,6 @@ trait Agency {
         case _ =>
       }
   }
-*/
 }
 
 case class Frame       (caller: Card, callee: Card, msg: AnyRef)
