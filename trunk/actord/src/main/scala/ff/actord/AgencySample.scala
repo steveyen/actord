@@ -26,21 +26,20 @@ object ChatRoomServer {
       actor { 
         loop { 
           react {
-            case CreateActor(cardBase, args, pool) => 
-              println("CreateActor " + cardBase)
-              val splitArr = cardBase.split("/")
- 
-              splitArr(0) match {
+            case CreateActor(callee, args, pool) => 
+              val base = callee.base
+
+              base.split("/")(0) match {
                 case "chatRoom" =>
                   args match {
                     case AddChatRoom(roomTitle, caller) =>
-                      val r = new ChatRoom(Card(cardBase, ""), roomTitle)
+                      val r = new ChatRoom(Card(base, ""), roomTitle)
                       val o = pool.offer(r.myCard, r, 0, false)
                       if (o == true)
                           r.start
                       if (caller != null)
-                          caller ~> Reply(myCard, args, r.myCard)
-                      println("AddChatRoom: " + cardBase + " for caller: " + caller + " offer: " + o)
+                          caller ~> Reply(callee, args, r.myCard)
+                      println("AddChatRoom: " + base + " for caller: " + caller + " offer: " + o)
                     case _ =>
                   }
                 case _ =>
@@ -187,6 +186,8 @@ case class ChatClientGo
 
 object ChatClientV2 {
   def main(args: Array[String]) {
+    println("ChatClientV2...")
+
     val (roomKey, roomBase, roomCard, userId, msg) = 
       ChatClient.init(args, 11422,
                       "usage: scala ff.actord.ChatRoomClientV2 serverList roomKey userId msg")
@@ -205,10 +206,15 @@ object ChatClientV2 {
     //
     // Note that the ~> invocations remain completely asynchronous.
     //
-    val u = actor {
+    val u = new Actor with AgencyActor {
+     def act {
+      println("V2 client act...")
+
       loop {
         reactToAgency {
           case ChatClientGo =>
+            println("ChatClientGo...")
+
             // Create chat room, if not already...
             //
             createActorCard(roomBase) ~> 
@@ -221,6 +227,8 @@ object ChatClientV2 {
                   currRoomCard = newRoomCard
                   self ! msg
               })
+
+            println("ChatClientGo... done")
 
           case text: String =>
             currRoomCard ~> 
@@ -242,6 +250,9 @@ object ChatClientV2 {
               })
         }
       }
+     }
+
+     start
     }
 
     u ! ChatClientGo

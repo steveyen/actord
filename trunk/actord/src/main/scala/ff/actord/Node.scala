@@ -404,7 +404,7 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
               //
               val latccmla = agency.localActorFor(Agency.createActorCard)
               if (latccmla.isDefined) {
-                  latccmla.get ! CreateActor(callee.base, msg, pool)
+                  latccmla.get ! CreateActor(callee, msg, pool)
                   return true
               }
             } else {
