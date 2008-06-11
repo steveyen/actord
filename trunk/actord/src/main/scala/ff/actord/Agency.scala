@@ -36,10 +36,10 @@ object Agency {
 
   def myCard = Agency.default.localCardFor(Actor.self)
 
-  // Some special cards used to reference the actor that creates more actors.
+  // Special card used to reference the actor that creates more actors.
   //
-  val createActorCard                     = Card("", "_createActor")
-  def createActorCard(base: String): Card = Card(base, createActorCard.more)
+  val factoryCard                     = Card("", "_factoryActor")
+  def factoryCard(base: String): Card = Card(base, factoryCard.more)
 }
 
 trait Agency {
@@ -74,7 +74,7 @@ var lastFrame: Frame = null
    * which allows a more natural, apparently linear style of programming with 
    * nested case statements.
    */
-  def reactToAgency(body: PartialFunction[Any, Unit]): Unit = 
+  def reactToAgency(body: PartialFunction[Any, Unit]): Nothing = 
       react(reactToAgencyPF orElse body)
 
   protected val reactToAgencyContinuations = 

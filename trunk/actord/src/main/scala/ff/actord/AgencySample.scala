@@ -22,7 +22,7 @@ object ChatRoomServer {
     // Register a factory actor that can create other actors, due
     // to special, parameterized requests coming from remote clients.
     //
-    agency.localRegister(createActorCard, 
+    agency.localRegister(factoryCard, 
       actor { 
         loop { 
           react {
@@ -109,7 +109,7 @@ object ChatClient {
           case ChatClientGo =>
             // Create chat room, if not already...
             //
-            createActorCard(roomBase) ~> AddChatRoom("room " + roomKey + " is fun!", myCard)
+            factoryCard(roomBase) ~> AddChatRoom("room " + roomKey + " is fun!", myCard)
 
           case Reply(_, AddChatRoom(_, _), newRoomCard: Card) => 
             currRoomCard = newRoomCard
@@ -204,7 +204,10 @@ object ChatClientV2 {
     // into the enclosing, top-most react loop, even though they look like
     // they're nested with apparent linearity.
     //
-    // Note that the ~> invocations remain completely asynchronous.
+    // Note that the ~> invocations remain asynchronous.
+    //
+    // Note that we're mixing in the AgencyActor trait, and that
+    // we're using reactToAgency instead of react.
     //
     val u = new Actor with AgencyActor {
      start
@@ -216,7 +219,7 @@ object ChatClientV2 {
           case ChatClientGo =>
             // Create chat room, if not already...
             //
-            createActorCard(roomBase) ~> 
+            factoryCard(roomBase) ~> 
               (AddChatRoom("room " + roomKey + " is fun!", myCard), 2000, {
                 case OnFailure(failReason) =>
                   println("failure: could not add chat room: " + failReason)
