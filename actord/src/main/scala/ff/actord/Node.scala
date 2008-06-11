@@ -398,13 +398,14 @@ class SReceptionist(host: String, port: Int, agency: Agency, serializer: Seriali
             if (localA.isDefined) { // One reason why we get here is handling a Reply.
                 localA.get ! msg
                 return true
-            } else if (callee.more == Agency.createActorCard.more) {
-              // Invoke our local actor that can create more local actors (LATCCMLA), if any.
-              // The LATCCMLA might add any new actors into the fluid actor pool.
+            } else if (callee.more == Agency.factoryCard.more) {
+              // Invoke our local actor that can create more local actors, aka the 
+              // factory actor), if any.  The factory actor might add any new 
+              // actors into the fluid actor pool.
               //
-              val latccmla = agency.localActorFor(Agency.createActorCard)
-              if (latccmla.isDefined) {
-                  latccmla.get ! CreateActor(callee, msg, pool)
+              val factory = agency.localActorFor(Agency.factoryCard)
+              if (factory.isDefined) {
+                  factory.get ! CreateActor(callee, msg, pool)
                   return true
               }
             } else {
