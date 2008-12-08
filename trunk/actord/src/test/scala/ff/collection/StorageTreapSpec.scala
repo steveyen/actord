@@ -60,7 +60,7 @@ object StorageTreapSpec extends Specification {
   
   def assertHasLoc(n: StorageTreapNode[String, String]) = {
     n.swizzleSelf.loc          must notBe(null)
-    n.swizzleSelf.loc.position must beStrictlyGreaterThan(0L)
+    n.swizzleSelf.loc.position must be_>/* beStrictlyGreaterThan*/(0L)
     n.swizzleSelf.value        must be_==(n)
     n.swizzleValue.loc         must notBe(null)
   }
@@ -92,7 +92,7 @@ object StorageTreapSpec extends Specification {
 
         t.swizzleSaveNode(t.rootStorable.swizzleSelf)
         t.rootStorable.swizzleSelf.loc          must notBe(null)
-        t.rootStorable.swizzleSelf.loc.position must beStrictlyGreaterThan(0L)
+        t.rootStorable.swizzleSelf.loc.position must be_>(0L)
         t.rootStorable must beEqual(t.rootStorable.swizzleSelf.value)
         t.rootStorable.swizzleValue.loc          must notBe(null)
         t.rootStorable.swizzleValue.loc.position mustEqual(0L)
@@ -218,7 +218,7 @@ object StorageTreapSpec extends Specification {
         t.rootStorable.swizzleValue.loc.position mustEqual(0L)
                      
         val fLength = f.length
-        fLength must beStrictlyGreaterThan(0L)
+        fLength must be_>(0L)
 
         val t2 = t.union(t.mkLeaf("3", "345")).
                    asInstanceOf[TS]
@@ -239,8 +239,8 @@ object StorageTreapSpec extends Specification {
         val shortSize = 2
         val longSize = 8
         val locSize = intSize + longSize
-        f2Length must beStrictlyGreaterThan(fLength)
-        f2Length must beStrictlyLessThan(fLength * 2L) // Resaving shouldn't double the size.
+        f2Length must be_>(fLength)
+        f2Length must be_<(fLength * 2L) // Resaving shouldn't double the size.
         f2Length mustEqual(fLength +
                            intSize + "3".length +    // key
                            intSize + "345".length +  // value
