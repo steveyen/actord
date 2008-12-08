@@ -7,11 +7,11 @@
   <groupId>ff.actord</groupId>
   <artifactId>actord</artifactId>
   <name>actord</name>
-  <version>0.1-SNAPSHOT</version>
+  <version>0.2-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <properties>
-    <scala.version>2.7.1</scala.version>
+    <scala.version>2.7.2</scala.version>
   </properties>
 
   <repositories>
@@ -44,7 +44,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>scala</groupId>
+      <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
       <version>${scala.version}</version>
     </dependency>
@@ -76,7 +76,7 @@
     <dependency>
       <groupId>org.specs</groupId>
       <artifactId>specs</artifactId>
-      <version>1.2.5</version>
+      <version>1.4.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>

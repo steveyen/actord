@@ -170,7 +170,7 @@ class LocalAgency extends Actor with Agency {
 
   protected var nextCard: Long = 0L
   protected val localActors = new mutable.HashMap[Card, Actor] 
-  protected val localCards  = new mutable.HashMap[Actor, Card] 
+  protected val localCards  = new mutable.HashMap[AbstractActor, Card] 
 
   def localRegister(c: Card, a: Actor): Unit = synchronized {
     localCards.get(a).foreach(localUnregister _)
